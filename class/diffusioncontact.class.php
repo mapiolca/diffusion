@@ -1094,7 +1094,8 @@ class DiffusionContact extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$url = dol_buildpath('/diffusion/diffusioncontact_card.php', 1).'?id='.$this->id;
+		$canreadobject = (isModEnabled('diffusion') && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
+		$url = $canreadobject ? dol_buildpath('/diffusion/diffusioncontact_card.php', 1).'?id='.$this->id : '';
 
 		if ($option !== 'nolink') {
 			// Add param to save lastsearch_values or not
