@@ -1072,7 +1072,7 @@ class DiffusionContact extends CommonObject
 	 */
 	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0, $morecss = '', $save_lastsearch_value = -1)
 	{
-		global $conf, $langs, $hookmanager;
+		global $conf, $langs, $user, $hookmanager;
 
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
@@ -1094,7 +1094,7 @@ class DiffusionContact extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$canreadobject = (isModEnabled('diffusion') && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
+		$canreadobject = (isModEnabled('diffusion') && is_object($user) && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
 		$url = $canreadobject ? dol_buildpath('/diffusion/diffusioncontact_card.php', 1).'?id='.$this->id : '';
 
 		if ($option !== 'nolink') {
@@ -1192,7 +1192,7 @@ class DiffusionContact extends CommonObject
 	 */
 	public function getKanbanView($option = '', $arraydata = null)
 	{
-		global $conf, $langs;
+		global $conf, $langs, $user;
 
 		$selected = (empty($arraydata['selected']) ? 0 : $arraydata['selected']);
 

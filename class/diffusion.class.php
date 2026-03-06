@@ -714,7 +714,7 @@ class Diffusion extends CommonObject
 	 */
 	public function validate($user, $notrigger = 0)
 	{
-		global $conf, $langs;
+		global $conf, $langs, $user;
 
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
@@ -1019,7 +1019,7 @@ class Diffusion extends CommonObject
 	 */
 	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0, $morecss = '', $save_lastsearch_value = -1)
 	{
-		global $conf, $langs, $hookmanager;
+		global $conf, $langs, $user, $hookmanager;
 
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
@@ -1041,7 +1041,7 @@ class Diffusion extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$canreadobject = (isModEnabled('diffusion') && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read')));
+		$canreadobject = (isModEnabled('diffusion') && is_object($user) && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read')));
 		$url = $canreadobject ? dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id : '';
 
 		if ($option !== 'nolink') {
