@@ -1094,7 +1094,16 @@ class DiffusionContact extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$canreadobject = (!empty($this->id) && isModEnabled('diffusion') && is_object($user) && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
+		$hasvalidid = !empty($this->id);
+		$ismoduleenabled = isModEnabled('diffusion');
+		$hasusercontext = is_object($user);
+		$isadmin = ($hasusercontext ? !empty($user->admin) : false);
+		$hasobjectreadright = ($hasusercontext ? $user->hasRight('diffusion', 'diffusioncontact', 'read') : false);
+		$hasmodulereadright = ($hasusercontext ? $user->hasRight('diffusion', 'read') : false);
+		$canreadobject = ($hasvalidid && $ismoduleenabled && $hasusercontext && ($isadmin || $hasobjectreadright || $hasmodulereadright));
+		if (!$canreadobject) {
+			dol_syslog(__METHOD__." getNomUrl link disabled ref=".$this->ref." id=".$this->id." hasvalidid=".(int) $hasvalidid." moduleenabled=".(int) $ismoduleenabled." hasusercontext=".(int) $hasusercontext." isadmin=".(int) $isadmin." hasobjectreadright=".(int) $hasobjectreadright." hasmodulereadright=".(int) $hasmodulereadright, LOG_DEBUG);
+		}
 		$url = $canreadobject ? dol_buildpath('/diffusion/diffusioncontact_card.php', 1).'?id='.$this->id : '';
 
 		if ($option !== 'nolink') {
