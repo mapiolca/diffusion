@@ -1019,12 +1019,11 @@ class Diffusion extends CommonObject
 	 */
 	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0, $morecss = '', $save_lastsearch_value = -1)
 	{
-		global $conf, $langs, $user, $hookmanager;
+		global $conf, $langs, $hookmanager;
 
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
 		}
-		$notooltip = 1;
 
 		$result = '';
 		$params = [
@@ -1042,17 +1041,7 @@ class Diffusion extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$hasvalidid = !empty($this->id);
-		$ismoduleenabled = isModEnabled('diffusion');
-		$hasusercontext = is_object($user);
-		$isadmin = ($hasusercontext ? !empty($user->admin) : false);
-		$hasobjectreadright = ($hasusercontext ? $user->hasRight('diffusion', 'diffusion', 'read') : false);
-		$hasmodulereadright = ($hasusercontext ? $user->hasRight('diffusion', 'read') : false);
-		$canreadobject = ($hasvalidid && $ismoduleenabled && $hasusercontext && ($isadmin || $hasobjectreadright || $hasmodulereadright));
-		if (!$canreadobject) {
-			dol_syslog(__METHOD__." getNomUrl link disabled ref=".$this->ref." id=".$this->id." hasvalidid=".(int) $hasvalidid." moduleenabled=".(int) $ismoduleenabled." hasusercontext=".(int) $hasusercontext." isadmin=".(int) $isadmin." hasobjectreadright=".(int) $hasobjectreadright." hasmodulereadright=".(int) $hasmodulereadright, LOG_DEBUG);
-		}
-		$url = $canreadobject ? dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id : '';
+		$url = (!empty($this->id) ? dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id : '');
 
 		if ($option !== 'nolink') {
 			// Add param to save lastsearch_values or not
