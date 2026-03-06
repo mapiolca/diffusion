@@ -1024,6 +1024,7 @@ class Diffusion extends CommonObject
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
 		}
+		$notooltip = 1;
 
 		$result = '';
 		$params = [
