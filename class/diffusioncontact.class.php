@@ -1094,7 +1094,7 @@ class DiffusionContact extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$canreadobject = (isModEnabled('diffusion') && is_object($user) && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
+		$canreadobject = (!empty($this->id) && isModEnabled('diffusion') && is_object($user) && (!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'read') || $user->hasRight('diffusion', 'read')));
 		$url = $canreadobject ? dol_buildpath('/diffusion/diffusioncontact_card.php', 1).'?id='.$this->id : '';
 
 		if ($option !== 'nolink') {
