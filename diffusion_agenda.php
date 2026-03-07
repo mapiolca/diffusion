@@ -342,7 +342,7 @@ if ($object->id > 0) {
 			$sql = "SELECT COUNT(a.id) as nb";
 			$sql .= " FROM ".MAIN_DB_PREFIX."actioncomm as a";
 			$sql .= " WHERE a.fk_element = ".((int) $object->id);
-			$sql .= " AND a.elementtype IN ('diffusion', 'diffusion@diffusion', 'diffusion')";
+			$sql .= " AND a.elementtype IN ('diffusion', 'diffusiondoc@diffusion', 'diffusion')";
 			$resql = $db->query($sql);
 			if ($resql) {
 				$objCount = $db->fetch_object($resql);
