@@ -1100,7 +1100,7 @@ class Diffusion extends CommonObject
 		$result = '';
 		$params = [
 			'id' => $this->id,
-			'objecttype' => $this->element.'@diffusion',
+			'objecttype' => 'diffusion@diffusion',
 			'moretitle' => $moretitle,
 			'option' => $option,
 		];
