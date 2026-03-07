@@ -127,7 +127,7 @@ print '<div class="fichecenter"><div class="fichethirdleft">';
 
 /* BEGIN MODULEBUILDER DRAFT MYOBJECT
 // Draft MyObject
-if (isModEnabled('diffusion') && $user->hasRight('diffusion', 'diffusion', 'read')) {
+if (isModEnabled('diffusion') && ($user->hasRight('diffusion', 'diffusiondoc', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read'))) {
 	$langs->load("orders");
 
 	$sql = "SELECT c.rowid, c.ref, c.ref_client, c.total_ht, c.tva as total_tva, c.total_ttc, s.rowid as socid, s.nom as name, s.client, s.canvas";
@@ -202,7 +202,7 @@ print '</div><div class="fichetwothirdright">';
 
 /* BEGIN MODULEBUILDER LASTMODIFIED MYOBJECT
 // Last modified myobject
-if (isModEnabled('diffusion') && $user->hasRight('diffusion', 'diffusion', 'read')) {
+if (isModEnabled('diffusion') && ($user->hasRight('diffusion', 'diffusiondoc', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read'))) {
 	$sql = "SELECT s.rowid, s.ref, s.label, s.date_creation, s.tms";
 	$sql.= " FROM ".MAIN_DB_PREFIX."diffusion_myobject as s";
 	$sql.= " WHERE s.entity IN (".getEntity($myobjectstatic->element).")";

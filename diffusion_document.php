@@ -167,8 +167,8 @@ if ($id > 0 || !empty($ref)) {
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read') || $user->hasRight('diffusion', 'read'));
-	$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write') || $user->hasRight('diffusion', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
+	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read'));
+	$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd  = 1;

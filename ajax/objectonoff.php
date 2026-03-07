@@ -102,7 +102,7 @@ if (!empty($user->socid)) {
 // Check is done on $user->rights->element->create or $user->rights->element->subelement->create (because $action = 'set')
 if (preg_match('/stat[u][st]$/', $field) || ($field == 'evenunsubscribe' && $object->table_element == 'mailing')) {
 	if ($object->element === 'diffusioncontact') {
-		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write') || $user->hasRight('diffusion', 'write'))) {
+		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write'))) {
 			httponly_accessforbidden('Not enough permissions');
 		}
 	} else {

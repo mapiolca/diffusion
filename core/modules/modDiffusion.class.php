@@ -342,17 +342,17 @@ class modDiffusion extends DolibarrModules
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 0 + 1);
 		$this->rights[$r][1] = 'ReadDiffusion';
-		$this->rights[$r][4] = 'diffusion';
+		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'read';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 1 + 1);
 		$this->rights[$r][1] = 'CreateDiffusion';
-		$this->rights[$r][4] = 'diffusion';
+		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'write';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (0 * 10) + 2 + 1);
 		$this->rights[$r][1] = 'DeleteDiffusion';
-		$this->rights[$r][4] = 'diffusion';
+		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'delete';
 		$r++;
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
@@ -395,7 +395,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',
 			'position' => 1001,
 			'enabled' => 'isModEnabled(\'diffusion\')',
-			'perms' => '$user->hasRight(\'diffusion\', \'diffusion\', \'read\')',
+			'perms' => '$user->hasRight(\'diffusion\', \'diffusiondoc\', \'read\') || $user->hasRight(\'diffusion\', \'diffusion\', \'read\') || $user->hasRight(\'diffusion\', \'read\')',
 			'target' => '',
 			'user' => 2,
 			'object' => 'Diffusion',
@@ -412,7 +412,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',
 			'position' => 1003,
 			'enabled' => 'isModEnabled(\'diffusion\')',
-			'perms' => '$user->hasRight(\'diffusion\', \'diffusion\', \'read\')',
+			'perms' => '$user->hasRight(\'diffusion\', \'diffusiondoc\', \'read\') || $user->hasRight(\'diffusion\', \'diffusion\', \'read\') || $user->hasRight(\'diffusion\', \'read\')',
 			'target' => '',
 			'user' => 2,
 			'object' => 'Diffusion',
@@ -429,7 +429,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',
 			'position' => 1002,
 			'enabled' => 'isModEnabled(\'diffusion\')',
-			'perms' => '$user->hasRight(\'diffusion\', \'diffusion\', \'write\')',
+			'perms' => '$user->hasRight(\'diffusion\', \'diffusiondoc\', \'write\') || $user->hasRight(\'diffusion\', \'diffusion\', \'write\') || $user->hasRight(\'diffusion\', \'write\')',
 			'target' => '',
 			'user' => 2,
 			'object' => 'Diffusion',
@@ -449,7 +449,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diffusion")', // Define condition to show or hide menu entry. Use 'isModEnabled("diffusion")' if entry must be visible if module is enabled.
-			'perms' => '$user->hasRight("diffusion", "diffusion", "read")',
+			'perms' => '$user->hasRight("diffusion", "diffusiondoc", "read") || $user->hasRight("diffusion", "diffusion", "read") || $user->hasRight("diffusion", "read")',
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
 			'object' => 'Diffusion'
@@ -464,7 +464,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diffusion")', // Define condition to show or hide menu entry. Use 'isModEnabled("diffusion")' if entry must be visible if module is enabled. Use '$leftmenu==\'system\'' to show if leftmenu system is selected.
-			'perms' => '$user->hasRight("diffusion", "diffusion", "write")'
+			'perms' => '$user->hasRight("diffusion", "diffusiondoc", "write") || $user->hasRight("diffusion", "diffusion", "write") || $user->hasRight("diffusion", "write")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
 			'object' => 'Diffusion'
@@ -479,7 +479,7 @@ class modDiffusion extends DolibarrModules
 			'langs' => 'diffusion@diffusion',	        // Lang file to use (without .lang) by module. File must be in langs/code_CODE/ directory.
 			'position' => 1000 + $r,
 			'enabled' => 'isModEnabled("diffusion")', // Define condition to show or hide menu entry. Use 'isModEnabled("diffusion")' if entry must be visible if module is enabled.
-			'perms' => '$user->hasRight("diffusion", "diffusion", "read")'
+			'perms' => '$user->hasRight("diffusion", "diffusiondoc", "read") || $user->hasRight("diffusion", "diffusion", "read") || $user->hasRight("diffusion", "read")'
 			'target' => '',
 			'user' => 2,				                // 0=Menu for internal users, 1=external users, 2=both
 			'object' => 'Diffusion'

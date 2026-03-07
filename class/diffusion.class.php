@@ -43,7 +43,7 @@ class Diffusion extends CommonObject
 	/**
 	 * @var string 	ID to identify managed object.
 	 */
-	public $element = 'diffusion';
+	public $element = 'diffusiondoc';
 
 	/**
 	 * @var string 	Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -53,7 +53,7 @@ class Diffusion extends CommonObject
 	/**
 	 * @var string 	If permission must be checkec with hasRight('diffusion', 'read') and not hasright('mymodyle', 'diffusion', 'read'), you can uncomment this line
 	 */
-	public $element_for_permission = 'diffusion';
+	public $element_for_permission = 'diffusiondoc';
 
 	/**
 	 * @var string 	String with name of icon for diffusion. Must be a 'fa-xxx' fontawesome code (or 'fa-xxx_fa_color_size') or 'diffusion@diffusion' if picto is file 'img/object_diffusion.png'.
