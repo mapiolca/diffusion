@@ -211,6 +211,20 @@ class Diffusion extends CommonObject
                 global $conf, $langs;
 
                 $this->db = $db;
+
+		// Keep backward compatibility for instances not reinitialized after permission key rename.
+		static $diffusionRightsMigrationDone = false;
+		if (!$diffusionRightsMigrationDone) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."rights_def";
+			$sql .= " SET perms = 'diffusiondoc'";
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND perms = 'diffusion'";
+			$sql .= " AND subperms IN ('read', 'write', 'delete')";
+			$sql .= " AND libelle IN ('ReadDiffusion', 'CreateDiffusion', 'DeleteDiffusion')";
+			$this->db->query($sql);
+			$diffusionRightsMigrationDone = true;
+		}
+
                 $this->ismultientitymanaged = 0;
                 $this->isextrafieldmanaged = 1;
 
