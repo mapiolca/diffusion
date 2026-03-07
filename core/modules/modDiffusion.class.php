@@ -355,6 +355,7 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'delete';
 		$r++;
+		/*
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
 		$this->rights[$r][1] = 'ReadDiffusionContact';
 		$this->rights[$r][4] = 'diffusioncontact';
@@ -370,7 +371,7 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusioncontact';
 		$this->rights[$r][5] = 'delete';
 		$r++;
-
+		*/
 		/* END MODULEBUILDER PERMISSIONS */
 
 
