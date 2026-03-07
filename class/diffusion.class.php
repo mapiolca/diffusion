@@ -977,7 +977,7 @@ class Diffusion extends CommonObject
 	{
 		global $langs;
 
-		$langs->load('diffusion@diffusion');
+		$langs->loadLangs(array('main', 'projects', 'diffusion@diffusion'));
 		$datas = [];
 
 		if (getDolGlobalInt('MAIN_OPTIMIZEFORTEXTBROWSER')) {
@@ -994,6 +994,14 @@ class Diffusion extends CommonObject
 		if (property_exists($this, 'label')) {
 			$datas['label'] = '<br><b>'.$langs->trans('Label').':</b> '.$this->label;
 		}
+		if (!empty($this->fk_project)) {
+			require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+
+			$project = new Project($this->db);
+			if ($project->fetch((int) $this->fk_project) > 0) {
+				$datas['project'] = '<br><b>'.$langs->trans('Project').':</b> '.dol_escape_htmltag($project->ref);
+			}
+		}
 		if (!empty($this->fk_user_exped)) {
 			$userexped = new User($this->db);
 			if ($userexped->fetch($this->fk_user_exped) > 0) {
@@ -1005,6 +1013,19 @@ class Diffusion extends CommonObject
 		}
 
 		return $datas;
+	}
+
+	/**
+	 * getTooltipContent
+	 *
+	 * @param	array<string,string> 	$params 	Params to construct tooltip data
+	 * @return	string
+	 */
+	public function getTooltipContent($params)
+	{
+		$datas = $this->getTooltipContentArray($params);
+
+		return implode('', array_filter($datas));
 	}
 
 	/**
@@ -1060,7 +1081,7 @@ class Diffusion extends CommonObject
 				$label = $langs->trans("ShowDiffusion");
 				$linkclose .= ' alt="'.dolPrintHTMLForAttribute($label).'"';
 			}
-			$linkclose .= ($label ? ' title="'.dolPrintHTMLForAttribute($label).'"' : ' title="tocomplete"');
+			$linkclose .= ($label ? ' title="'.dolPrintHTMLForAttribute($label).'"' : ' title="'.dolPrintHTMLForAttribute($langs->trans("ShowDiffusion")).'"');
 			$linkclose .= $dataparams.' class="'.$classfortooltip.($morecss ? ' '.$morecss : '').'"';
 		} else {
 			$linkclose = ($morecss ? ' class="'.$morecss.'"' : '');
@@ -1205,21 +1226,22 @@ class Diffusion extends CommonObject
 	public function LibStatut($status, $mode = 0)
 	{
 		// phpcs:enable
+		global $langs;
+
 		if (is_null($status)) {
 			return '';
 		}
 
 		if (empty($this->labelStatus) || empty($this->labelStatusShort)) {
-			global $langs;
-			//$langs->load("diffusion@diffusion");
-			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Validated');
-			$this->labelStatus[self::STATUS_SENT] = $langs->transnoentitiesnoconv('Sent');
-			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
-			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Validated');
-			$this->labelStatusShort[self::STATUS_SENT] = $langs->transnoentitiesnoconv('Sent');
-			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
+			$langs->loadLangs(array('main', 'diffusion@diffusion'));
+			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('DiffusionStatusDraft');
+			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('DiffusionStatusValidated');
+			$this->labelStatus[self::STATUS_SENT] = $langs->transnoentitiesnoconv('DiffusionStatusSent');
+			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('DiffusionStatusCanceled');
+			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('DiffusionStatusDraft');
+			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('DiffusionStatusValidated');
+			$this->labelStatusShort[self::STATUS_SENT] = $langs->transnoentitiesnoconv('DiffusionStatusSent');
+			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('DiffusionStatusCanceled');
 		}
 
 		$statusType = 'status'.$status;

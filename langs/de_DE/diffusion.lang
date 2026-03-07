@@ -118,3 +118,8 @@ DIFFUSIONNUMBERINGSharingDescription = Verwendet eine gemeinsame Nummernfolge f�
 DestinatairesEntite = Empfänger der Entität
 DIFFUSION_FULLACCESS_CONTACT = Vollzugriff auf das Kontaktverzeichnis
 DIFFUSION_FULLACCESS_CONTACTHelp = Ermöglicht den Zugriff auf das gesamte Kontaktverzeichnis der Entität, einschließlich über Multicompany freigegebener Kontakte.
+
+DiffusionStatusDraft = Entwurf
+DiffusionStatusValidated = Validiert
+DiffusionStatusSent = Gesendet
+DiffusionStatusCanceled = Storniert

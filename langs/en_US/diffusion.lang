@@ -270,3 +270,8 @@ DIFFUSIONNUMBERINGSharingDescription = Use a common numbering sequence for diffu
 DestinatairesEntite = Entity recipients
 DIFFUSION_FULLACCESS_CONTACT = Full access to contact directory
 DIFFUSION_FULLACCESS_CONTACTHelp = Allows access to the full contact directory of the entity, including contacts shared through multicompany.
+
+DiffusionStatusDraft = Draft
+DiffusionStatusValidated = Validated
+DiffusionStatusSent = Sent
+DiffusionStatusCanceled = Canceled
