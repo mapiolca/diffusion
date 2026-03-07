@@ -74,7 +74,7 @@ $value = GETPOST('value', 'aZ09');
 $object = new Diffusion($db);
 
 // Security check
-if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write'))) {
+if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'))) {
 	accessforbidden();
 }
 
