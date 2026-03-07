@@ -158,8 +158,8 @@ if ($id > 0 || !empty($ref)) {
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read'));
-	$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write'));
+	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read')
+	$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1;
@@ -342,7 +342,7 @@ if ($object->id > 0) {
 			$sql = "SELECT COUNT(a.id) as nb";
 			$sql .= " FROM ".MAIN_DB_PREFIX."actioncomm as a";
 			$sql .= " WHERE a.fk_element = ".((int) $object->id);
-			$sql .= " AND a.elementtype IN ('diffusion', 'diffusiondoc@diffusion', 'diffusion')";
+			$sql .= " AND a.elementtype IN ('diffusiondoc@diffusion')";
 			$resql = $db->query($sql);
 			if ($resql) {
 				$objCount = $db->fetch_object($resql);
