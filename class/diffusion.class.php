@@ -1043,27 +1043,65 @@ class Diffusion extends CommonObject
 	}
 
 	/**
-	 *  Return a link to the object card (with optionally the picto)
+	 *  Return clickable link of object (with eventually picto)
 	 *
-	 *  @param	int     $withpicto                  Include picto in link (0=No picto, 1=Include picto into link, 2=Only picto)
-	 *  @param	string  $option                     On what the link point to ('nolink', ...)
-	 *  @param	int     $notooltip                  1=Disable tooltip
-	 *  @param	string  $morecss                    Add more css on link
-	 *  @param	int     $save_lastsearch_value      -1=Auto, 0=No save of lastsearch_values when clicking, 1=Save lastsearch_values whenclicking
-	 *  @return	string                              String with URL
+	 *  @param	int		$withpicto				Add picto into link
+	 *  @param	string	$option					Where point the link
+	 *  @param	int		$max						Maxlength of ref
+	 *  @param	int		$short					1=Return just URL
+	 *  @param	string	$moretitle				Add more text to title tooltip
+	 *  @param	int		$notooltip				1=Disable tooltip
+	 *  @param	int		$addlinktonotes			1=Add link to notes
+	 *  @param	int		$save_lastsearch_value	-1=Auto, 0=No save of lastsearch_values when clicking, 1=Save lastsearch_values whenclicking
+	 *  @param	string	$target					Target of link ('', '_self', '_blank', '_parent', '_backoffice', ...)
+	 *  @return	string						String with URL
 	 */
-	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0, $morecss = '', $save_lastsearch_value = -1)
+	public function getNomUrl($withpicto = 0, $option = '', $max = 0, $short = 0, $moretitle = '', $notooltip = 0, $addlinktonotes = 0, $save_lastsearch_value = -1, $target = '')
 	{
-		global $conf, $langs, $hookmanager;
+		global $conf, $langs, $user, $hookmanager;
+
+		// Backward compatibility with old signature:
+		// getNomUrl($withpicto, $option, $notooltip, $morecss, $save_lastsearch_value)
+		$morecss = '';
+		if (func_num_args() <= 5 && is_string($short)) {
+			$notooltip = (int) $max;
+			$morecss = $short;
+			$save_lastsearch_value = is_numeric($moretitle) ? (int) $moretitle : -1;
+			$max = 0;
+			$short = 0;
+			$moretitle = '';
+		}
 
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
+		}
+
+		if (!$user->hasRight('diffusion', 'diffusiondoc', 'read') && !$user->hasRight('diffusion', 'diffusion', 'read') && !$user->hasRight('diffusion', 'read')) {
+			$option = 'nolink';
+		}
+
+		$url = dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id;
+
+		if ($option !== 'nolink') {
+			// Add param to save lastsearch_values or not
+			$add_save_lastsearch_values = ($save_lastsearch_value == 1 ? 1 : 0);
+			if ($save_lastsearch_value == -1 && isset($_SERVER["PHP_SELF"]) && preg_match('/list\.php/', $_SERVER["PHP_SELF"])) {
+				$add_save_lastsearch_values = 1;
+			}
+			if ($add_save_lastsearch_values) {
+				$url .= '&save_lastsearch_values=1';
+			}
+		}
+
+		if ($short) {
+			return $url;
 		}
 
 		$result = '';
 		$params = [
 			'id' => $this->id,
 			'objecttype' => $this->element.'@diffusion',
+			'moretitle' => $moretitle,
 			'option' => $option,
 		];
 		$classfortooltip = 'classfortooltip';
@@ -1076,48 +1114,30 @@ class Diffusion extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$url = dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id;
-
-		if ($option !== 'nolink') {
-			// Add param to save lastsearch_values or not
-			$add_save_lastsearch_values = ($save_lastsearch_value == 1 ? 1 : 0);
-			if ($save_lastsearch_value == -1 && isset($_SERVER["PHP_SELF"]) && preg_match('/list\.php/', $_SERVER["PHP_SELF"])) {
-				$add_save_lastsearch_values = 1;
-			}
-			if ($url && $add_save_lastsearch_values) {
-				$url .= '&save_lastsearch_values=1';
-			}
-		}
-
-		$linkclose = '';
-		if (empty($notooltip)) {
-			if (getDolGlobalInt('MAIN_OPTIMIZEFORTEXTBROWSER')) {
+		$linkclose = ($target ? ' target="'.$target.'"' : '');
+		if (empty($notooltip) && $option !== 'nolink') {
+			if (getDolGlobalString('MAIN_OPTIMIZEFORTEXTBROWSER')) {
 				$label = $langs->trans("ShowDiffusion");
 				$linkclose .= ' alt="'.dolPrintHTMLForAttribute($label).'"';
 			}
 			$linkclose .= ($label ? ' title="'.dolPrintHTMLForAttribute($label).'"' : ' title="'.dolPrintHTMLForAttribute($langs->trans("ShowDiffusion")).'"');
 			$linkclose .= $dataparams.' class="'.$classfortooltip.($morecss ? ' '.$morecss : '').'"';
-		} else {
-			$linkclose = ($morecss ? ' class="'.$morecss.'"' : '');
 		}
 
-		if ($option == 'nolink' || empty($url)) {
-			$linkstart = '<span';
-		} else {
-			$linkstart = '<a href="'.$url.'"';
-		}
+		$linkstart = '<a href="'.$url.'"';
 		$linkstart .= $linkclose.'>';
-		if ($option == 'nolink' || empty($url)) {
-			$linkend = '</span>';
-		} else {
-			$linkend = '</a>';
+		$linkend = '</a>';
+
+		if ($option == 'nolink') {
+			$linkstart = '';
+			$linkend = '';
 		}
 
 		$result .= $linkstart;
 
 		if (empty($this->showphoto_on_popup)) {
 			if ($withpicto) {
-				$result .= img_object(($notooltip ? '' : $label), ($this->picto ? $this->picto : 'generic'), (($withpicto != 2) ? 'class="paddingright"' : ''), 0, 0, $notooltip ? 0 : 1);
+				$result .= img_object(($notooltip ? '' : $label), ($this->picto ? $this->picto : 'generic'), ($notooltip ? (($withpicto != 2) ? 'class="paddingright"' : '') : 'class="'.(($withpicto != 2) ? 'paddingright ' : '').'"'), 0, 0, $notooltip ? 0 : 1);
 			}
 		} else {
 			if ($withpicto) {
@@ -1145,15 +1165,26 @@ class Diffusion extends CommonObject
 		}
 
 		if ($withpicto != 2) {
-			$result .= $this->ref;
+			$result .= ($max ? dol_trunc($this->ref, $max) : $this->ref);
 		}
 
 		$result .= $linkend;
-		//if ($withpicto != 2) $result.=(($addlabel && $this->label) ? $sep . dol_trunc($this->label, ($addlabel > 1 ? $addlabel : 0)) : '');
 
-		global $action, $hookmanager;
+		if ($addlinktonotes) {
+			$txttoshow = ($user->socid > 0 ? $this->note_public : $this->note_private);
+			if (!empty($txttoshow)) {
+				$notetoshow = $langs->trans("ViewPrivateNote").':<br>'.$txttoshow;
+				$result .= ' <span class="note inline-block">';
+				$result .= '<a href="'.dol_buildpath('/diffusion/diffusion_note.php', 1).'?id='.$this->id.'" class="classfortooltip" title="'.dolPrintHTMLForAttribute($notetoshow).'">';
+				$result .= img_picto('', 'note');
+				$result .= '</a>';
+				$result .= '</span>';
+			}
+		}
+
+		global $action;
 		$hookmanager->initHooks(array($this->element.'dao'));
-		$parameters = array('id' => $this->id, 'getnomurl' => &$result);
+		$parameters = array('id' => $this->id, 'getnomurl' => &$result, 'notooltip' => $notooltip, 'addlinktonotes' => $addlinktonotes, 'save_lastsearch_value' => $save_lastsearch_value, 'target' => $target);
 		$reshook = $hookmanager->executeHooks('getNomUrl', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
 		if ($reshook > 0) {
 			$result = $hookmanager->resPrint;
