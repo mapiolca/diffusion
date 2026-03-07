@@ -254,9 +254,9 @@ $object->fields = dol_sort_array($object->fields, 'position');
 $arrayfields = dol_sort_array($arrayfields, 'position');
 
 // EN: Always enforce rights to keep list behavior consistent with card access.
-$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read'));
-$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write'));
-$permissiontodelete = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'delete') || $user->hasRight('diffusion', 'diffusion', 'delete') || $user->hasRight('diffusion', 'delete'));
+$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
+$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'));
+$permissiontodelete = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'delete'));
 
 // Security check (enable the most restrictive one)
 if ($user->socid > 0) {
