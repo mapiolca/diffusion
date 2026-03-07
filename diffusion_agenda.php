@@ -158,8 +158,8 @@ if ($id > 0 || !empty($ref)) {
 // Set $enablepermissioncheck to 1 to enable a minimum low level of checks
 $enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
 if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read')
-	$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')
+	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read');
+	$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write');
 } else {
 	$permissiontoread = 1;
 	$permissiontoadd = 1;
