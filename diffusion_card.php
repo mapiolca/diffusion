@@ -1041,7 +1041,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 		// Documents
 
-		$object->element = "diffusion";
+		$object->element = "diffusiondoc";
 		if ($includedocgeneration) {
 			$objref = dol_sanitizeFileName($object->ref);
 			$relativepath = $object->element.'/'.$objref;
