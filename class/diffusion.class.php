@@ -43,7 +43,7 @@ class Diffusion extends CommonObject
 	/**
 	 * @var string 	ID to identify managed object.
 	 */
-	public $element = 'diffusion';
+	public $element = 'diffusiondoc';
 
 	/**
 	 * @var string 	Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -53,7 +53,7 @@ class Diffusion extends CommonObject
 	/**
 	 * @var string 	If permission must be checkec with hasRight('diffusion', 'read') and not hasright('mymodyle', 'diffusion', 'read'), you can uncomment this line
 	 */
-	public $element_for_permission = 'diffusion';
+	public $element_for_permission = 'diffusiondoc';
 
 	/**
 	 * @var string 	String with name of icon for diffusion. Must be a 'fa-xxx' fontawesome code (or 'fa-xxx_fa_color_size') or 'diffusion@diffusion' if picto is file 'img/object_diffusion.png'.
@@ -211,6 +211,20 @@ class Diffusion extends CommonObject
                 global $conf, $langs;
 
                 $this->db = $db;
+
+		// Keep backward compatibility for instances not reinitialized after permission key rename.
+		static $diffusionRightsMigrationDone = false;
+		if (!$diffusionRightsMigrationDone) {
+			$sql = "UPDATE ".MAIN_DB_PREFIX."rights_def";
+			$sql .= " SET perms = 'diffusiondoc'";
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND perms = 'diffusion'";
+			$sql .= " AND subperms IN ('read', 'write', 'delete')";
+			$sql .= " AND libelle IN ('ReadDiffusion', 'CreateDiffusion', 'DeleteDiffusion')";
+			$this->db->query($sql);
+			$diffusionRightsMigrationDone = true;
+		}
+
                 $this->ismultientitymanaged = 0;
                 $this->isextrafieldmanaged = 1;
 
@@ -977,7 +991,7 @@ class Diffusion extends CommonObject
 	{
 		global $langs;
 
-		$langs->load('diffusion@diffusion');
+		$langs->loadLangs(array('main', 'projects', 'diffusion@diffusion'));
 		$datas = [];
 
 		if (getDolGlobalInt('MAIN_OPTIMIZEFORTEXTBROWSER')) {
@@ -994,6 +1008,14 @@ class Diffusion extends CommonObject
 		if (property_exists($this, 'label')) {
 			$datas['label'] = '<br><b>'.$langs->trans('Label').':</b> '.$this->label;
 		}
+		if (!empty($this->fk_project)) {
+			require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+
+			$project = new Project($this->db);
+			if ($project->fetch((int) $this->fk_project) > 0) {
+				$datas['project'] = '<br><b>'.$langs->trans('Project').':</b> '.dol_escape_htmltag($project->ref);
+			}
+		}
 		if (!empty($this->fk_user_exped)) {
 			$userexped = new User($this->db);
 			if ($userexped->fetch($this->fk_user_exped) > 0) {
@@ -1008,37 +1030,54 @@ class Diffusion extends CommonObject
 	}
 
 	/**
-	 *  Return a link to the object card (with optionally the picto)
+	 * getTooltipContent
 	 *
-	 *  @param	int     $withpicto                  Include picto in link (0=No picto, 1=Include picto into link, 2=Only picto)
-	 *  @param	string  $option                     On what the link point to ('nolink', ...)
-	 *  @param	int     $notooltip                  1=Disable tooltip
-	 *  @param	string  $morecss                    Add more css on link
-	 *  @param	int     $save_lastsearch_value      -1=Auto, 0=No save of lastsearch_values when clicking, 1=Save lastsearch_values whenclicking
-	 *  @return	string                              String with URL
+	 * @param	array<string,string> 	$params 	Params to construct tooltip data
+	 * @return	string
 	 */
-	public function getNomUrl($withpicto = 0, $option = '', $notooltip = 0, $morecss = '', $save_lastsearch_value = -1)
+	public function getTooltipContent($params)
 	{
-		global $conf, $langs, $hookmanager;
+		$datas = $this->getTooltipContentArray($params);
+
+		return implode('', array_filter($datas));
+	}
+
+	/**
+	 *  Return clickable link of object (with eventually picto)
+	 *
+	 *  @param	int		$withpicto				Add picto into link
+	 *  @param	string	$option					Where point the link
+	 *  @param	int		$max						Maxlength of ref
+	 *  @param	int		$short					1=Return just URL
+	 *  @param	string	$moretitle				Add more text to title tooltip
+	 *  @param	int		$notooltip				1=Disable tooltip
+	 *  @param	int		$addlinktonotes			1=Add link to notes
+	 *  @param	int		$save_lastsearch_value	-1=Auto, 0=No save of lastsearch_values when clicking, 1=Save lastsearch_values whenclicking
+	 *  @param	string	$target					Target of link ('', '_self', '_blank', '_parent', '_backoffice', ...)
+	 *  @return	string						String with URL
+	 */
+	public function getNomUrl($withpicto = 0, $option = '', $max = 0, $short = 0, $moretitle = '', $notooltip = 0, $addlinktonotes = 0, $save_lastsearch_value = -1, $target = '')
+	{
+		global $conf, $langs, $user, $hookmanager;
+
+		// Backward compatibility with old signature:
+		// getNomUrl($withpicto, $option, $notooltip, $morecss, $save_lastsearch_value)
+		$morecss = '';
+		if (func_num_args() <= 5 && is_string($short)) {
+			$notooltip = (int) $max;
+			$morecss = $short;
+			$save_lastsearch_value = is_numeric($moretitle) ? (int) $moretitle : -1;
+			$max = 0;
+			$short = 0;
+			$moretitle = '';
+		}
 
 		if (!empty($conf->dol_no_mouse_hover)) {
 			$notooltip = 1; // Force disable tooltips
 		}
 
-		$result = '';
-		$params = [
-			'id' => $this->id,
-			'objecttype' => $this->element.'@diffusion',
-			'option' => $option,
-		];
-		$classfortooltip = 'classfortooltip';
-		$dataparams = '';
-		if (getDolGlobalInt('MAIN_ENABLE_AJAX_TOOLTIP')) {
-			$classfortooltip = 'classforajaxtooltip';
-			$dataparams = ' data-params="'.dol_escape_htmltag(json_encode($params)).'"';
-			$label = '';
-		} else {
-			$label = implode($this->getTooltipContentArray($params));
+		if (!$user->hasRight('diffusion', 'diffusiondoc', 'read') && !$user->hasRight('diffusion', 'diffusion', 'read') && !$user->hasRight('diffusion', 'read')) {
+			$option = 'nolink';
 		}
 
 		$url = dol_buildpath('/diffusion/diffusion_card.php', 1).'?id='.$this->id;
@@ -1049,40 +1088,56 @@ class Diffusion extends CommonObject
 			if ($save_lastsearch_value == -1 && isset($_SERVER["PHP_SELF"]) && preg_match('/list\.php/', $_SERVER["PHP_SELF"])) {
 				$add_save_lastsearch_values = 1;
 			}
-			if ($url && $add_save_lastsearch_values) {
+			if ($add_save_lastsearch_values) {
 				$url .= '&save_lastsearch_values=1';
 			}
 		}
 
-		$linkclose = '';
-		if (empty($notooltip)) {
-			if (getDolGlobalInt('MAIN_OPTIMIZEFORTEXTBROWSER')) {
+		if ($short) {
+			return $url;
+		}
+
+		$result = '';
+		$params = [
+			'id' => $this->id,
+			'objecttype' => 'diffusion@diffusion',
+			'moretitle' => $moretitle,
+			'option' => $option,
+		];
+		$classfortooltip = 'classfortooltip';
+		$dataparams = '';
+		if (getDolGlobalInt('MAIN_ENABLE_AJAX_TOOLTIP')) {
+			$classfortooltip .= ' classforajaxtooltip';
+			$dataparams = ' data-params="'.dol_escape_htmltag(json_encode($params)).'"';
+			$label = '';
+		} else {
+			$label = implode($this->getTooltipContentArray($params));
+		}
+
+		$linkclose = ($target ? ' target="'.$target.'"' : '');
+		if (empty($notooltip) && $option !== 'nolink') {
+			if (getDolGlobalString('MAIN_OPTIMIZEFORTEXTBROWSER')) {
 				$label = $langs->trans("ShowDiffusion");
 				$linkclose .= ' alt="'.dolPrintHTMLForAttribute($label).'"';
 			}
-			$linkclose .= ($label ? ' title="'.dolPrintHTMLForAttribute($label).'"' : ' title="tocomplete"');
+			$linkclose .= ($label ? ' title="'.dolPrintHTMLForAttribute($label).'"' : ' title="'.dolPrintHTMLForAttribute($langs->trans("ShowDiffusion")).'"');
 			$linkclose .= $dataparams.' class="'.$classfortooltip.($morecss ? ' '.$morecss : '').'"';
-		} else {
-			$linkclose = ($morecss ? ' class="'.$morecss.'"' : '');
 		}
 
-		if ($option == 'nolink' || empty($url)) {
-			$linkstart = '<span';
-		} else {
-			$linkstart = '<a href="'.$url.'"';
-		}
+		$linkstart = '<a href="'.$url.'"';
 		$linkstart .= $linkclose.'>';
-		if ($option == 'nolink' || empty($url)) {
-			$linkend = '</span>';
-		} else {
-			$linkend = '</a>';
+		$linkend = '</a>';
+
+		if ($option == 'nolink') {
+			$linkstart = '';
+			$linkend = '';
 		}
 
 		$result .= $linkstart;
 
 		if (empty($this->showphoto_on_popup)) {
 			if ($withpicto) {
-				$result .= img_object(($notooltip ? '' : $label), ($this->picto ? $this->picto : 'generic'), (($withpicto != 2) ? 'class="paddingright"' : ''), 0, 0, $notooltip ? 0 : 1);
+				$result .= img_object(($notooltip ? '' : $label), ($this->picto ? $this->picto : 'generic'), ($notooltip ? (($withpicto != 2) ? 'class="paddingright"' : '') : 'class="'.(($withpicto != 2) ? 'paddingright ' : '').'"'), 0, 0, $notooltip ? 0 : 1);
 			}
 		} else {
 			if ($withpicto) {
@@ -1110,15 +1165,26 @@ class Diffusion extends CommonObject
 		}
 
 		if ($withpicto != 2) {
-			$result .= $this->ref;
+			$result .= ($max ? dol_trunc($this->ref, $max) : $this->ref);
 		}
 
 		$result .= $linkend;
-		//if ($withpicto != 2) $result.=(($addlabel && $this->label) ? $sep . dol_trunc($this->label, ($addlabel > 1 ? $addlabel : 0)) : '');
 
-		global $action, $hookmanager;
+		if ($addlinktonotes) {
+			$txttoshow = ($user->socid > 0 ? $this->note_public : $this->note_private);
+			if (!empty($txttoshow)) {
+				$notetoshow = $langs->trans("ViewPrivateNote").':<br>'.$txttoshow;
+				$result .= ' <span class="note inline-block">';
+				$result .= '<a href="'.dol_buildpath('/diffusion/diffusion_note.php', 1).'?id='.$this->id.'" class="classfortooltip" title="'.dolPrintHTMLForAttribute($notetoshow).'">';
+				$result .= img_picto('', 'note');
+				$result .= '</a>';
+				$result .= '</span>';
+			}
+		}
+
+		global $action;
 		$hookmanager->initHooks(array($this->element.'dao'));
-		$parameters = array('id' => $this->id, 'getnomurl' => &$result);
+		$parameters = array('id' => $this->id, 'getnomurl' => &$result, 'notooltip' => $notooltip, 'addlinktonotes' => $addlinktonotes, 'save_lastsearch_value' => $save_lastsearch_value, 'target' => $target);
 		$reshook = $hookmanager->executeHooks('getNomUrl', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
 		if ($reshook > 0) {
 			$result = $hookmanager->resPrint;
@@ -1205,21 +1271,22 @@ class Diffusion extends CommonObject
 	public function LibStatut($status, $mode = 0)
 	{
 		// phpcs:enable
+		global $langs;
+
 		if (is_null($status)) {
 			return '';
 		}
 
 		if (empty($this->labelStatus) || empty($this->labelStatusShort)) {
-			global $langs;
-			//$langs->load("diffusion@diffusion");
-			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Validated');
-			$this->labelStatus[self::STATUS_SENT] = $langs->transnoentitiesnoconv('Sent');
-			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
-			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Validated');
-			$this->labelStatusShort[self::STATUS_SENT] = $langs->transnoentitiesnoconv('Sent');
-			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
+			$langs->loadLangs(array('main', 'diffusion@diffusion'));
+			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('DiffusionStatusDraft');
+			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('DiffusionStatusValidated');
+			$this->labelStatus[self::STATUS_SENT] = $langs->transnoentitiesnoconv('DiffusionStatusSent');
+			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('DiffusionStatusCanceled');
+			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('DiffusionStatusDraft');
+			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('DiffusionStatusValidated');
+			$this->labelStatusShort[self::STATUS_SENT] = $langs->transnoentitiesnoconv('DiffusionStatusSent');
+			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('DiffusionStatusCanceled');
 		}
 
 		$statusType = 'status'.$status;

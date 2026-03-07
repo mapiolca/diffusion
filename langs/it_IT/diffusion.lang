@@ -118,3 +118,8 @@ DIFFUSIONNUMBERINGSharingDescription = Usa una sequenza di numerazione comune pe
 DestinatairesEntite = Destinatari dell'entità
 DIFFUSION_FULLACCESS_CONTACT = Accesso completo alla rubrica contatti
 DIFFUSION_FULLACCESS_CONTACTHelp = Consente l'accesso all'intera rubrica contatti dell'entità, inclusi i contatti condivisi tramite multicompany.
+
+DiffusionStatusDraft = Bozza
+DiffusionStatusValidated = Validata
+DiffusionStatusSent = Inviata
+DiffusionStatusCanceled = Annullata

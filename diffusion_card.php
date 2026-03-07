@@ -153,9 +153,9 @@ if (empty($action) && empty($id) && empty($ref)) {
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'include', not 'include_once'.
 
 
-$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'diffusion', 'read') || $user->hasRight('diffusion', 'read') || $user->hasRight('diffusion', 'read'));
-$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write') || $user->hasRight('diffusion', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
-$permissiontodelete = ((!empty($user->admin) || $user->hasRight('diffusion', 'diffusion', 'delete') || $user->hasRight('diffusion', 'diffusion', 'delete') || $user->hasRight('diffusion', 'delete') || $user->hasRight('diffusion', 'delete'))) || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
+$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
+$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
+$permissiontodelete = ((!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'delete'))) || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
 $permissionnote = $permissiontoadd; // Used by the include of actions_setnotes.inc.php
 $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink.inc.php
 
@@ -1041,7 +1041,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 		// Documents
 
-		$object->element = "diffusion";
+		$object->element = "diffusiondoc";
 		if ($includedocgeneration) {
 			$objref = dol_sanitizeFileName($object->ref);
 			$relativepath = $object->element.'/'.$objref;

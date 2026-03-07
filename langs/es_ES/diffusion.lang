@@ -118,3 +118,8 @@ DIFFUSIONNUMBERINGSharingDescription = Utiliza una secuencia de numeraci√≥n com√
 DestinatairesEntite = Destinatarios de la entidad
 DIFFUSION_FULLACCESS_CONTACT = Acceso completo al directorio de contactos
 DIFFUSION_FULLACCESS_CONTACTHelp = Permite acceder a todo el directorio de contactos de la entidad, incluidos los contactos compartidos mediante multicompany.
+
+DiffusionStatusDraft = Borrador
+DiffusionStatusValidated = Validada
+DiffusionStatusSent = Enviada
+DiffusionStatusCanceled = Cancelada

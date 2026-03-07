@@ -270,3 +270,8 @@ DIFFUSIONNUMBERINGSharingDescription = Utilise une séquence de numérotation co
 DestinatairesEntite = Destinataires de l'entité
 DIFFUSION_FULLACCESS_CONTACT = Accès complet au répertoire de contacts
 DIFFUSION_FULLACCESS_CONTACTHelp = Permet d'accéder à tout le répertoire de contacts de l'entité, y compris les contacts partagés via multicompany.
+
+DiffusionStatusDraft = Brouillon
+DiffusionStatusValidated = Validée
+DiffusionStatusSent = Envoyée
+DiffusionStatusCanceled = Annulée
