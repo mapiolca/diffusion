@@ -5,6 +5,7 @@
  * Copyright (C) 2023       Benjamin GREMBI         <benjamin@oarces.com>
  * Copyright (C) 2024		Frédéric France			<frederic.france@free.fr>
  * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Pierre Ardoin			<developpeur@lesmetiersdubatiment.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -412,7 +413,7 @@ if ($action == 'presend') {
 	}
 
 	// Add entity contacts for diffusion recipient selector.
-	if ($object->element === 'diffusion') {
+	if ($object->element === 'diffusiondoc') {
 		$sharescopecontacts = (int) getDolGlobalInt('DIFFUSION_FULLACCESS_CONTACT');
 		$sql = 'SELECT sp.rowid, sp.firstname, sp.lastname, sp.email, s.nom as company';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'socpeople as sp';
