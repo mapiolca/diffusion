@@ -71,7 +71,14 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 					return 0;
 				}
 
-				if (!empty($object) && is_object($object) && !empty($object->element) && $object->element === 'diffusion') {
+				if (!empty($object) && is_object($object)) {
+					$iselementdiffusion = (!empty($object->element) && $object->element === 'diffusiondoc');
+					$istableelementdiffusion = (!empty($object->table_element) && $object->table_element === 'diffusion');
+
+					if (!$iselementdiffusion && !$istableelementdiffusion) {
+						return 0;
+					}
+
 					if ((int) $object->status === (int) $object::STATUS_VALIDATED && method_exists($object, 'setSent')) {
 						$result = $object->setSent($user);
 						if ($result < 0) {
