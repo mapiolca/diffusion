@@ -85,6 +85,7 @@ function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element)
 	$typeid = (int) $typeid;
 	$source = ($source === 'internal' ? 'internal' : 'external');
 	$element = preg_replace('/[^a-z0-9_]/i', '', (string) $element);
+	$objtype = null;
 
 	if ($typeid > 0) {
 		$sql = 'SELECT rowid, code, libelle, source, element';
@@ -151,6 +152,60 @@ function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element)
 		if (!empty($obj->rowid)) {
 			return (int) $obj->rowid;
 		}
+	}
+
+	$label = '';
+	if (!empty($objtype) && !empty($objtype->libelle)) {
+		$label = (string) $objtype->libelle;
+	}
+
+	return diffusionCreateContactType($db, $source, $element, $label);
+}
+
+
+/**
+ * Create a diffusion contact type when no compatible type exists yet.
+ *
+ * @param DoliDB	$db		Database handler
+ * @param string	$source		Contact source (internal|external)
+ * @param string	$element	Object element key
+ * @param string	$label		Preferred label
+ * @return int				Created contact type id, 0 on failure
+ */
+function diffusionCreateContactType(DoliDB $db, $source, $element, $label = '')
+{
+	$source = ($source === 'internal' ? 'internal' : 'external');
+	$element = preg_replace('/[^a-z0-9_]/i', '', (string) $element);
+	$label = trim((string) $label);
+	if ($label === '') {
+		$label = ($source === 'internal' ? 'Intervenant diffusion' : 'Contact diffusion');
+	}
+
+	$basecode = 'DIFFUSION_'.strtoupper($source).'_AUTO';
+	$code = $basecode;
+	$index = 0;
+	while ($index < 100) {
+		$sqlcheck = 'SELECT rowid';
+		$sqlcheck .= ' FROM '.MAIN_DB_PREFIX.'c_type_contact';
+		$sqlcheck .= " WHERE element = '".$db->escape($element)."'";
+		$sqlcheck .= " AND source = '".$db->escape($source)."'";
+		$sqlcheck .= " AND code = '".$db->escape($code)."'";
+		$rescheck = $db->query($sqlcheck);
+		if ($rescheck && $db->num_rows($rescheck) == 0) {
+			break;
+		}
+		$index++;
+		$code = $basecode.'_'.$index;
+	}
+
+	$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'c_type_contact(';
+	$sql .= 'element, source, code, libelle, active, position';
+	$sql .= ') VALUES (';
+	$sql .= "'".$db->escape($element)."', '".$db->escape($source)."', '".$db->escape($code)."', '".$db->escape($label)."', 1, 0";
+	$sql .= ')';
+
+	if ($db->query($sql)) {
+		return (int) $db->last_insert_id(MAIN_DB_PREFIX.'c_type_contact');
 	}
 
 	return 0;
@@ -561,7 +616,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 
 						$typeid = diffusionResolveContactTypeId($db, $typeid, $source, $object->element);
 						if ($typeid <= 0) {
-							dol_syslog(__METHOD__.' importprojectcontacts skip: no compatible diffusion contact type for source='.$source.' contactid='.$contactid, LOG_WARNING);
+							dol_syslog(__METHOD__.' importprojectcontacts skip: failed to build diffusion contact type for source='.$source.' contactid='.$contactid, LOG_WARNING);
 							$nberrors++;
 							continue;
 						}
