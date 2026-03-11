@@ -211,6 +211,7 @@ class modDiffusion extends DolibarrModules
 			$i++ => ['DIFFUSION_DIFFUSION_ADDON', 'chaine', 'mod_diffusion_standard', '', 0, 'current', 0],
 			$i++ => ['DIFFUSION_DIFFUSION_ADDON_ODT_PATH', 'chaine', 'DOL_DATA_ROOT/diffusion/diffusion/', '', 0, 'current', 0],
 			$i++ => ['DIFFUSION_DIFFUSION_DEFAULT_MODEL', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
+			$i++ => ['DIFFUSION_DIFFUSION_ADDON_PDF', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_VALIDATE', 'yesno', '1', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_BACKTODRAFT', 'yesno', '1', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SENDMAIL', 'yesno', '1', '', 0, 'current', 0],
