@@ -208,14 +208,14 @@ class modDiffusion extends DolibarrModules
 		// );
 		$i = 0;
 		$this->const = array(
-			$i++ => ['DIFFUSION_DIFFUSION_ADDON', 'chaine', 'mod_diffusion_standard', '', 0, 'current'],
-			$i++ => ['DIFFUSION_DIFFUSION_ADDON_ODT_PATH', 'chaine', 'DOL_DATA_ROOT/diffusion/diffusion/', '', 0, 'current'],
-			$i++ => ['DIFFUSION_DIFFUSION_DEFAULT_MODEL', 'chaine', 'standard_diffusion', '', 0, 'current'],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_VALIDATE', 'yesno', '1', '', 0, 'current'],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_BACKTODRAFT', 'yesno', '1', '', 0, 'current'],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SENDMAIL', 'yesno', '1', '', 0, 'current'],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SETDIFFUSED', 'yesno', '1', '', 0, 'current'],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_DELETE', 'yesno', '1', '', 0, 'current'],
+			$i++ => ['DIFFUSION_DIFFUSION_ADDON', 'chaine', 'mod_diffusion_standard', '', 0, 'current', 0],
+			$i++ => ['DIFFUSION_DIFFUSION_ADDON_ODT_PATH', 'chaine', 'DOL_DATA_ROOT/diffusion/diffusion/', '', 0, 'current', 0],
+			$i++ => ['DIFFUSION_DIFFUSION_DEFAULT_MODEL', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
+			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_VALIDATE', 'yesno', '1', '', 0, 'current', 0],
+			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_BACKTODRAFT', 'yesno', '1', '', 0, 'current', 0],
+			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SENDMAIL', 'yesno', '1', '', 0, 'current', 0],
+			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SETDIFFUSED', 'yesno', '1', '', 0, 'current', 0],
+			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_DELETE', 'yesno', '1', '', 0, 'current', 0],
 		);
 
 		// Some keys to add into the overwriting translation tables
