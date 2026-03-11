@@ -155,7 +155,7 @@ class modDiffusion extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
-				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
+				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'toprightmenu', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
 				'entity' => '0',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
