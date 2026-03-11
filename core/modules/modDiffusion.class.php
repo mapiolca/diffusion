@@ -206,19 +206,7 @@ class modDiffusion extends DolibarrModules
 		// Example: $this->const=array(1 => array('DIFFUSION_MYNEWCONST1', 'chaine', 'myvalue', 'This is a constant to add', 1),
 		//                             2 => array('DIFFUSION_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
-		$i = 0;
-		$this->const = array(
-			$i++ => ['DIFFUSION_DIFFUSION_ADDON', 'chaine', 'mod_diffusion_standard', '', 0, 'current', 0],
-			$i++ => ['DIFFUSION_DIFFUSION_ADDON_ODT_PATH', 'chaine', 'DOL_DATA_ROOT/diffusion/diffusion/', '', 0, 'current', 0],
-			$i++ => ['DIFFUSION_DIFFUSION_DEFAULT_MODEL', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
-			$i++ => ['DIFFUSION_DIFFUSION_ADDON_PDF', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
-			$i++ => ['DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED', 'yesno', '0', '', 0, 'current', 0],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_VALIDATE', 'yesno', '1', '', 0, 'current', 0],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_BACKTODRAFT', 'yesno', '1', '', 0, 'current', 0],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SENDMAIL', 'yesno', '1', '', 0, 'current', 0],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SETDIFFUSED', 'yesno', '1', '', 0, 'current', 0],
-			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_DELETE', 'yesno', '1', '', 0, 'current', 0],
-		);
+		$this->const = array();
 
 		// Some keys to add into the overwriting translation tables
 		/*$this->overwrite_translation = array(
