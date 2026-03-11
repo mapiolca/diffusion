@@ -212,6 +212,7 @@ class modDiffusion extends DolibarrModules
 			$i++ => ['DIFFUSION_DIFFUSION_ADDON_ODT_PATH', 'chaine', 'DOL_DATA_ROOT/diffusion/diffusion/', '', 0, 'current', 0],
 			$i++ => ['DIFFUSION_DIFFUSION_DEFAULT_MODEL', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
 			$i++ => ['DIFFUSION_DIFFUSION_ADDON_PDF', 'chaine', 'standard_diffusion', '', 0, 'current', 0],
+			$i++ => ['DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED', 'yesno', '0', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_VALIDATE', 'yesno', '1', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_BACKTODRAFT', 'yesno', '1', '', 0, 'current', 0],
 			$i++ => ['MAIN_AGENDA_ACTIONAUTO_DIFFUSION_SENDMAIL', 'yesno', '1', '', 0, 'current', 0],
@@ -614,17 +615,22 @@ class modDiffusion extends DolibarrModules
 					}
 				}
 
-				$sql = array_merge($sql, array(
-					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
-					"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-					"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
-				));
+				if (!getDolGlobalInt('DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED')) {
+					$sql = array_merge($sql, array(
+						"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+						"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
+						"DELETE FROM ".MAIN_DB_PREFIX."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
+						"INSERT INTO ".MAIN_DB_PREFIX."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
+					));
+				}
 			}
 		}
 
 		$result = $this->_init($sql, $options);
 		if ($result > 0) {
+			if (!getDolGlobalInt('DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED')) {
+				dolibarr_set_const($this->db, 'DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED', '1', 'yesno', 0, '', $conf->entity);
+			}
 			dolibarr_set_const($this->db, 'MAIN_MODULE_DIFFUSION', '1', 'chaine', 0, '', $conf->entity);
 
 			dol_include_once('/diffusion/class/actions_diffusion.class.php');
