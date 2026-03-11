@@ -187,6 +187,38 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Inject Diffusion entry into the quick add dropdown menu.
+	 *
+	 * @param array<string,mixed>	$parameters Hook parameters
+	 * @param CommonObject			$object	Current object
+	 * @param string				$action	Current action
+	 * @param HookManager			$hookmanager Hook manager propagated
+	 * @return int
+	 */
+	public function menuDropdownQuickaddItems($parameters, &$object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		$this->results = array();
+		$this->resprints = '';
+
+		$langs->loadLangs(array('diffusion@diffusion'));
+
+		$hasWriteRight = $user->hasRight('diffusion', 'diffusiondoc', 'write') || $user->hasRight('diffusion', 'diffusion', 'write') || $user->hasRight('diffusion', 'write');
+
+		$this->results[0] = array(
+			'url' => '/custom/diffusion/diffusion_card.php?action=create',
+			'title' => 'QuickCreateDiffusion@diffusion',
+			'name' => 'Diffusion@diffusion',
+			'picto' => 'fa-paper-plane',
+			'activation' => isModEnabled('diffusion') && $hasWriteRight,
+			'position' => 100,
+		);
+
+		return 0;
+	}
+
+	/**
 	 * Return diffusion count linked to project.
 	 *
 	 * @param int $projectid Project id
