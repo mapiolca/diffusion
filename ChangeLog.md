@@ -8,9 +8,6 @@
 - EN: Improved standard diffusion PDF layout with robust pagination for contacts and attachments sections, continuing on next page before footer overlap.
 - FR: Ajout de la clé de traduction `Diffusion@diffusion` pour afficher correctement le libellé du module dans la page des notifications.
 - EN: Added `Diffusion@diffusion` translation key to correctly render module label on the notifications page.
-- FR: Mise à jour de la version du module en `1.1.1`.
-- EN: Bumped module version to `1.1.1`.
-
 ## 1.1
 
 - FR: Ajout de l'intégration du module Diffusion dans le menu de création rapide (quick add) avec une entrée de création directe.
