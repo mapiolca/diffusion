@@ -409,8 +409,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 				// Display diffusion contacts and attachments summary
 				$summaryStartY = max($pdf->GetY(), $bottomlasttab + 2);
-				$afterContactsY = $this->renderContactsSection($pdf, $object, $contactSummaries, $outputlangs, $summaryStartY, $availableWidth);
-				$this->renderAttachmentsSection($pdf, $attachmentSummaries, $outputlangs, $afterContactsY + 4, $availableWidth);
+				$afterContactsY = $this->renderContactsSection($pdf, $object, $contactSummaries, $outputlangs, $summaryStartY, $availableWidth, $heightforfooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
+				$this->renderAttachmentsSection($pdf, $object, $attachmentSummaries, $outputlangs, $afterContactsY + 4, $availableWidth, $heightforfooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
 
 				$nbpagesgenerated = $pdf->getNumPages();
 				for ($pageid = 1; $pageid <= $nbpagesgenerated; $pageid++) {
@@ -1187,7 +1187,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		return $pdf->GetY();
 	}
 
-       /**
+	/**
 	* FR: Affiche le tableau des contacts liés à la diffusion.
 	* EN: Render the contacts table for the diffusion.
 	*
@@ -1199,17 +1199,18 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	* @param float $width Available width
 	* @return float
 	*/
-       protected function renderContactsSection(&$pdf, $object, array $contacts, $outputlangs, $startY, $width)
-       {
-	       unset($object);
-	       $defaultFontSize = pdf_getPDFFontSize($outputlangs);
+	protected function renderContactsSection(&$pdf, $object, array $contacts, $outputlangs, $startY, $width, $heightforfooter, $tplidx, &$pagenb, $outputlangsbis = null)
+	{
+		$defaultFontSize = pdf_getPDFFontSize($outputlangs);
+		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$minimumContinuationRatio = 0.5;
 
-	       // FR: Insère le titre de la section contacts dans le document PDF.
-	       // EN: Insert the contacts section title into the PDF document.
-	       $pdf->SetFont('', 'B', $defaultFontSize);
-	       $pdf->SetXY($this->marge_gauche, $startY);
-	       $pdf->MultiCell($width, 6, $outputlangs->transnoentities('DiffusionContactsTitle'), 0, 'L');
-	       $y = $pdf->GetY() + 1;
+		$printSectionHeader = function () use (&$pdf, $outputlangs, $defaultFontSize, $width, &$y) {
+			$pdf->SetFont('', 'B', $defaultFontSize);
+			$pdf->SetXY($this->marge_gauche, $y);
+			$pdf->MultiCell($width, 6, $outputlangs->transnoentities('DiffusionContactsTitle'), 0, 'L');
+			$y = $pdf->GetY() + 1;
+		};
 
 		// FR: Calcule des largeurs équilibrées pour la colonne Contact restaurée et les indicateurs de diffusion.
 		// EN: Compute balanced widths for the restored Contact column and the delivery status indicators.
@@ -1237,53 +1238,78 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$headerRowHeight = max($headerRowHeight, $numLines * $headerLineHeight);
 		}
 
-		$x = $this->marge_gauche;
-		for ($i = 0; $i < count($columns); $i++) {
-			$column = $columns[$i];
-			// FR: Affiche l'en-tête de colonne avec la traduction appropriée.
-			// EN: Output the column header with the proper translation.
-			$label = $outputlangs->transnoentities($column['label']);
-			$pdf->SetXY($x, $y);
-			$pdf->MultiCell($column['width'], $headerLineHeight, $outputlangs->convToOutputCharset($label), 0, $column['align'], 0, 0, '', '', true, 0, false, true, $headerRowHeight, 'T', true);
-			$x += $column['width'];
+		$printTableHeader = function () use (&$pdf, $outputlangs, $columns, $headerLineHeight, $headerRowHeight, $width, $defaultFontSize, &$y) {
+			$pdf->SetFont('', 'B', $defaultFontSize - 1);
+			$x = $this->marge_gauche;
+			for ($i = 0; $i < count($columns); $i++) {
+				$column = $columns[$i];
+				$label = $outputlangs->transnoentities($column['label']);
+				$pdf->SetXY($x, $y);
+				$pdf->MultiCell($column['width'], $headerLineHeight, $outputlangs->convToOutputCharset($label), 0, $column['align'], 0, 0, '', '', true, 0, false, true, $headerRowHeight, 'T', true);
+				$x += $column['width'];
+			}
+			$y += $headerRowHeight;
+			$pdf->SetDrawColor(200, 200, 200);
+			$pdf->line($this->marge_gauche, $y, $this->marge_gauche + $width, $y);
+			$y += 1;
+			$pdf->SetFont('', '', $defaultFontSize - 1);
+		};
+
+		$y = $startY;
+		if (($y + 6 + 1 + $headerRowHeight + 1) > $pageBottomLimit) {
+			$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
 		}
-		$y += $headerRowHeight;
-		$pdf->SetDrawColor(200, 200, 200);
-		$pdf->line($this->marge_gauche, $y, $this->marge_gauche + $width, $y);
-		$y += 1;
-	       $pdf->SetFont('', '', $defaultFontSize - 1);
+		$printSectionHeader();
+		if (($y + $headerRowHeight + 1) > $pageBottomLimit) {
+			$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+			$printSectionHeader();
+		}
+		$printTableHeader();
 
-	       if (empty($contacts)) {
-		       // FR: Message affiché lorsqu'aucun contact n'est lié à la diffusion.
-		       // EN: Message displayed when no contact is linked to the diffusion.
-		       $pdf->SetXY($this->marge_gauche, $y);
-		       $pdf->MultiCell($width, 5, $outputlangs->transnoentities('DiffusionNoContacts'), 0, 'L');
-		       return $pdf->GetY();
-	       }
+		if (empty($contacts)) {
+			if (($y + 5) > $pageBottomLimit) {
+				$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+				$printSectionHeader();
+				$printTableHeader();
+			}
+			$pdf->SetXY($this->marge_gauche, $y);
+			$pdf->MultiCell($width, 5, $outputlangs->transnoentities('DiffusionNoContacts'), 0, 'L');
+			return $pdf->GetY();
+		}
 
-	       for ($i = 0; $i < count($contacts); $i++) {
-		       $contact = $contacts[$i];
-		       $lineHeight = 4.5;
-		       $rowHeight = 5;
-		       for ($j = 0; $j < count($columns); $j++) {
-			       $column = $columns[$j];
-			       $text = $this->formatContactColumnValue($contact, $column, $outputlangs);
-			       // FR: Calcule la hauteur nécessaire pour gérer les textes multilignes.
-			       // EN: Compute the row height required to handle multi-line text.
-			       $numLines = max(1, (int) $pdf->getNumLines($outputlangs->convToOutputCharset($text), $column['width']));
-			       $rowHeight = max($rowHeight, $numLines * $lineHeight);
-		       }
+		for ($i = 0; $i < count($contacts); $i++) {
+			$contact = $contacts[$i];
+			$lineHeight = 4.5;
+			$rowHeight = 5;
+			for ($j = 0; $j < count($columns); $j++) {
+				$column = $columns[$j];
+				$text = $this->formatContactColumnValue($contact, $column, $outputlangs);
+				$numLines = max(1, (int) $pdf->getNumLines($outputlangs->convToOutputCharset($text), $column['width']));
+				$rowHeight = max($rowHeight, $numLines * $lineHeight);
+			}
+			$rowTotalHeight = $rowHeight + 0.5;
+			$availableHeight = $pageBottomLimit - $y;
+			if ($availableHeight < $rowTotalHeight) {
+				if ($availableHeight <= 0 || ($availableHeight / $rowTotalHeight) < $minimumContinuationRatio) {
+					$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+					$printSectionHeader();
+					$printTableHeader();
+				}
+			}
+			if (($y + $rowTotalHeight) > $pageBottomLimit) {
+				$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+				$printSectionHeader();
+				$printTableHeader();
+			}
 
-		       $x = $this->marge_gauche;
-		       for ($j = 0; $j < count($columns); $j++) {
-			       $column = $columns[$j];
-			       $text = $this->formatContactColumnValue($contact, $column, $outputlangs);
-			       // FR: Écrit chaque cellule en respectant l'alignement prévu.
-			       // EN: Write each cell while respecting the expected alignment.
-			       $pdf->SetXY($x, $y);
-			       $pdf->MultiCell($column['width'], $lineHeight, $outputlangs->convToOutputCharset($text), 0, $column['align'], 0, 0, '', '', true, 0, false, true, $rowHeight, 'T', true);
-			       $x += $column['width'];
-		       }
+			$x = $this->marge_gauche;
+			for ($j = 0; $j < count($columns); $j++) {
+				$column = $columns[$j];
+				$text = $this->formatContactColumnValue($contact, $column, $outputlangs);
+				$pdf->SetXY($x, $y);
+				$pdf->MultiCell($column['width'], $lineHeight, $outputlangs->convToOutputCharset($text), 0, $column['align'], 0, 0, '', '', true, 0, false, true, $rowHeight, 'T', true);
+				$x += $column['width'];
+			}
 			$y += $rowHeight;
 			$pdf->line($this->marge_gauche, $y, $this->marge_gauche + $width, $y);
 			$y += 0.5;
@@ -1292,7 +1318,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		return $y;
 	}
 
-       /**
+	/**
 	* FR: Formate les valeurs affichées dans le tableau des contacts.
 	* EN: Format value displayed in the contacts table.
 	*
@@ -1301,8 +1327,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	* @param Translate $outputlangs Output language handler
 	* @return string
 	*/
-       protected function formatContactColumnValue(array $contact, array $column, $outputlangs)
-       {
+	protected function formatContactColumnValue(array $contact, array $column, $outputlangs)
+	{
 		$key = $column['key'];
 		if ($key === 'thirdparty_name') {
 			// FR: Affiche uniquement la raison sociale pour refléter la colonne « Tiers ».
@@ -1342,12 +1368,12 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		}
 
 
-	       // FR: Retourne la valeur textuelle si elle existe, sinon une chaîne vide.
-	       // EN: Return the textual value when it exists, otherwise an empty string.
-	       return isset($contact[$key]) ? (string) $contact[$key] : '';
-       }
+		// FR: Retourne la valeur textuelle si elle existe, sinon une chaîne vide.
+		// EN: Return the textual value when it exists, otherwise an empty string.
+		return isset($contact[$key]) ? (string) $contact[$key] : '';
+	}
 
-       /**
+	/**
 	* FR: Affiche la liste des pièces jointes de la diffusion.
 	* EN: Render the attachments list.
 	*
@@ -1358,26 +1384,36 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	* @param float $width Available width
 	* @return float
 	*/
-       protected function renderAttachmentsSection(&$pdf, array $attachments, $outputlangs, $startY, $width)
-       {
-	       $defaultFontSize = pdf_getPDFFontSize($outputlangs);
+	protected function renderAttachmentsSection(&$pdf, $object, array $attachments, $outputlangs, $startY, $width, $heightforfooter, $tplidx, &$pagenb, $outputlangsbis = null)
+	{
+		$defaultFontSize = pdf_getPDFFontSize($outputlangs);
+		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$minimumContinuationRatio = 0.5;
+		$lineHeight = 4.5;
 
-	       // FR: Ajoute le titre de la section consacrée aux documents joints.
-	       // EN: Add the title for the attachments section.
-	       $pdf->SetFont('', 'B', $defaultFontSize);
-	       $pdf->SetXY($this->marge_gauche, $startY);
-	       $pdf->MultiCell($width, 6, $outputlangs->transnoentities('DiffusionAttachmentsTitle'), 0, 'L');
-	       $y = $pdf->GetY() + 1;
+		$y = $startY;
+		if (($y + 6 + 1) > $pageBottomLimit) {
+			$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+		}
 
-	       $pdf->SetFont('', '', $defaultFontSize - 1);
+		$printSectionTitle = function () use (&$pdf, $outputlangs, $defaultFontSize, $width, &$y) {
+			$pdf->SetFont('', 'B', $defaultFontSize);
+			$pdf->SetXY($this->marge_gauche, $y);
+			$pdf->MultiCell($width, 6, $outputlangs->transnoentities('DiffusionAttachmentsTitle'), 0, 'L');
+			$y = $pdf->GetY() + 1;
+			$pdf->SetFont('', '', $defaultFontSize - 1);
+		};
+		$printSectionTitle();
 
-	       if (empty($attachments)) {
-		       // FR: Indique clairement l'absence de documents joints.
-		       // EN: Clearly state that no documents are attached.
-		       $pdf->SetXY($this->marge_gauche, $y);
-		       $pdf->MultiCell($width, 5, $outputlangs->transnoentities('DiffusionNoDocuments'), 0, 'L');
-		       return $pdf->GetY();
-	       }
+		if (empty($attachments)) {
+			if (($y + 5) > $pageBottomLimit) {
+				$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+				$printSectionTitle();
+			}
+			$pdf->SetXY($this->marge_gauche, $y);
+			$pdf->MultiCell($width, 5, $outputlangs->transnoentities('DiffusionNoDocuments'), 0, 'L');
+			return $pdf->GetY();
+		}
 
 		for ($i = 0; $i < count($attachments); $i++) {
 			$fileinfo = $attachments[$i];
@@ -1387,6 +1423,19 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			if (!empty($fileinfo['public_share_link'])) {
 				$lineToDisplay = '- '.dol_escape_htmltag($fileinfo['name']).' - '.dol_escape_htmltag($outputlangs->transnoentities('DiffusionAttachmentPublicLink')).' : <a href="'.dol_escape_htmltag((string) $fileinfo['public_share_link']).'">'.dol_escape_htmltag((string) $fileinfo['public_share_link']).'</a>';
 			}
+			$plainLine = preg_replace('/<[^>]+>/', '', $lineToDisplay);
+			$requiredHeight = max(5, max(1, (int) $pdf->getNumLines($outputlangs->convToOutputCharset($plainLine), $width)) * $lineHeight);
+			$availableHeight = $pageBottomLimit - $y;
+			if ($availableHeight < $requiredHeight) {
+				if ($availableHeight <= 0 || ($availableHeight / $requiredHeight) < $minimumContinuationRatio) {
+					$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+					$printSectionTitle();
+				}
+			}
+			if (($y + $requiredHeight) > $pageBottomLimit) {
+				$y = $this->addSummaryPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis);
+				$printSectionTitle();
+			}
 			$pdf->SetXY($this->marge_gauche, $y);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $y, $outputlangs->convToOutputCharset($lineToDisplay), 0, 1, false, true, 'L', true);
 			$y = $pdf->GetY();
@@ -1394,6 +1443,28 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 
 		return $y;
+	}
+
+	/**
+	 * Add a page and render the standard PDF page header.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language handler
+	 * @return float
+	 */
+	protected function addSummaryPage(&$pdf, $object, $outputlangs, $tplidx, &$pagenb, $outputlangsbis = null)
+	{
+		$pdf->AddPage();
+		$pagenb++;
+		if (!empty($tplidx)) {
+			$pdf->useTemplate($tplidx);
+		}
+		$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
+		return !getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 : 10;
 	}
 
 
