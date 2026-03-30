@@ -104,6 +104,13 @@ function diffusionPrepareHead($object)
 		$h++;
 	}
 
+	if (!empty($object->is_template)) {
+		$head[$h][0] = dol_buildpath("/diffusion/diffusion_generated_list.php", 1).'?id='.$object->id;
+		$head[$h][1] = $langs->trans("DiffusionsGenerees");
+		$head[$h][2] = 'generated';
+		$h++;
+	}
+
 	// Show more tabs from modules
 	// Entries must be declared in modules descriptor with line
 	//$this->tabs = array(

@@ -753,6 +753,7 @@ if ($action == 'create') {
 	}
 	if ($fromtemplateid > 0) {
 		print '<input type="hidden" name="fromtemplateid" value="'.$fromtemplateid.'">';
+		print '<input type="hidden" name="model_source" value="'.$fromtemplateid.'">';
 	}
 
 	print dol_get_fiche_head(array(), '');
@@ -1092,7 +1093,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	 * Lines
 	 */
 
-	include './tpl/diffusion_contacts.tpl.php';
+	if (empty($object->is_template)) {
+		include './tpl/diffusion_contacts.tpl.php';
+	}
 
 	if (!empty($object->table_element_line)) {
 		// Show object lines

@@ -585,6 +585,10 @@ class modDiffusion extends DolibarrModules
 		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
 			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN is_template integer DEFAULT 0 NOT NULL");
 		}
+		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion LIKE 'model_source'");
+		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN model_source integer");
+		}
 
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';

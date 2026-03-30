@@ -286,3 +286,4 @@ DiffusionConvertedToTemplate = La diffusion a été convertie en modèle.
 ErrorActionNotAllowedOnDiffusionTemplate = Cette action n'est pas autorisée sur un modèle de diffusion.
 DiffusionStatusTemplate = Modèle
 DiffusionModele = Diffusion modèle
+DiffusionsGenerees = Diffusions générées

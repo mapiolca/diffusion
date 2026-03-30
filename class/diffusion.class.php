@@ -145,6 +145,7 @@ class Diffusion extends CommonObject
 		"import_key" => array("type" => "varchar(14)", "label" => "ImportId", "enabled" => "1", 'position' => 1000, 'notnull' => -1, "visible" => "-2",),
 		"model_pdf" => array("type" => "varchar(255)", "label" => "Model pdf", "enabled" => "1", 'position' => 1010, 'notnull' => -1, "visible" => "0",),
 		"is_template" => array("type" => "integer", "label" => "Modele", "enabled" => "1", 'position' => 1015, 'notnull' => 1, "visible" => "0", "default" => "0",),
+		"model_source" => array("type" => "integer", "label" => "ModeleSource", "enabled" => "1", 'position' => 1020, 'notnull' => -1, "visible" => "0", "index" => "1",),
 		"status" => array("type" => "integer", "label" => "Status", "enabled" => "1", 'position' => 2000, 'notnull' => 1, "visible" => "1", "index" => "1", "arrayofkeyval" => array("0" => "Brouillon", "1" => "Valid&eacute;", "6" => "Envoy&eacute;", "9" => "Annul&eacute;"), "validate" => "1",),
 	);
 	public $rowid;
@@ -163,6 +164,7 @@ class Diffusion extends CommonObject
 	public $import_key;
 	public $model_pdf;
 	public $is_template;
+	public $model_source;
 	public $status;
 	// END MODULEBUILDER PROPERTIES
 
@@ -328,6 +330,7 @@ class Diffusion extends CommonObject
 		$sql.= " `entity`,";
 		$sql.= " `fk_user_creat`,";
 		$sql.= " `is_template`,";
+		$sql.= " `model_source`,";
 		$sql.= " `status`";
 		$sql.= ')';
 		$sql.= " VALUES (";
@@ -344,6 +347,7 @@ class Diffusion extends CommonObject
 		$sql.= " ".((int) (!empty($conf->entity) ? $conf->entity : 1)).",";
 		$sql.= " ".((int) $user->id).",";
 		$sql.= " ".((int) (!empty($this->is_template) ? 1 : 0)).",";
+		$sql.= " ".((!empty($this->model_source) && (int) $this->model_source > 0) ? (int) $this->model_source : 'NULL').",";
 		$sql.= " " . ((isset($this->status) && $this->status !== '') ? ((int) $this->status) : self::STATUS_DRAFT);
 		$sql.= ')';
 
