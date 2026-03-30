@@ -393,6 +393,13 @@ if (empty($reshook)) {
 
 	$triggermodname = 'DIFFUSION_DIFFUSION_MODIFY'; // Name of trigger action code to execute when we modify record
 
+	$forbiddenactionsontemplate = array('ask_import_project_contacts', 'importprojectcontacts', 'confirm_validate', 'validate', 'clone', 'confirm_clone');
+	if (!empty($object->id) && !empty($object->is_template) && in_array($action, $forbiddenactionsontemplate, true)) {
+		setEventMessages($langs->trans('ErrorActionNotAllowedOnDiffusionTemplate'), null, 'errors');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+
 	// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
 	include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
@@ -1151,7 +1158,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				print dolGetButtonAction('', $langs->trans('SendMail'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=presend&token='.newToken().'&mode=init#formmailbeforetitle');
 			}
 
-			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project)) {
+			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project) && empty($object->is_template)) {
 				print dolGetButtonAction('', $langs->trans('ImportProjectContacts'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=ask_import_project_contacts&token='.newToken());
 			}
 
@@ -1176,7 +1183,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			//print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
 
 			// Validate
-			if ($object->status == $object::STATUS_DRAFT) {
+			if ($object->status == $object::STATUS_DRAFT && empty($object->is_template)) {
 				if (empty($object->table_element_line) || (is_array($object->lines) && count($object->lines) > 0)) {
 					print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_validate&confirm=yes&token='.newToken(), '', $permissiontoadd);
 				} else {
@@ -1186,7 +1193,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 
 			// Clone
-			if ($permissiontoadd) {
+			if ($permissiontoadd && empty($object->is_template)) {
 				print dolGetButtonAction('', $langs->trans('ToClone'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.(!empty($object->socid) ? '&socid='.$object->socid : '').'&action=clone&token='.newToken(), '', $permissiontoadd);
 			}
 

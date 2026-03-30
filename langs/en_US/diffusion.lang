@@ -283,3 +283,4 @@ Modele = Template
 ConvertirEnModele = Convert to template
 CreerUneDiffusionDepuisModele = Create diffusion
 DiffusionConvertedToTemplate = The diffusion has been converted into a template.
+ErrorActionNotAllowedOnDiffusionTemplate = This action is not allowed on a diffusion template.

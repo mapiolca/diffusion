@@ -131,3 +131,4 @@ Modele = Modello
 ConvertirEnModele = Converti in modello
 CreerUneDiffusionDepuisModele = Crea diffusione
 DiffusionConvertedToTemplate = La diffusione è stata convertita in modello.
+ErrorActionNotAllowedOnDiffusionTemplate = Questa azione non è consentita su un modello di diffusione.
