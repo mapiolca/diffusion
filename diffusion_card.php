@@ -958,17 +958,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
 	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
-	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
 
 	$morehtmlref = '<div class="refidno">';
 	if (isset($object->fields['label'])) {
 		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
 		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
-	}
-	if (!empty($object->is_template)) {
-		$morehtmlref .= '<br>';
-		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
-		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
 	}
 	if (isModEnabled('project')) {
 		$langs->load("projects");
