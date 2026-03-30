@@ -227,6 +227,7 @@ $langs->loadLangs(array("diffusion@diffusion", "other"));
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $lineid   = GETPOSTINT('lineid');
+$fromtemplateid = GETPOSTINT('fromtemplateid');
 
 $action = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm', 'alpha');
@@ -484,6 +485,18 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 			exit;
 		}
 	}
+
+	if ($action == 'convert_to_template' && $permissiontoadd) {
+		if ((int) $object->id > 0 && (int) $object->status === (int) $object::STATUS_DRAFT && empty($object->is_template)) {
+			$resultsettemplate = $object->setValueFrom('is_template', 1, '', null, 'int', '', $user, $triggermodname);
+			if ($resultsettemplate > 0) {
+				setEventMessages($langs->trans('DiffusionConvertedToTemplate'), null, 'mesgs');
+				header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+				exit;
+			}
+			setEventMessages($object->error, $object->errors, 'errors');
+		}
+	}
 }
 
 /*
@@ -700,6 +713,19 @@ if ($action == 'create') {
 		accessforbidden('NotEnoughPermissions', 0, 1);
 	}
 
+	$templatedefaultlabel = '';
+	$templatedefaultdescription = '';
+	if ($fromtemplateid > 0) {
+		$templateobject = new Diffusion($db);
+		$resulttemplate = $templateobject->fetch($fromtemplateid);
+		if ($resulttemplate > 0 && !empty($templateobject->is_template)) {
+			$templatedefaultlabel = (string) $templateobject->label;
+			$templatedefaultdescription = (string) $templateobject->description;
+		} else {
+			$fromtemplateid = 0;
+		}
+	}
+
 	print load_fiche_titre($title, '', $object->picto);
 
 	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
@@ -718,6 +744,9 @@ if ($action == 'create') {
 	if ($dol_openinpopup) {
 		print '<input type="hidden" name="dol_openinpopup" value="'.$dol_openinpopup.'">';
 	}
+	if ($fromtemplateid > 0) {
+		print '<input type="hidden" name="fromtemplateid" value="'.$fromtemplateid.'">';
+	}
 
 	print dol_get_fiche_head(array(), '');
 
@@ -730,7 +759,11 @@ if ($action == 'create') {
 
 	// Label
 	print '<tr class="field_label"><td class="titlefieldcreate">'.$langs->trans('Label').'</td><td class="valuefieldcreate">';
-	print '<input type="text" name="label" value="'.(!empty($label) ? $ref_client : GETPOST('label')).'"></td>';
+	$inputlabel = GETPOST('label');
+	if ($inputlabel === '' && $templatedefaultlabel !== '') {
+		$inputlabel = $templatedefaultlabel;
+	}
+	print '<input type="text" name="label" value="'.dol_escape_htmltag($inputlabel).'"></td>';
 	print '</tr>';
 
 	// Project
@@ -763,7 +796,7 @@ if ($action == 'create') {
 	print '<td class="valuefieldcreate">';
 	$description = GETPOST('description', 'none');
 	if ($description === '') {
-		$description = $object->getDefaultCreateValueFor('description');
+		$description = ($templatedefaultdescription !== '' ? $templatedefaultdescription : $object->getDefaultCreateValueFor('description'));
 	}
 	$doleditor = new DolEditor('description', $description, '', 160, 'dolibarr_details', '', false, true, getDolGlobalString('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
 	print $doleditor->Create(1);
@@ -1120,6 +1153,14 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project)) {
 				print dolGetButtonAction('', $langs->trans('ImportProjectContacts'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=ask_import_project_contacts&token='.newToken());
+			}
+
+			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && empty($object->is_template)) {
+				print dolGetButtonAction('', $langs->trans('ConvertirEnModele'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=convert_to_template&token='.newToken(), '', $permissiontoadd);
+			}
+
+			if (empty($user->socid) && $permissiontoadd && !empty($object->is_template)) {
+				print dolGetButtonAction('', $langs->trans('CreerUneDiffusionDepuisModele'), 'default', $_SERVER['PHP_SELF'].'?action=create&fromtemplateid='.$object->id.'&token='.newToken(), '', $permissiontoadd);
 			}
 
 			// Back to draft

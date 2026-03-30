@@ -408,6 +408,21 @@ class modDiffusion extends DolibarrModules
 			'user' => 2,
 			'object' => 'Diffusion',
 		);
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=tools,fk_leftmenu=diffusion',
+			'type' => 'left',
+			'titre' => 'ListModelesDiffusion',
+			'mainmenu' => 'tools',
+			'leftmenu' => 'diffusion_diffusion_template_list',
+			'url' => '/diffusion/diffusion_list.php?show_templates=1',
+			'langs' => 'diffusion@diffusion',
+			'position' => 1004,
+			'enabled' => 'isModEnabled(\'diffusion\')',
+			'perms' => '$user->hasRight(\'diffusion\', \'diffusiondoc\', \'read\') || $user->hasRight(\'diffusion\', \'diffusion\', \'read\') || $user->hasRight(\'diffusion\', \'read\')',
+			'target' => '',
+			'user' => 2,
+			'object' => 'Diffusion',
+		);
 		/* END MODULEBUILDER LEFTMENU DIFFUSION */
 		/* BEGIN MODULEBUILDER LEFTMENU DIFFUSION */
 		$this->menu[$r++] = array(
@@ -564,6 +579,11 @@ class modDiffusion extends DolibarrModules
 		$result = $this->_load_tables('/diffusion/sql/');
 		if ($result < 0) {
 			return -1; // Do not activate module if error 'not allowed' returned when loading module SQL queries (the _load_table run sql with run_sql with the error allowed parameter set to 'default')
+		}
+
+		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion LIKE 'is_template'");
+		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN is_template integer DEFAULT 0 NOT NULL");
 		}
 
 		// Create extrafields during init

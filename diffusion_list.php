@@ -112,6 +112,7 @@ $backtopage = GETPOST('backtopage', 'alpha'); // Go back to a dedicated page
 $optioncss  = GETPOST('optioncss', 'aZ'); // Option for the css output (always '' except when 'print')
 $mode       = GETPOST('mode', 'aZ'); // The display mode ('list', 'kanban', 'hierarchy', 'calendar', 'gantt', ...)
 $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' or $groupby = 'p.fk_statut'
+$show_templates = GETPOSTINT('show_templates');
 $search_entity = GETPOST('search_entity', 'array:int');
 $search_fk_user_exped = GETPOST('search_fk_user_exped', 'array:int');
 $entityfilteroptions = array();
@@ -273,6 +274,8 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+$show_templates = ($show_templates ? 1 : 0);
+
 
 /*
  * Actions
@@ -336,7 +339,7 @@ $form = new Form($db);
 
 $now = dol_now();
 
-$title = $langs->trans("Diffusions");
+$title = ($show_templates ? $langs->trans("ListModelesDiffusion") : $langs->trans("Diffusions"));
 //$help_url = "EN:Module_Diffusion|FR:Module_Diffusion_FR|ES:Módulo_Diffusion";
 $help_url = '';
 $morejs = array();
@@ -377,6 +380,7 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListFrom', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 $sql .= " WHERE t.entity IN (".getEntity('diffusion', (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
+$sql .= " AND t.is_template = ".$show_templates;
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
 		if ($key === 'fk_user_exped' && is_array($search[$key])) {
@@ -552,6 +556,9 @@ $param = '';
 if (!empty($mode)) {
 	$param .= '&mode='.urlencode($mode);
 }
+if ($show_templates) {
+	$param .= '&show_templates=1';
+}
 if (!empty($contextpage) && $contextpage != $_SERVER["PHP_SELF"]) {
 	$param .= '&contextpage='.urlencode($contextpage);
 }
@@ -621,13 +628,14 @@ print '<input type="hidden" name="page" value="'.$page.'">';
 print '<input type="hidden" name="contextpage" value="'.$contextpage.'">';
 print '<input type="hidden" name="page_y" value="">';
 print '<input type="hidden" name="mode" value="'.$mode.'">';
+print '<input type="hidden" name="show_templates" value="'.$show_templates.'">';
 
 
 $newcardbutton = '';
 $newcardbutton .= dolGetButtonTitle($langs->trans('ViewList'), '', 'fa fa-bars imgforviewmode', $_SERVER["PHP_SELF"].'?mode=common'.preg_replace('/(&|\?)*mode=[^&]+/', '', $param), '', ((empty($mode) || $mode == 'common') ? 2 : 1), array('morecss' => 'reposition'));
 $newcardbutton .= dolGetButtonTitle($langs->trans('ViewKanban'), '', 'fa fa-th-list imgforviewmode', $_SERVER["PHP_SELF"].'?mode=kanban'.preg_replace('/(&|\?)*mode=[^&]+/', '', $param), '', ($mode == 'kanban' ? 2 : 1), array('morecss' => 'reposition'));
 $newcardbutton .= dolGetButtonTitleSeparator();
-$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/diffusion/diffusion_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
+$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/diffusion/diffusion_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF'].($show_templates ? '?show_templates=1' : '')), '', $permissiontoadd);
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
