@@ -35,14 +35,14 @@ function diffusionPrepareHead($object)
 
 	$showtabofpagecontact = 0;
 	$showtabofpagenote = 0;
-	$showtabofpagedocument = 1;
+	$showtabofpagedocument = (empty($object->is_template) ? 1 : 0);
 	$showtabofpageagenda = 1;
 
 	$h = 0;
 	$head = array();
 
 	$head[$h][0] = dol_buildpath("/diffusion/diffusion_card.php", 1).'?id='.$object->id;
-	$head[$h][1] = $langs->trans("Diffusion");
+	$head[$h][1] = $langs->trans((!empty($object->is_template) ? "DiffusionModele" : "Diffusion"));
 	$head[$h][2] = 'card';
 	$h++;
 

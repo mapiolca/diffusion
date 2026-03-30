@@ -132,3 +132,5 @@ ConvertirEnModele = In Modell umwandeln
 CreerUneDiffusionDepuisModele = Diffusion erstellen
 DiffusionConvertedToTemplate = Die Diffusion wurde in ein Modell umgewandelt.
 ErrorActionNotAllowedOnDiffusionTemplate = Diese Aktion ist für ein Diffusionsmodell nicht erlaubt.
+DiffusionStatusTemplate = Modell
+DiffusionModele = Modell-Diffusion

@@ -1281,6 +1281,12 @@ class Diffusion extends CommonObject
 			return '';
 		}
 
+		if (!empty($this->is_template)) {
+			$langs->loadLangs(array('main', 'diffusion@diffusion'));
+			$labeltemplate = $langs->transnoentitiesnoconv('DiffusionStatusTemplate');
+			return dolGetStatus($labeltemplate, $labeltemplate, '', 'status8', $mode);
+		}
+
 		if (empty($this->labelStatus) || empty($this->labelStatusShort)) {
 			$langs->loadLangs(array('main', 'diffusion@diffusion'));
 			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('DiffusionStatusDraft');
@@ -1507,7 +1513,7 @@ class Diffusion extends CommonObject
 		global $langs;
 
 		$result = 0;
-		$includedocgeneration = 1;
+		$includedocgeneration = (empty($this->is_template) ? 1 : 0);
 
 		$langs->load("diffusion@diffusion");
 

@@ -865,7 +865,7 @@ if (($id || $ref) && $action == 'edit') {
 if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'create'))) {
 	$head = diffusionPrepareHead($object);
 
-	print dol_get_fiche_head($head, 'card', $langs->trans("Diffusion"), -1, $object->picto, 0, '', '', 0, '', 1);
+	print dol_get_fiche_head($head, 'card', $langs->trans((!empty($object->is_template) ? "DiffusionModele" : "Diffusion")), -1, $object->picto, 0, '', '', 0, '', 1);
 
 	$formconfirm = '';
 
@@ -1241,7 +1241,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<div class="fichecenter"><div class="fichehalfleft">';
 		print '<a name="builddoc"></a>'; // ancre
 
-		$includedocgeneration = 1;
+		$includedocgeneration = (empty($object->is_template) ? 1 : 0);
 
 		// Documents
 
