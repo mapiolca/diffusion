@@ -418,19 +418,6 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 	if ($action == 'set_thirdparty' && $permissiontoadd) {
 		$object->setValueFrom('fk_soc', GETPOSTINT('fk_soc'), '', null, 'date', '', $user, $triggermodname);
 	}
-	if ($action == 'set_ref_template' && $permissiontoadd && !empty($object->is_template)) {
-		$newref = trim((string) GETPOST('new_ref', 'alphanohtml'));
-		if ($newref === '') {
-			setEventMessages($langs->trans('ErrorFieldRequired', $langs->transnoentitiesnoconv('Ref')), null, 'errors');
-		} else {
-			$resultsetref = $object->setValueFrom('ref', $newref, '', null, 'text', '', $user, $triggermodname);
-			if ($resultsetref > 0) {
-				header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-				exit;
-			}
-			setEventMessages($object->error, $object->errors, 'errors');
-		}
-	}
 	if ($action == 'classin' && $permissiontoadd) {
 		dol_syslog(__METHOD__." action=classin objectid=".((int) $object->id)." requested_projectid=".GETPOSTINT('projectid'), LOG_DEBUG);
 		$resultsetproject = $object->setProject(GETPOSTINT('projectid'));
@@ -971,11 +958,17 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
 	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
+	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
 
 	$morehtmlref = '<div class="refidno">';
 	if (isset($object->fields['label'])) {
 		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
 		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
+	}
+	if (!empty($object->is_template)) {
+		$morehtmlref .= '<br>';
+		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
+		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
 	}
 	if (isModEnabled('project')) {
 		$langs->load("projects");
@@ -1033,17 +1026,6 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
 	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
-	if ($permissiontoadd && !empty($object->is_template)) {
-		print '<div class="refidno margintoponly">';
-		print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'">';
-		print '<input type="hidden" name="token" value="'.newToken().'">';
-		print '<input type="hidden" name="action" value="set_ref_template">';
-		print '<span class="opacitymedium">'.$langs->trans('Ref').'</span> ';
-		print '<input type="text" class="flat minwidth200" name="new_ref" value="'.dol_escape_htmltag($object->ref).'">';
-		print '<input type="submit" class="button button-edit" value="'.$langs->trans('Save').'">';
-		print '</form>';
-		print '</div>';
-	}
 
 
 	print '<div class="fichecenter">';
