@@ -958,9 +958,17 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
 	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
+	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
 
 	$morehtmlref = '<div class="refidno">';
+	if (!empty($object->is_template)) {
+		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
+		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
+	}
 	if (isset($object->fields['label'])) {
+		if (!empty($object->is_template)) {
+			$morehtmlref .= '<br>';
+		}
 		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
 		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
 	}
@@ -1019,7 +1027,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 
 	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
+	$fieldrefbanner = (!empty($object->is_template) ? '' : 'ref');
+	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', $fieldrefbanner, $morehtmlref, '', 0, '', $morehtmlstatus);
 
 
 	print '<div class="fichecenter">';
