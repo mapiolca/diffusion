@@ -118,6 +118,7 @@ $search_fk_user_exped = GETPOST('search_fk_user_exped', 'array:int');
 $entityfilteroptions = array();
 $senderfilteroptions = array();
 $showentitycolumn = false;
+$show_templates = ($show_templates ? 1 : 0);
 
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
@@ -141,13 +142,22 @@ $extrafields = new ExtraFields($db);
 $diroutputmassaction = $conf->diffusion->multidir_output[$conf->entity].'/temp/massgeneration/'.$user->id;
 $hookmanager->initHooks(array($contextpage)); 	// Note that conf->hooks_modules contains array of activated contexes
 
+$hiddenfieldsontemplatelist = array('date_expedition', 'fk_user_exped');
+if ($show_templates) {
+	foreach ($hiddenfieldsontemplatelist as $hiddenfield) {
+		if (isset($object->fields[$hiddenfield])) {
+			unset($object->fields[$hiddenfield]);
+		}
+	}
+}
+
 if (isModEnabled('multicompany')) {
 	$sharedentities = getEntity('diffusion', 1);
 	$currententityonly = getEntity('diffusion', 0);
 	$partagediffusionactive = ($sharedentities !== $currententityonly);
 	$sharedentityids = array_filter(array_map('intval', explode(',', $sharedentities)));
 	$receivessharedentities = (in_array((int) $conf->entity, $sharedentityids, true) && count(array_diff($sharedentityids, array((int) $conf->entity))) > 0);
-	$showentitycolumn = ($partagediffusionactive && $receivessharedentities);
+	$showentitycolumn = ($partagediffusionactive && ($receivessharedentities || $show_templates));
 }
 
 // Fetch optionals attributes and labels
@@ -274,8 +284,6 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
-$show_templates = ($show_templates ? 1 : 0);
-
 
 /*
  * Actions
@@ -362,6 +370,9 @@ $reshook = $hookmanager->executeHooks('printFieldListSelect', $parameters, $obje
 $sql .= $hookmanager->resPrint;
 if ($showentitycolumn) {
 	$sql .= ", t.entity as entity, e.label as entity_label";
+}
+if ($show_templates) {
+	$sql .= ", (SELECT COUNT(ts.rowid) FROM ".MAIN_DB_PREFIX."diffusion as ts WHERE ts.model_source = t.rowid AND ts.is_template = 0 AND ts.entity IN (".getEntity('diffusion', (GETPOSTINT('search_current_entity') ? 0 : 1)).")) as nb_generated";
 }
 $sql = preg_replace('/,\s*$/', '', $sql);
 
@@ -743,6 +754,9 @@ if ($showentitycolumn) {
 	print $form->multiselectarray('search_entity', $entityfilteroptions, $search_entity, 0, 0, 'maxwidth100', 1);
 	print '</td>';
 }
+if ($show_templates) {
+	print '<td class="liste_titre center"></td>';
+}
 // Extra fields
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_input.tpl.php';
 
@@ -792,6 +806,10 @@ foreach ($object->fields as $key => $val) {
 }
 if ($showentitycolumn) {
 	print getTitleFieldOfList($langs->trans('Environment'), 0, $_SERVER['PHP_SELF'], 't.entity', '', $param, 'class="center"', $sortfield, $sortorder, 'center ')."\n";
+	$totalarray['nbfield']++;
+}
+if ($show_templates) {
+	print getTitleFieldOfList($langs->trans('DiffusionsGenerees'), 0, $_SERVER['PHP_SELF'], '', '', $param, 'class="center"', $sortfield, $sortorder, 'center ')."\n";
 	$totalarray['nbfield']++;
 }
 // Extra fields
@@ -946,6 +964,14 @@ while ($i < $imaxinloop) {
 			$entitylabel = (!empty($obj->entity_label) ? $obj->entity_label : $obj->entity);
 			print '<td class="center">';
 			print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entitylabel).'</span></div>';
+			print '</td>';
+			if (!$i) {
+				$totalarray['nbfield']++;
+			}
+		}
+		if ($show_templates) {
+			print '<td class="center">';
+			print '<span class="badge badge-status4">'.((int) $obj->nb_generated).'</span>';
 			print '</td>';
 			if (!$i) {
 				$totalarray['nbfield']++;
