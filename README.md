@@ -14,6 +14,8 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Liaison d’une diffusion à un **projet** Dolibarr.
 - Gestion des **contacts de diffusion**.
 - Import des contacts depuis le projet lié.
+- Gestion des **modèles de diffusion** (conversion d'une diffusion en modèle, création d'une diffusion à partir d'un modèle).
+- Suivi des diffusions générées depuis un modèle (liaison `model_source` et onglet dédié).
 - Ajout et suivi des **documents joints**.
 - Génération/régénération des documents PDF de diffusion.
 - Envoi de diffusion par e-mail.
@@ -109,6 +111,8 @@ The module allows you to create distribution records linked to a project, manage
 - Link a distribution to a Dolibarr **project**.
 - Management of **distribution contacts**.
 - Import contacts from the linked project.
+- Management of **distribution templates** (convert a distribution to a template, create a distribution from a template).
+- Tracking generated distributions from a template (`model_source` linkage and dedicated tab).
 - Add and track **attached documents**.
 - Generate/regenerate distribution PDF documents.
 - Send distributions by email.

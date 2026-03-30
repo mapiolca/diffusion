@@ -227,6 +227,7 @@ $langs->loadLangs(array("diffusion@diffusion", "other"));
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
 $lineid   = GETPOSTINT('lineid');
+$fromtemplateid = GETPOSTINT('fromtemplateid');
 
 $action = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm', 'alpha');
@@ -392,6 +393,13 @@ if (empty($reshook)) {
 
 	$triggermodname = 'DIFFUSION_DIFFUSION_MODIFY'; // Name of trigger action code to execute when we modify record
 
+	$forbiddenactionsontemplate = array('ask_import_project_contacts', 'importprojectcontacts', 'confirm_validate', 'validate', 'clone', 'confirm_clone');
+	if (!empty($object->id) && !empty($object->is_template) && in_array($action, $forbiddenactionsontemplate, true)) {
+		setEventMessages($langs->trans('ErrorActionNotAllowedOnDiffusionTemplate'), null, 'errors');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+
 	// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
 	include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
@@ -482,6 +490,18 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 		} else {
 			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 			exit;
+		}
+	}
+
+	if ($action == 'convert_to_template' && $permissiontoadd) {
+		if ((int) $object->id > 0 && (int) $object->status === (int) $object::STATUS_DRAFT && empty($object->is_template)) {
+			$resultsettemplate = $object->setValueFrom('is_template', 1, '', null, 'int', '', $user, $triggermodname);
+			if ($resultsettemplate > 0) {
+				setEventMessages($langs->trans('DiffusionConvertedToTemplate'), null, 'mesgs');
+				header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+				exit;
+			}
+			setEventMessages($object->error, $object->errors, 'errors');
 		}
 	}
 }
@@ -700,6 +720,19 @@ if ($action == 'create') {
 		accessforbidden('NotEnoughPermissions', 0, 1);
 	}
 
+	$templatedefaultlabel = '';
+	$templatedefaultdescription = '';
+	if ($fromtemplateid > 0) {
+		$templateobject = new Diffusion($db);
+		$resulttemplate = $templateobject->fetch($fromtemplateid);
+		if ($resulttemplate > 0 && !empty($templateobject->is_template)) {
+			$templatedefaultlabel = (string) $templateobject->label;
+			$templatedefaultdescription = (string) $templateobject->description;
+		} else {
+			$fromtemplateid = 0;
+		}
+	}
+
 	print load_fiche_titre($title, '', $object->picto);
 
 	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
@@ -718,6 +751,10 @@ if ($action == 'create') {
 	if ($dol_openinpopup) {
 		print '<input type="hidden" name="dol_openinpopup" value="'.$dol_openinpopup.'">';
 	}
+	if ($fromtemplateid > 0) {
+		print '<input type="hidden" name="fromtemplateid" value="'.$fromtemplateid.'">';
+		print '<input type="hidden" name="model_source" value="'.$fromtemplateid.'">';
+	}
 
 	print dol_get_fiche_head(array(), '');
 
@@ -730,7 +767,11 @@ if ($action == 'create') {
 
 	// Label
 	print '<tr class="field_label"><td class="titlefieldcreate">'.$langs->trans('Label').'</td><td class="valuefieldcreate">';
-	print '<input type="text" name="label" value="'.(!empty($label) ? $ref_client : GETPOST('label')).'"></td>';
+	$inputlabel = GETPOST('label');
+	if ($inputlabel === '' && $templatedefaultlabel !== '') {
+		$inputlabel = $templatedefaultlabel;
+	}
+	print '<input type="text" name="label" value="'.dol_escape_htmltag($inputlabel).'"></td>';
 	print '</tr>';
 
 	// Project
@@ -763,7 +804,7 @@ if ($action == 'create') {
 	print '<td class="valuefieldcreate">';
 	$description = GETPOST('description', 'none');
 	if ($description === '') {
-		$description = $object->getDefaultCreateValueFor('description');
+		$description = ($templatedefaultdescription !== '' ? $templatedefaultdescription : $object->getDefaultCreateValueFor('description'));
 	}
 	$doleditor = new DolEditor('description', $description, '', 160, 'dolibarr_details', '', false, true, getDolGlobalString('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
 	print $doleditor->Create(1);
@@ -825,7 +866,7 @@ if (($id || $ref) && $action == 'edit') {
 if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'create'))) {
 	$head = diffusionPrepareHead($object);
 
-	print dol_get_fiche_head($head, 'card', $langs->trans("Diffusion"), -1, $object->picto, 0, '', '', 0, '', 1);
+	print dol_get_fiche_head($head, 'card', $langs->trans((!empty($object->is_template) ? "DiffusionModele" : "Diffusion")), -1, $object->picto, 0, '', '', 0, '', 1);
 
 	$formconfirm = '';
 
@@ -917,9 +958,17 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
 	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
+	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
 
 	$morehtmlref = '<div class="refidno">';
+	if (!empty($object->is_template)) {
+		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
+		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
+	}
 	if (isset($object->fields['label'])) {
+		if (!empty($object->is_template)) {
+			$morehtmlref .= '<br>';
+		}
 		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
 		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
 	}
@@ -941,21 +990,23 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 		}
 	}
-	$morehtmlref .= '<br>';
-	$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
-	$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
+	if (empty($object->is_template)) {
+		$morehtmlref .= '<br>';
+		$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
+		$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
 
-	$morehtmlref .= '<br>';
-	$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
-	if (!empty($object->fk_user_exped)) {
-		$userexped = new User($db);
-		if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
-			$morehtmlref .= $userexped->getNomUrl(-1);
+		$morehtmlref .= '<br>';
+		$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
+		if (!empty($object->fk_user_exped)) {
+			$userexped = new User($db);
+			if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
+				$morehtmlref .= $userexped->getNomUrl(-1);
+			} else {
+				$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
+			}
 		} else {
-			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
+			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
 		}
-	} else {
-		$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
 	}
 
 	if (isModEnabled('multicompany') && !empty($object->entity) && (int) $object->entity !== (int) $conf->entity) {
@@ -975,7 +1026,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
+	$fieldrefbanner = (!empty($object->is_template) ? '' : 'ref');
+	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', $fieldrefbanner, $morehtmlref, '', 0, '', $morehtmlstatus);
 
 
 	print '<div class="fichecenter">';
@@ -1049,7 +1102,9 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	 * Lines
 	 */
 
-	include './tpl/diffusion_contacts.tpl.php';
+	if (empty($object->is_template)) {
+		include './tpl/diffusion_contacts.tpl.php';
+	}
 
 	if (!empty($object->table_element_line)) {
 		// Show object lines
@@ -1118,8 +1173,16 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				print dolGetButtonAction('', $langs->trans('SendMail'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=presend&token='.newToken().'&mode=init#formmailbeforetitle');
 			}
 
-			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project)) {
+			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project) && empty($object->is_template)) {
 				print dolGetButtonAction('', $langs->trans('ImportProjectContacts'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=ask_import_project_contacts&token='.newToken());
+			}
+
+			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && empty($object->is_template)) {
+				print dolGetButtonAction('', $langs->trans('ConvertirEnModele'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=convert_to_template&token='.newToken(), '', $permissiontoadd);
+			}
+
+			if (empty($user->socid) && $permissiontoadd && !empty($object->is_template)) {
+				print dolGetButtonAction('', $langs->trans('CreerUneDiffusionDepuisModele'), 'default', $_SERVER['PHP_SELF'].'?action=create&fromtemplateid='.$object->id.'&token='.newToken(), '', $permissiontoadd);
 			}
 
 			// Back to draft
@@ -1135,7 +1198,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			//print dolGetButtonAction('', $langs->trans('Modify'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=edit&token='.newToken(), '', $permissiontoadd);
 
 			// Validate
-			if ($object->status == $object::STATUS_DRAFT) {
+			if ($object->status == $object::STATUS_DRAFT && empty($object->is_template)) {
 				if (empty($object->table_element_line) || (is_array($object->lines) && count($object->lines) > 0)) {
 					print dolGetButtonAction('', $langs->trans('Validate'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=confirm_validate&confirm=yes&token='.newToken(), '', $permissiontoadd);
 				} else {
@@ -1145,7 +1208,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 
 			// Clone
-			if ($permissiontoadd) {
+			if ($permissiontoadd && empty($object->is_template)) {
 				print dolGetButtonAction('', $langs->trans('ToClone'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.(!empty($object->socid) ? '&socid='.$object->socid : '').'&action=clone&token='.newToken(), '', $permissiontoadd);
 			}
 
@@ -1190,7 +1253,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<div class="fichecenter"><div class="fichehalfleft">';
 		print '<a name="builddoc"></a>'; // ancre
 
-		$includedocgeneration = 1;
+		$includedocgeneration = (empty($object->is_template) ? 1 : 0);
 
 		// Documents
 

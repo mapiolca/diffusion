@@ -112,11 +112,13 @@ $backtopage = GETPOST('backtopage', 'alpha'); // Go back to a dedicated page
 $optioncss  = GETPOST('optioncss', 'aZ'); // Option for the css output (always '' except when 'print')
 $mode       = GETPOST('mode', 'aZ'); // The display mode ('list', 'kanban', 'hierarchy', 'calendar', 'gantt', ...)
 $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' or $groupby = 'p.fk_statut'
+$show_templates = GETPOSTINT('show_templates');
 $search_entity = GETPOST('search_entity', 'array:int');
 $search_fk_user_exped = GETPOST('search_fk_user_exped', 'array:int');
 $entityfilteroptions = array();
 $senderfilteroptions = array();
 $showentitycolumn = false;
+$show_templates = ($show_templates ? 1 : 0);
 
 $id = GETPOSTINT('id');
 $ref = GETPOST('ref', 'alpha');
@@ -140,13 +142,22 @@ $extrafields = new ExtraFields($db);
 $diroutputmassaction = $conf->diffusion->multidir_output[$conf->entity].'/temp/massgeneration/'.$user->id;
 $hookmanager->initHooks(array($contextpage)); 	// Note that conf->hooks_modules contains array of activated contexes
 
+$hiddenfieldsontemplatelist = array('date_expedition', 'fk_user_exped');
+if ($show_templates) {
+	foreach ($hiddenfieldsontemplatelist as $hiddenfield) {
+		if (isset($object->fields[$hiddenfield])) {
+			unset($object->fields[$hiddenfield]);
+		}
+	}
+}
+
 if (isModEnabled('multicompany')) {
 	$sharedentities = getEntity('diffusion', 1);
 	$currententityonly = getEntity('diffusion', 0);
 	$partagediffusionactive = ($sharedentities !== $currententityonly);
 	$sharedentityids = array_filter(array_map('intval', explode(',', $sharedentities)));
 	$receivessharedentities = (in_array((int) $conf->entity, $sharedentityids, true) && count(array_diff($sharedentityids, array((int) $conf->entity))) > 0);
-	$showentitycolumn = ($partagediffusionactive && $receivessharedentities);
+	$showentitycolumn = ($partagediffusionactive && ($receivessharedentities || $show_templates));
 }
 
 // Fetch optionals attributes and labels
@@ -336,7 +347,7 @@ $form = new Form($db);
 
 $now = dol_now();
 
-$title = $langs->trans("Diffusions");
+$title = ($show_templates ? $langs->trans("ListModelesDiffusion") : $langs->trans("Diffusions"));
 //$help_url = "EN:Module_Diffusion|FR:Module_Diffusion_FR|ES:Módulo_Diffusion";
 $help_url = '';
 $morejs = array();
@@ -360,6 +371,9 @@ $sql .= $hookmanager->resPrint;
 if ($showentitycolumn) {
 	$sql .= ", t.entity as entity, e.label as entity_label";
 }
+if ($show_templates) {
+	$sql .= ", (SELECT COUNT(ts.rowid) FROM ".MAIN_DB_PREFIX."diffusion as ts WHERE ts.model_source = t.rowid AND ts.is_template = 0 AND ts.entity IN (".getEntity('diffusion', (GETPOSTINT('search_current_entity') ? 0 : 1)).")) as nb_generated";
+}
 $sql = preg_replace('/,\s*$/', '', $sql);
 
 $sqlfields = $sql; // $sql fields to remove for count total
@@ -377,6 +391,7 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListFrom', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 $sql .= " WHERE t.entity IN (".getEntity('diffusion', (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
+$sql .= " AND t.is_template = ".$show_templates;
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
 		if ($key === 'fk_user_exped' && is_array($search[$key])) {
@@ -552,6 +567,9 @@ $param = '';
 if (!empty($mode)) {
 	$param .= '&mode='.urlencode($mode);
 }
+if ($show_templates) {
+	$param .= '&show_templates=1';
+}
 if (!empty($contextpage) && $contextpage != $_SERVER["PHP_SELF"]) {
 	$param .= '&contextpage='.urlencode($contextpage);
 }
@@ -621,13 +639,14 @@ print '<input type="hidden" name="page" value="'.$page.'">';
 print '<input type="hidden" name="contextpage" value="'.$contextpage.'">';
 print '<input type="hidden" name="page_y" value="">';
 print '<input type="hidden" name="mode" value="'.$mode.'">';
+print '<input type="hidden" name="show_templates" value="'.$show_templates.'">';
 
 
 $newcardbutton = '';
 $newcardbutton .= dolGetButtonTitle($langs->trans('ViewList'), '', 'fa fa-bars imgforviewmode', $_SERVER["PHP_SELF"].'?mode=common'.preg_replace('/(&|\?)*mode=[^&]+/', '', $param), '', ((empty($mode) || $mode == 'common') ? 2 : 1), array('morecss' => 'reposition'));
 $newcardbutton .= dolGetButtonTitle($langs->trans('ViewKanban'), '', 'fa fa-th-list imgforviewmode', $_SERVER["PHP_SELF"].'?mode=kanban'.preg_replace('/(&|\?)*mode=[^&]+/', '', $param), '', ($mode == 'kanban' ? 2 : 1), array('morecss' => 'reposition'));
 $newcardbutton .= dolGetButtonTitleSeparator();
-$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/diffusion/diffusion_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
+$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/diffusion/diffusion_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF'].($show_templates ? '?show_templates=1' : '')), '', $permissiontoadd);
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
@@ -735,6 +754,9 @@ if ($showentitycolumn) {
 	print $form->multiselectarray('search_entity', $entityfilteroptions, $search_entity, 0, 0, 'maxwidth100', 1);
 	print '</td>';
 }
+if ($show_templates) {
+	print '<td class="liste_titre center"></td>';
+}
 // Extra fields
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_input.tpl.php';
 
@@ -784,6 +806,10 @@ foreach ($object->fields as $key => $val) {
 }
 if ($showentitycolumn) {
 	print getTitleFieldOfList($langs->trans('Environment'), 0, $_SERVER['PHP_SELF'], 't.entity', '', $param, 'class="center"', $sortfield, $sortorder, 'center ')."\n";
+	$totalarray['nbfield']++;
+}
+if ($show_templates) {
+	print getTitleFieldOfList($langs->trans('DiffusionsGenerees'), 0, $_SERVER['PHP_SELF'], '', '', $param, 'class="center"', $sortfield, $sortorder, 'center ')."\n";
 	$totalarray['nbfield']++;
 }
 // Extra fields
@@ -938,6 +964,14 @@ while ($i < $imaxinloop) {
 			$entitylabel = (!empty($obj->entity_label) ? $obj->entity_label : $obj->entity);
 			print '<td class="center">';
 			print '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entitylabel).'</span></div>';
+			print '</td>';
+			if (!$i) {
+				$totalarray['nbfield']++;
+			}
+		}
+		if ($show_templates) {
+			print '<td class="center">';
+			print '<span class="badge badge-status4">'.((int) $obj->nb_generated).'</span>';
 			print '</td>';
 			if (!$i) {
 				$totalarray['nbfield']++;
