@@ -136,17 +136,23 @@ print_liste_field_titre($langs->trans("DateEnvoi"), $_SERVER["PHP_SELF"], "t.dat
 print_liste_field_titre($langs->trans("Status"), $_SERVER["PHP_SELF"], "t.status", "", '&'.$param, '', $sortfield, $sortorder, 'center ');
 print '</tr>';
 
-while ($obj = $db->fetch_object($resql)) {
-	$tmpobj = new Diffusion($db);
-	$tmpobj->id = (int) $obj->rowid;
-	$tmpobj->ref = $obj->ref;
-	$tmpobj->status = (int) $obj->status;
+if ($db->num_rows($resql) > 0) {
+	while ($obj = $db->fetch_object($resql)) {
+		$tmpobj = new Diffusion($db);
+		$tmpobj->id = (int) $obj->rowid;
+		$tmpobj->ref = $obj->ref;
+		$tmpobj->status = (int) $obj->status;
+		print '<tr class="oddeven">';
+		print '<td>'.$tmpobj->getNomUrl(1).'</td>';
+		print '<td>'.dol_escape_htmltag($obj->label).'</td>';
+		print '<td class="center">'.dol_print_date($db->jdate($obj->date_creation), 'dayhour').'</td>';
+		print '<td class="center">'.(!empty($obj->date_expedition) ? dol_print_date($db->jdate($obj->date_expedition), 'dayhour') : '<span class="opacitymedium">'.$langs->trans('None').'</span>').'</td>';
+		print '<td class="center">'.$tmpobj->getLibStatut(5).'</td>';
+		print '</tr>';
+	}
+} else {
 	print '<tr class="oddeven">';
-	print '<td>'.$tmpobj->getNomUrl(1).'</td>';
-	print '<td>'.dol_escape_htmltag($obj->label).'</td>';
-	print '<td class="center">'.dol_print_date($db->jdate($obj->date_creation), 'dayhour').'</td>';
-	print '<td class="center">'.(!empty($obj->date_expedition) ? dol_print_date($db->jdate($obj->date_expedition), 'dayhour') : '<span class="opacitymedium">'.$langs->trans('None').'</span>').'</td>';
-	print '<td class="center">'.$tmpobj->getLibStatut(5).'</td>';
+	print '<td class="opacitymedium center" colspan="5">'.$langs->trans('NoGeneratedDiffusionFromTemplate').'</td>';
 	print '</tr>';
 }
 

@@ -287,3 +287,4 @@ ErrorActionNotAllowedOnDiffusionTemplate = Cette action n'est pas autorisée sur
 DiffusionStatusTemplate = Modèle
 DiffusionModele = Diffusion modèle
 DiffusionsGenerees = Diffusions générées
+NoGeneratedDiffusionFromTemplate = Aucune diffusion générée à partir de ce modèle.

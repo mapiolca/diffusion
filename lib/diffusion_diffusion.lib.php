@@ -46,6 +46,13 @@ function diffusionPrepareHead($object)
 	$head[$h][2] = 'card';
 	$h++;
 
+	if (!empty($object->is_template)) {
+		$head[$h][0] = dol_buildpath("/diffusion/diffusion_generated_list.php", 1).'?id='.$object->id;
+		$head[$h][1] = $langs->trans("DiffusionsGenerees");
+		$head[$h][2] = 'generated';
+		$h++;
+	}
+
 	if ($showtabofpagecontact) {
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_contact.php", 1).'?id='.$object->id;
 		$head[$h][1] = $langs->trans("Contacts");
@@ -101,13 +108,6 @@ function diffusionPrepareHead($object)
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_agenda.php", 1).'?id='.$object->id;
 		$head[$h][1] = $langs->trans("Events");
 		$head[$h][2] = 'agenda';
-		$h++;
-	}
-
-	if (!empty($object->is_template)) {
-		$head[$h][0] = dol_buildpath("/diffusion/diffusion_generated_list.php", 1).'?id='.$object->id;
-		$head[$h][1] = $langs->trans("DiffusionsGenerees");
-		$head[$h][2] = 'generated';
 		$h++;
 	}
 
