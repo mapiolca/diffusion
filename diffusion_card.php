@@ -981,21 +981,23 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 		}
 	}
-	$morehtmlref .= '<br>';
-	$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
-	$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
+	if (empty($object->is_template)) {
+		$morehtmlref .= '<br>';
+		$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
+		$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
 
-	$morehtmlref .= '<br>';
-	$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
-	if (!empty($object->fk_user_exped)) {
-		$userexped = new User($db);
-		if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
-			$morehtmlref .= $userexped->getNomUrl(-1);
+		$morehtmlref .= '<br>';
+		$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
+		if (!empty($object->fk_user_exped)) {
+			$userexped = new User($db);
+			if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
+				$morehtmlref .= $userexped->getNomUrl(-1);
+			} else {
+				$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
+			}
 		} else {
-			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
+			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
 		}
-	} else {
-		$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
 	}
 
 	if (isModEnabled('multicompany') && !empty($object->entity) && (int) $object->entity !== (int) $conf->entity) {
@@ -1015,7 +1017,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
+	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0, '', $morehtmlstatus);
 
 
 	print '<div class="fichecenter">';
