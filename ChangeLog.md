@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.1
+
+- FR: Passage du formulaire de description diffusion sur le profil d'éditeur `dolibarr_mailings` avec alignement du rendu HTML sur la constante `FCKEDITOR_ENABLE_MAILINGS`.
+- EN: Switched the diffusion description form to the `dolibarr_mailings` editor profile and aligned HTML rendering with the `FCKEDITOR_ENABLE_MAILINGS` setting.
+
 ## 1.2
 
 - FR: Ajout de la gestion des modèles de diffusion (`is_template`) avec conversion d'une diffusion en modèle et création d'une diffusion à partir d'un modèle.
