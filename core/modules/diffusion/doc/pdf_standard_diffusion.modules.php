@@ -1239,54 +1239,54 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
 		$bufferY = 0.5;
-		$startIndex = 0;
+		$rowsOnPage = array();
+		$rowCount = count($rows);
 
-		while ($startIndex < count($rows)) {
-			$acceptedRows = array();
-			$cursor = $startIndex;
-			while ($cursor < count($rows)) {
-				$candidateRows = $acceptedRows;
-				$candidateRows[] = $rows[$cursor];
-				$candidateHtml = $tableOpen.$thead.'<tbody>'.implode('', $candidateRows).'</tbody>'.$tableClose;
+		for ($rowIndex = 0; $rowIndex < $rowCount; $rowIndex++) {
+			$candidateRows = $rowsOnPage;
+			$candidateRows[] = $rows[$rowIndex];
+			$candidateHtml = $tableOpen.$thead.'<tbody>'.implode('', $candidateRows).'</tbody>'.$tableClose;
 
-				$pdf->startTransaction();
-				$startPage = $pdf->getPage();
-				$pdf->SetAutoPageBreak(false, 0);
-				$pdf->SetFont('', '', $defaultFontSize);
-				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $candidateHtml, 0, 1, false, true, 'L', true);
-				$endPage = $pdf->getPage();
-				$endY = $pdf->GetY();
-				$pdf = $pdf->rollbackTransaction(true);
+			$pdf->startTransaction();
+			$startPage = $pdf->getPage();
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $candidateHtml, 0, 1, false, true, 'L', true);
+			$endPage = $pdf->getPage();
+			$endY = $pdf->GetY();
+			$pdf = $pdf->rollbackTransaction(true);
 
-				if ($endPage > $startPage || $endY > ($pageBottomLimit - $bufferY)) {
-					break;
-				}
-
-				$acceptedRows = $candidateRows;
-				$cursor++;
-			}
-
-			if (empty($acceptedRows)) {
-				$singleRowHtml = $tableOpen.$thead.'<tbody>'.$rows[$startIndex].'</tbody>'.$tableClose;
-				$pdf->SetAutoPageBreak(false, 0);
-				$pdf->SetFont('', '', $defaultFontSize);
-				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $singleRowHtml, 0, 1, false, true, 'L', true);
-				$startIndex++;
-				if ($startIndex < count($rows)) {
-					$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
-				}
+			$fitsCurrentPage = ($endPage == $startPage && $endY <= ($pageBottomLimit - $bufferY));
+			if ($fitsCurrentPage) {
+				$rowsOnPage = $candidateRows;
 				continue;
 			}
 
-			$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $acceptedRows).'</tbody>'.$tableClose;
+			if (!empty($rowsOnPage)) {
+				$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $rowsOnPage).'</tbody>'.$tableClose;
+				$pdf->SetAutoPageBreak(false, 0);
+				$pdf->SetFont('', '', $defaultFontSize);
+				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+				$rowsOnPage = array($rows[$rowIndex]);
+				continue;
+			}
+
+			$singleRowHtml = $tableOpen.$thead.'<tbody>'.$rows[$rowIndex].'</tbody>'.$tableClose;
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $singleRowHtml, 0, 1, false, true, 'L', true);
+			if ($rowIndex < ($rowCount - 1)) {
+				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+			}
+			$rowsOnPage = array();
+		}
+
+		if (!empty($rowsOnPage)) {
+			$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $rowsOnPage).'</tbody>'.$tableClose;
 			$pdf->SetAutoPageBreak(false, 0);
 			$pdf->SetFont('', '', $defaultFontSize);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
-			$startIndex += count($acceptedRows);
-
-			if ($startIndex < count($rows)) {
-				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
-			}
 		}
 	}
 
