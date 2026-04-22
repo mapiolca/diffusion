@@ -1338,7 +1338,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$baseWidths = array();
 		for ($i = 0; $i < $maxColCount; $i++) {
 			$chars = isset($maxCharsByCol[$i]) ? (int) $maxCharsByCol[$i] : 1;
-			$baseWidths[$i] = max(4.0, ($chars / $largestColChars) * 60.0);
+			$baseWidths[$i] = max(5.0, ($chars / $largestColChars) * 85.0);
 		}
 
 		$sumBase = array_sum($baseWidths);
@@ -1364,7 +1364,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			return preg_replace_callback('/<(td|th)\b([^>]*)>/si', function ($cellOpenMatch) use (&$cellIndex, $baseWidths) {
 				$tag = (string) $cellOpenMatch[1];
 				$attrs = (string) $cellOpenMatch[2];
-				$colWidth = isset($baseWidths[$cellIndex]) ? (float) $baseWidths[$cellIndex] : 4.0;
+				$colWidth = isset($baseWidths[$cellIndex]) ? (float) $baseWidths[$cellIndex] : 5.0;
 				$cellIndex++;
 				$existingStyle = '';
 				if (preg_match('/\bstyle\s*=\s*([\'"])(.*?)\1/si', $attrs, $styleMatch)) {
