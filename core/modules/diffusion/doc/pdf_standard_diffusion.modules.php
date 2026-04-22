@@ -1202,19 +1202,57 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$maxHeightByRatio = $maxWidth * 0.75;
 		$maxHeight = min(100.0, $maxHeightByRatio);
 		$maxHeight = max(10.0, $maxHeight);
+		$descriptionHtml = $this->normalizeTablesForPdf($descriptionHtml);
 
 		$descriptionHtml = preg_replace('/(<table\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sheight\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sstyle\s*=\s*([\'"])(.*?)\2/si', '$1 style="$3 max-width: '.$maxWidth.'mm; max-height: '.$maxHeight.'mm; width: auto; height: auto;"', $descriptionHtml);
+		$descriptionHtml = preg_replace('/<tr\b(?![^>]*\bnobr=)([^>]*)>/si', '<tr nobr="true"$1>', $descriptionHtml);
 
 		$layoutStyle = '<style>
 table{width:100% !important;max-width:100% !important;table-layout:auto;border-collapse:collapse;}
 thead,tbody,tfoot,tr,td,th{max-width:100%;word-wrap:break-word;overflow-wrap:anywhere;}
+tr{page-break-inside:avoid;}
 img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important;width:auto !important;height:auto !important;}
 </style>';
 
 		return $layoutStyle.$descriptionHtml;
+	}
+
+	/**
+	 * Normalize table blocks for TCPDF pagination rules.
+	 *
+	 * @param string $html HTML content
+	 * @return string
+	 */
+	protected function normalizeTablesForPdf($html)
+	{
+		return preg_replace_callback('/<table\b[^>]*>.*?<\/table>/si', array($this, 'normalizeSingleTableForPdfCallback'), (string) $html);
+	}
+
+	/**
+	 * Ensure table has a repeatable header block when possible.
+	 *
+	 * @param array<int,string> $matches Regex callback matches
+	 * @return string
+	 */
+	protected function normalizeSingleTableForPdfCallback(array $matches)
+	{
+		$tableHtml = isset($matches[0]) ? (string) $matches[0] : '';
+		if ($tableHtml === '' || preg_match('/<thead\b/i', $tableHtml)) {
+			return $tableHtml;
+		}
+		if (!preg_match('/(<tr\b[^>]*>.*?<\/tr>)/si', $tableHtml, $firstRowMatch)) {
+			return $tableHtml;
+		}
+		$firstRow = $firstRowMatch[1];
+		if (!preg_match('/<th\b/i', $firstRow)) {
+			return $tableHtml;
+		}
+		$thead = '<thead>'.$firstRow.'</thead>';
+		$tableHtml = preg_replace('/'.preg_quote($firstRow, '/').'/', $thead, $tableHtml, 1);
+		return (string) $tableHtml;
 	}
 
 	/**
