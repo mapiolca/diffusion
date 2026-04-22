@@ -51,6 +51,8 @@ if (!$res) {
 	die("Include of main fails");
 }
 
+dol_include_once('/diffusion/class/diffusioncontact.class.php');
+
 /**
  * @var Conf $conf
  * @var DoliDB $db

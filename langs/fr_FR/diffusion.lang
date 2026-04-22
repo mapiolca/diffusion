@@ -196,6 +196,7 @@ SelectProjectContactsToImport = Sélectionnez les contacts du projet à importer
 NoProjectContactsToImport = Aucun contact du projet n'est disponible pour l'import.
 ErrorNoProjectLinkedToDiffusion = Aucun projet n'est lié à cette diffusion.
 ErrorFailedToLoadProject = Impossible de charger le projet lié.
+ErrorNoCompatibleContactTypeForDiffusion = Aucun type de contact compatible avec la diffusion n'a été trouvé.
 ErrorNoContactSelectedForImport = Aucun contact sélectionné pour l'import.
 ProjectContactsImportedCount = %s contact(s) importé(s) depuis le projet.
 ProjectContactsImportErrorCount = %s contact(s) n'ont pas pu être importé(s).

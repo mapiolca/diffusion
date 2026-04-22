@@ -50,6 +50,7 @@ if (empty($preselectedtypeofcontact)) {
 
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
+require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/diffusion/lib/diffusion.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/diffusion/lib/diffusion.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/custom/diffusion/lib/ajax.lib.php';
