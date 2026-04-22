@@ -1208,12 +1208,12 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sheight\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sstyle\s*=\s*([\'"])(.*?)\2/si', '$1 style="$3 max-width: '.$maxWidth.'mm; max-height: '.$maxHeight.'mm; width: auto; height: auto;"', $descriptionHtml);
-		$descriptionHtml = preg_replace('/<tr\b(?![^>]*\bnobr=)([^>]*)>/si', '<tr nobr="true"$1>', $descriptionHtml);
 
 		$layoutStyle = '<style>
 table{width:100% !important;max-width:100% !important;table-layout:auto;border-collapse:collapse;}
+thead{display:table-header-group;}
+tbody{display:table-row-group;}
 thead,tbody,tfoot,tr,td,th{max-width:100%;word-wrap:break-word;overflow-wrap:anywhere;}
-tr{page-break-inside:avoid;}
 img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important;width:auto !important;height:auto !important;}
 </style>';
 
