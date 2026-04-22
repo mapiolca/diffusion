@@ -1212,6 +1212,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	protected function renderTableHtmlChunked(&$pdf, $object, $outputlangs, $tableHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
 		$tableHtml = (string) $tableHtml;
+		$tableHtml = $this->applyColumnWidthsByContentRatio($tableHtml, (float) $width);
 		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
 			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
@@ -1288,6 +1289,96 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$pdf->SetFont('', '', $defaultFontSize);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
 		}
+	}
+
+	/**
+	 * Apply column widths from character-based ratio to occupy available width.
+	 *
+	 * @param string $tableHtml Table HTML
+	 * @param float $tableWidthMm Available table width in mm
+	 * @return string
+	 */
+	protected function applyColumnWidthsByContentRatio($tableHtml, $tableWidthMm)
+	{
+		$tableHtml = (string) $tableHtml;
+		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
+			return $tableHtml;
+		}
+
+		$tableOpen = (string) $tableParts[1];
+		$tableInner = (string) $tableParts[2];
+		$tableClose = (string) $tableParts[3];
+		$rowMatches = array();
+		preg_match_all('/<tr\b[^>]*>.*?<\/tr>/si', $tableInner, $rowMatches);
+		$rows = isset($rowMatches[0]) ? $rowMatches[0] : array();
+		if (empty($rows)) {
+			return $tableHtml;
+		}
+
+		$maxCharsByCol = array();
+		$maxColCount = 0;
+		foreach ($rows as $rowHtml) {
+			$cellMatches = array();
+			preg_match_all('/<(td|th)\b[^>]*>(.*?)<\/\\1>/si', (string) $rowHtml, $cellMatches, PREG_SET_ORDER);
+			$maxColCount = max($maxColCount, count($cellMatches));
+			for ($i = 0; $i < count($cellMatches); $i++) {
+				$cellText = trim((string) html_entity_decode(strip_tags((string) $cellMatches[$i][2]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+				$charCount = function_exists('mb_strlen') ? mb_strlen($cellText, 'UTF-8') : strlen($cellText);
+				if (!isset($maxCharsByCol[$i])) {
+					$maxCharsByCol[$i] = 0;
+				}
+				$maxCharsByCol[$i] = max((int) $maxCharsByCol[$i], (int) $charCount);
+			}
+		}
+		if ($maxColCount <= 0) {
+			return $tableHtml;
+		}
+
+		$largestColChars = max(1, (int) max($maxCharsByCol));
+		$baseWidths = array();
+		for ($i = 0; $i < $maxColCount; $i++) {
+			$chars = isset($maxCharsByCol[$i]) ? (int) $maxCharsByCol[$i] : 1;
+			$baseWidths[$i] = max(4.0, ($chars / $largestColChars) * 75.0);
+		}
+
+		$sumBase = array_sum($baseWidths);
+		$tableWidthMm = max(20.0, (float) $tableWidthMm);
+		if ($sumBase > $tableWidthMm) {
+			$ratio = $tableWidthMm / $sumBase;
+			for ($i = 0; $i < count($baseWidths); $i++) {
+				$baseWidths[$i] = $baseWidths[$i] * $ratio;
+			}
+		} else {
+			$largestColIndex = (int) array_search(max($baseWidths), $baseWidths);
+			$baseWidths[$largestColIndex] += ($tableWidthMm - $sumBase);
+		}
+
+		$tableOpen = preg_replace('/\bstyle\s*=\s*([\'"]).*?\1/si', '', $tableOpen);
+		$tableOpen = preg_replace('/\bwidth\s*=\s*([\'"]).*?\1/si', '', $tableOpen);
+		$tableOpen = rtrim((string) preg_replace('/>$/', '', $tableOpen));
+		$tableOpen .= ' style="width:'.$tableWidthMm.'mm; max-width:'.$tableWidthMm.'mm; table-layout:fixed; border-collapse:collapse;">';
+
+		$tableInner = preg_replace_callback('/<tr\b[^>]*>.*?<\/tr>/si', function ($rowMatch) use ($baseWidths) {
+			$rowHtml = (string) $rowMatch[0];
+			$cellIndex = 0;
+			return preg_replace_callback('/<(td|th)\b([^>]*)>/si', function ($cellOpenMatch) use (&$cellIndex, $baseWidths) {
+				$tag = (string) $cellOpenMatch[1];
+				$attrs = (string) $cellOpenMatch[2];
+				$colWidth = isset($baseWidths[$cellIndex]) ? (float) $baseWidths[$cellIndex] : 4.0;
+				$cellIndex++;
+				$existingStyle = '';
+				if (preg_match('/\bstyle\s*=\s*([\'"])(.*?)\1/si', $attrs, $styleMatch)) {
+					$existingStyle = trim((string) $styleMatch[2]);
+				}
+				$attrs = preg_replace('/\bwidth\s*=\s*([\'"]).*?\1/si', '', $attrs);
+				$attrs = preg_replace('/\bstyle\s*=\s*([\'"]).*?\1/si', '', $attrs);
+				$widthStyle = 'width:'.round($colWidth, 2).'mm; min-width:'.round($colWidth, 2).'mm; max-width:'.round($colWidth, 2).'mm;';
+				$finalStyle = trim($existingStyle.($existingStyle !== '' ? '; ' : '').$widthStyle);
+				return '<'.$tag.$attrs.' style="'.$finalStyle.'">';
+			}, $rowHtml);
+		}, $tableInner);
+
+		return $tableOpen.$tableInner.$tableClose;
 	}
 
 	/**
