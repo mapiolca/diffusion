@@ -1109,44 +1109,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		if (dol_textishtml($descriptionText)) {
 			$descriptionHtml = convertBackOfficeMediasLinksToPublicLinks($descriptionText);
 			$descriptionHtml = $this->normalizeDescriptionHtmlForPdf($descriptionHtml, (float) $width);
-			$pageposbeforedesc = $pdf->getPage();
-			$posybefore = $pdf->GetY();
-
-			$pdf->setTopMargin($startYNewPage);
-			$pdf->startTransaction();
-			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
-			$pageposafterdesc = $pdf->getPage();
-			$posyafter = $pdf->GetY();
-
-			if ($pageposafterdesc > $pageposbeforedesc) {
-				$pdf = $pdf->rollbackTransaction(true);
-
-				while ($pagenb < $pageposafterdesc) {
-					$pdf->AddPage();
-					$pagenb++;
-					if (!empty($tplidx)) {
-						$pdf->useTemplate($tplidx);
-					}
-					if ($repeatPageHeadOnExtraPages) {
-						$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
-					}
-					$pdf->setTopMargin($startYNewPage);
-				}
-
-				$pdf->setPage($pageposbeforedesc);
-				$pdf->setTopMargin($startYNewPage);
-				$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
-				$pdf->SetFont('', '', $defaultFontSize);
-				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
-				$pageposafterdesc = $pdf->getPage();
-				$posyafter = $pdf->GetY();
-			} else {
-				$pdf->commitTransaction();
-			}
-
-			$pagenb = max($pagenb, $pageposafterdesc);
-			$pdf->setPage($pageposafterdesc);
+			$posyafter = $this->renderHtmlDescriptionWithTableAwarePagination($pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 			$pdf->SetAutoPageBreak(true, 0);
 			return $posyafter;
 		}
@@ -1187,6 +1150,172 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		}
 
 		return $pdf->GetY();
+	}
+
+	/**
+	 * Render HTML description by splitting tables into page-safe chunks.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $descriptionHtml Normalized HTML
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return float
+	 */
+	protected function renderHtmlDescriptionWithTableAwarePagination(&$pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$parts = preg_split('/(<table\b[^>]*>.*?<\/table>)/si', (string) $descriptionHtml, -1, PREG_SPLIT_DELIM_CAPTURE);
+		if (!is_array($parts)) {
+			$parts = array((string) $descriptionHtml);
+		}
+
+		for ($i = 0; $i < count($parts); $i++) {
+			$part = (string) $parts[$i];
+			if ($part === '') {
+				continue;
+			}
+			if (preg_match('/^\s*<table\b/i', $part)) {
+				$this->renderTableHtmlChunked($pdf, $object, $outputlangs, $part, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+				continue;
+			}
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $part, 0, 1, false, true, 'L', true);
+		}
+
+		return $pdf->GetY();
+	}
+
+	/**
+	 * Render one table and split rows across pages while repeating headers.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $tableHtml Table HTML
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function renderTableHtmlChunked(&$pdf, $object, $outputlangs, $tableHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$tableHtml = (string) $tableHtml;
+		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			return;
+		}
+
+		$tableOpen = $tableParts[1];
+		$tableInner = $tableParts[2];
+		$tableClose = $tableParts[3];
+		$thead = '';
+		$tbody = $tableInner;
+
+		if (preg_match('/<thead\b[^>]*>.*?<\/thead>/si', $tableInner, $theadMatch)) {
+			$thead = $theadMatch[0];
+			$tbody = preg_replace('/<thead\b[^>]*>.*?<\/thead>/si', '', $tableInner, 1);
+		}
+		$tbody = preg_replace('/<\/?tbody\b[^>]*>/si', '', (string) $tbody);
+		preg_match_all('/<tr\b[^>]*>.*?<\/tr>/si', (string) $tbody, $rowMatches);
+		$rows = isset($rowMatches[0]) ? $rowMatches[0] : array();
+		if (empty($rows)) {
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			return;
+		}
+
+		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
+		$bufferY = 0.5;
+		$startIndex = 0;
+
+		while ($startIndex < count($rows)) {
+			$acceptedRows = array();
+			$cursor = $startIndex;
+			while ($cursor < count($rows)) {
+				$candidateRows = $acceptedRows;
+				$candidateRows[] = $rows[$cursor];
+				$candidateHtml = $tableOpen.$thead.'<tbody>'.implode('', $candidateRows).'</tbody>'.$tableClose;
+
+				$pdf->startTransaction();
+				$startPage = $pdf->getPage();
+				$pdf->SetAutoPageBreak(false, 0);
+				$pdf->SetFont('', '', $defaultFontSize);
+				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $candidateHtml, 0, 1, false, true, 'L', true);
+				$endPage = $pdf->getPage();
+				$endY = $pdf->GetY();
+				$pdf = $pdf->rollbackTransaction(true);
+
+				if ($endPage > $startPage || $endY > ($pageBottomLimit - $bufferY)) {
+					break;
+				}
+
+				$acceptedRows = $candidateRows;
+				$cursor++;
+			}
+
+			if (empty($acceptedRows)) {
+				$singleRowHtml = $tableOpen.$thead.'<tbody>'.$rows[$startIndex].'</tbody>'.$tableClose;
+				$pdf->SetAutoPageBreak(false, 0);
+				$pdf->SetFont('', '', $defaultFontSize);
+				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $singleRowHtml, 0, 1, false, true, 'L', true);
+				$startIndex++;
+				if ($startIndex < count($rows)) {
+					$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+				}
+				continue;
+			}
+
+			$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $acceptedRows).'</tbody>'.$tableClose;
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+			$startIndex += count($acceptedRows);
+
+			if ($startIndex < count($rows)) {
+				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+			}
+		}
+	}
+
+	/**
+	 * Add a new page for description overflow and reset cursor.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function addPageForDescriptionOverflow(&$pdf, $object, $outputlangs, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$pdf->AddPage();
+		$pagenb++;
+		if (!empty($tplidx)) {
+			$pdf->useTemplate($tplidx);
+		}
+		if ($repeatPageHeadOnExtraPages) {
+			$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
+			$pdf->SetXY($this->marge_gauche, $startYNewPage);
+		} else {
+			$pdf->SetXY($this->marge_gauche, $this->marge_haute + 2);
+		}
 	}
 
 	/**
