@@ -321,7 +321,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 			    $heightforinfotot = $this->estimateSummaryHeight($contactSummaries, $attachmentSummaries);
 				$heightforfreetext = getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Height reserved to output the free text on last page
-				$heightforfooter = $this->marge_basse + (getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
+				$heightforfooter = $this->marge_basse + (getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 22 : 12); // Height reserved to output the footer (value include bottom margin)
 
 				if (class_exists('TCPDF')) {
 					$pdf->setPrintHeader(false);
@@ -1094,10 +1094,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function renderDescriptionWithPagination(&$pdf, $object, $outputlangs, $descriptionText, $startY, $startYNewPage, $width, $heightforfooter, $defaultFontSize, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
+		$reservedFooterHeight = $heightforfooter + 2;
 		$pdf->SetFont('', '', $defaultFontSize);
 		$pdf->SetXY($this->marge_gauche, $startY);
 		$lineHeight = 4;
-		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
 		$descriptionText = trim((string) $descriptionText);
 		$descriptionText = str_replace(array("\\r\\n", "\\n", "\\r"), "\n", $descriptionText);
 
@@ -1113,7 +1114,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 			$pdf->setTopMargin($startYNewPage);
 			$pdf->startTransaction();
-			$pdf->SetAutoPageBreak(true, $heightforfooter);
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
 			$pageposafterdesc = $pdf->getPage();
 			$posyafter = $pdf->GetY();
@@ -1135,7 +1136,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 				$pdf->setPage($pageposbeforedesc);
 				$pdf->setTopMargin($startYNewPage);
-				$pdf->SetAutoPageBreak(true, $heightforfooter);
+				$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
 				$pdf->SetFont('', '', $defaultFontSize);
 				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
 				$pageposafterdesc = $pdf->getPage();
