@@ -1340,15 +1340,20 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sheight\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<(?:colgroup|col|tr|td|th)\b[^>]*?)\sstyle\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
 		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sstyle\s*=\s*([\'"])(.*?)\2/si', '$1 style="$3 max-width: '.$maxWidth.'mm; max-height: '.$maxHeight.'mm; width: auto; height: auto;"', $descriptionHtml);
+		$descriptionHtml = preg_replace('/<td\b([^>]*)>/si', '<td$1 style="text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', $descriptionHtml);
+		$descriptionHtml = preg_replace('/<th\b([^>]*)>/si', '<th$1 style="background-color:#e6e6e6; font-weight:bold; text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', $descriptionHtml);
+		$descriptionHtml = preg_replace_callback('/<thead\b[^>]*>.*?<\/thead>/si', function ($matches) {
+			return preg_replace('/<td\b([^>]*)>/si', '<td$1 style="background-color:#e6e6e6; font-weight:bold; text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', (string) $matches[0]);
+		}, $descriptionHtml);
 
 		$layoutStyle = '<style>
-table{width:auto !important;max-width:'.$maxWidth.'mm !important;table-layout:auto;border-collapse:collapse;border-spacing:0;}
+table{width:auto !important;max-width:'.$maxWidth.'mm !important;table-layout:auto;border-collapse:collapse;border-spacing:0;border:0.1mm solid #999999;}
 thead{display:table-header-group;}
 tbody{display:table-row-group;}
 thead,tbody,tfoot,tr,td,th,col,colgroup{max-width:100% !important;word-wrap:break-word;overflow-wrap:anywhere;}
 td,th,col{width:auto !important;min-width:0 !important;max-width:100% !important;}
-th{font-weight:bold;background-color:#f0f0f0;color:#000000;}
-td,th{border:0.2mm solid #666666;padding:0.8mm;vertical-align:top;text-align:left;}
+thead th,thead td{font-weight:bold;background-color:#e6e6e6;color:#000000;}
+td,th{border:0.1mm solid #999999;padding:0.8mm;vertical-align:middle;text-align:left;}
 p,div,span{margin:0;padding:0;}
 img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important;width:auto !important;height:auto !important;}
 </style>';
