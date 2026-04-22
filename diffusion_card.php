@@ -1079,14 +1079,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
 			print '</div>';
 			print '</form>';
-		} elseif (getDolGlobalString('FCKEDITOR_ENABLE_MAILINGS')) {
+		} else {
 			if (function_exists('dol_print_html')) {
 				print dol_print_html($object->description, '1');
 			} else {
 				print $object->description;
 			}
-		} else {
-			print dol_nl2br(dol_escape_htmltag($object->description));
 		}
 		print '</td>';
 		print '</tr>';

@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.2
+
+- FR: Correction du rendu de la description sur la card diffusion pour afficher systématiquement le HTML saisi.
+- EN: Fixed description rendering on the diffusion card to always display entered HTML content.
+
 ## 1.2.1
 
 - FR: Passage du formulaire de description diffusion sur le profil d'éditeur `dolibarr_mailings` avec alignement du rendu HTML sur la constante `FCKEDITOR_ENABLE_MAILINGS`.
