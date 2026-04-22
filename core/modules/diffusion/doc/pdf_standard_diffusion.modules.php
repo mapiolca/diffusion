@@ -1107,6 +1107,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 		if (dol_textishtml($descriptionText)) {
 			$descriptionHtml = convertBackOfficeMediasLinksToPublicLinks($descriptionText);
+			$descriptionHtml = $this->normalizeDescriptionHtmlForPdf($descriptionHtml, (float) $width);
 			$pageposbeforedesc = $pdf->getPage();
 			$posybefore = $pdf->GetY();
 
@@ -1185,6 +1186,32 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		}
 
 		return $pdf->GetY();
+	}
+
+	/**
+	 * Normalize description HTML for TCPDF rendering.
+	 *
+	 * @param string $descriptionHtml Raw HTML
+	 * @param float $availableWidth Available content width in mm
+	 * @return string
+	 */
+	protected function normalizeDescriptionHtmlForPdf($descriptionHtml, $availableWidth)
+	{
+		$descriptionHtml = (string) $descriptionHtml;
+		$maxWidth = max(10, (float) $availableWidth);
+
+		$descriptionHtml = preg_replace('/(<table\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sheight\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sstyle\s*=\s*([\'"])(.*?)\2/si', '$1 style="$3 max-width: '.$maxWidth.'mm; max-height: 100mm; width: auto; height: auto;"', $descriptionHtml);
+
+		$layoutStyle = '<style>
+table{width:100% !important;max-width:100% !important;table-layout:fixed;border-collapse:collapse;}
+thead,tbody,tfoot,tr,td,th{max-width:100%;word-wrap:break-word;overflow-wrap:anywhere;}
+img{max-width: '.$maxWidth.'mm !important;max-height:100mm !important;width:auto !important;height:auto !important;}
+</style>';
+
+		return $layoutStyle.$descriptionHtml;
 	}
 
 	/**
