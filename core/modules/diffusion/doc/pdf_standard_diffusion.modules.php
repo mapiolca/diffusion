@@ -1323,7 +1323,15 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$maxColCount = max($maxColCount, count($cellMatches));
 			for ($i = 0; $i < count($cellMatches); $i++) {
 				$cellText = trim((string) html_entity_decode(strip_tags((string) $cellMatches[$i][2]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-				$charCount = function_exists('mb_strlen') ? mb_strlen($cellText, 'UTF-8') : strlen($cellText);
+				$tokens = preg_split('/\s+/u', $cellText, -1, PREG_SPLIT_NO_EMPTY);
+				$longestTokenChars = 0;
+				if (is_array($tokens)) {
+					for ($t = 0; $t < count($tokens); $t++) {
+						$tokenLen = function_exists('mb_strlen') ? mb_strlen((string) $tokens[$t], 'UTF-8') : strlen((string) $tokens[$t]);
+						$longestTokenChars = max($longestTokenChars, (int) $tokenLen);
+					}
+				}
+				$charCount = max(1, $longestTokenChars);
 				if (!isset($maxCharsByCol[$i])) {
 					$maxCharsByCol[$i] = 0;
 				}
@@ -1442,7 +1450,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 table{width:auto !important;max-width:'.$maxWidth.'mm !important;table-layout:auto;border-collapse:collapse;border-spacing:0;border:0.1mm solid #999999;}
 thead{display:table-header-group;}
 tbody{display:table-row-group;}
-thead,tbody,tfoot,tr,td,th,col,colgroup{max-width:100% !important;word-wrap:break-word;overflow-wrap:anywhere;}
+thead,tbody,tfoot,tr,td,th,col,colgroup{max-width:100% !important;word-wrap:normal;overflow-wrap:normal;word-break:normal;}
 td,th,col{width:auto !important;min-width:0 !important;max-width:100% !important;}
 thead th,thead td{font-weight:bold;background-color:#e6e6e6;color:#000000;}
 td,th{border:0.1mm solid #999999;padding:0.8mm;vertical-align:middle;text-align:left;}
