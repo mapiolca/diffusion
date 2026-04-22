@@ -1,5 +1,18 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.2
+
+- FR: Refonte du rendu PDF de la description HTML avec pagination robuste des tableaux : découpe multi-pages, répétition de l'en-tête à chaque page et respect systématique de la zone avant pied de page.
+- EN: Reworked HTML description PDF rendering with robust table pagination: multi-page splitting, header repetition on each page, and strict respect of the area before footer.
+- FR: Normalisation avancée des tableaux HTML pour le PDF : conversion automatique de la première ligne en en-tête répétable quand nécessaire et alignement stable des colonnes.
+- EN: Added advanced HTML table normalization for PDF: automatic conversion of first row into repeatable header when needed and stable column alignment.
+- FR: Harmonisation du style tableau PDF (en-têtes grisés, bordures fines, cellules alignées à gauche/centrées verticalement) et meilleure compatibilité TCPDF via styles inline.
+- EN: Harmonized PDF table styling (gray headers, thin borders, left-aligned/middle cells) and improved TCPDF compatibility through inline styles.
+- FR: Amélioration du calcul des largeurs de colonnes basé sur le contenu non césurable (mot le plus long), avec plafonnement de la colonne de référence à 75mm, plancher à 5mm et redistribution équitable du reste entre toutes les colonnes.
+- EN: Improved column width computation based on non-breakable content (longest word), with a 75mm reference-column cap, 5mm floor, and equal redistribution of remaining width across all columns.
+- FR: Encadrement renforcé des images HTML dans la description PDF (hauteur max 100mm et largeur max limitée à la zone utile).
+- EN: Strengthened HTML image constraints in PDF descriptions (max height 100mm and max width limited to usable area).
+
 ## 1.2.1
 
 - FR: Passage du formulaire de description diffusion sur le profil d'éditeur `dolibarr_mailings` avec alignement du rendu HTML sur la constante `FCKEDITOR_ENABLE_MAILINGS`.
