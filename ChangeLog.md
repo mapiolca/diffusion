@@ -12,6 +12,8 @@
 - EN: Improved column width computation based on non-breakable content (longest word), with a 75mm reference-column cap, 5mm floor, and equal redistribution of remaining width across all columns.
 - FR: Encadrement renforcé des images HTML dans la description PDF (hauteur max 100mm et largeur max limitée à la zone utile).
 - EN: Strengthened HTML image constraints in PDF descriptions (max height 100mm and max width limited to usable area).
+- FR: Correction du rendu de la description sur la card diffusion pour afficher systématiquement le HTML saisi.
+- EN: Fixed description rendering on the diffusion card to always display entered HTML content.
 
 ## 1.2.1
 
