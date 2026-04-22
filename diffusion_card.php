@@ -806,7 +806,7 @@ if ($action == 'create') {
 	if ($description === '') {
 		$description = ($templatedefaultdescription !== '' ? $templatedefaultdescription : $object->getDefaultCreateValueFor('description'));
 	}
-	$doleditor = new DolEditor('description', $description, '', 160, 'dolibarr_mailings', '', false, true, getDolGlobalString('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '90%');
+	$doleditor = new DolEditor('description', $description, '', 200, 'dolibarr_mailings', 'In', true, true, true, 40, '90%');
 	print $doleditor->Create(1);
 	print '</tr>';
 
@@ -1073,7 +1073,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			print '<input type="hidden" name="token" value="'.newToken().'">';
 			print '<input type="hidden" name="action" value="update">';
 			print '<input type="hidden" name="id" value="'.$object->id.'">';
-			$doleditor = new DolEditor('description', $object->description, '', 160, 'dolibarr_mailings', '', false, true, getDolGlobalString('FCKEDITOR_ENABLE_DETAILS'), ROWS_4, '100%');
+			$doleditor = new DolEditor('description', $object->description, '', 200, 'dolibarr_mailings', 'In', true, true, true, 40, '100%');
 			print $doleditor->Create(1);
 			print '<div class="center">';
 			print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
