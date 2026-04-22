@@ -1345,6 +1345,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$descriptionHtml = preg_replace_callback('/<thead\b[^>]*>.*?<\/thead>/si', function ($matches) {
 			return preg_replace('/<td\b([^>]*)>/si', '<td$1 style="background-color:#e6e6e6; font-weight:bold; text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', (string) $matches[0]);
 		}, $descriptionHtml);
+		$descriptionHtml = $this->normalizeSingleWordCellsForPdf($descriptionHtml);
 
 		$layoutStyle = '<style>
 table{width:auto !important;max-width:'.$maxWidth.'mm !important;table-layout:auto;border-collapse:collapse;border-spacing:0;border:0.1mm solid #999999;}
@@ -1359,6 +1360,31 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 </style>';
 
 		return $layoutStyle.$descriptionHtml;
+	}
+
+	/**
+	 * Force compact width for cells that contain a single word.
+	 *
+	 * @param string $html HTML content
+	 * @return string
+	 */
+	protected function normalizeSingleWordCellsForPdf($html)
+	{
+		return preg_replace_callback('/<(td|th)\b([^>]*)>(.*?)<\/\\1>/si', function ($matches) {
+			$cellTag = isset($matches[1]) ? (string) $matches[1] : 'td';
+			$cellAttrs = isset($matches[2]) ? (string) $matches[2] : '';
+			$cellContent = isset($matches[3]) ? (string) $matches[3] : '';
+			$cellText = trim((string) html_entity_decode(strip_tags($cellContent), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+			if ($cellText === '' || preg_match('/\s/u', $cellText)) {
+				return '<'.$cellTag.$cellAttrs.'>'.$cellContent.'</'.$cellTag.'>';
+			}
+			if (preg_match('/\bstyle\s*=\s*([\'"])(.*?)\1/i', $cellAttrs, $styleMatch)) {
+				$newStyle = trim((string) $styleMatch[2]).'; white-space:nowrap; width:1%;';
+				$cellAttrs = preg_replace('/\bstyle\s*=\s*([\'"])(.*?)\1/i', 'style="'.trim($newStyle).'"', $cellAttrs);
+				return '<'.$cellTag.$cellAttrs.'>'.$cellContent.'</'.$cellTag.'>';
+			}
+			return '<'.$cellTag.$cellAttrs.' style="white-space:nowrap; width:1%;">'.$cellContent.'</'.$cellTag.'>';
+		}, (string) $html);
 	}
 
 	/**
