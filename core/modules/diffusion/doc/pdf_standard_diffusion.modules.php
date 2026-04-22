@@ -1357,8 +1357,14 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$baseWidths[$i] = $baseWidths[$i] * $ratio;
 			}
 		} else {
-			$largestColIndex = (int) array_search(max($baseWidths), $baseWidths);
-			$baseWidths[$largestColIndex] += ($tableWidthMm - $sumBase);
+			$remainingWidth = $tableWidthMm - $sumBase;
+			$columnCount = count($baseWidths);
+			if ($columnCount > 0) {
+				$extraPerColumn = $remainingWidth / $columnCount;
+				for ($i = 0; $i < $columnCount; $i++) {
+					$baseWidths[$i] += $extraPerColumn;
+				}
+			}
 		}
 
 		$tableOpen = preg_replace('/\bstyle\s*=\s*([\'"]).*?\1/si', '', $tableOpen);
