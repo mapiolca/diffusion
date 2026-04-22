@@ -1338,7 +1338,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$baseWidths = array();
 		for ($i = 0; $i < $maxColCount; $i++) {
 			$chars = isset($maxCharsByCol[$i]) ? (int) $maxCharsByCol[$i] : 1;
-			$baseWidths[$i] = max(4.0, ($chars / $largestColChars) * 75.0);
+			$baseWidths[$i] = max(4.0, ($chars / $largestColChars) * 60.0);
 		}
 
 		$sumBase = array_sum($baseWidths);
