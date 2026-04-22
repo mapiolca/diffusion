@@ -1513,10 +1513,9 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 			return $tableHtml;
 		}
 		$firstRow = $firstRowMatch[1];
-		if (!preg_match('/<th\b/i', $firstRow)) {
-			return $tableHtml;
-		}
-		$thead = '<thead>'.$firstRow.'</thead>';
+		$firstRowAsHeader = preg_replace('/<td\b([^>]*)>/si', '<th$1>', $firstRow);
+		$firstRowAsHeader = preg_replace('/<\/td>/si', '</th>', (string) $firstRowAsHeader);
+		$thead = '<thead>'.$firstRowAsHeader.'</thead>';
 		$tableHtml = preg_replace('/'.preg_quote($firstRow, '/').'/', $thead, $tableHtml, 1);
 		return (string) $tableHtml;
 	}
