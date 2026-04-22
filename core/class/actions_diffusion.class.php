@@ -248,6 +248,42 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Check if user can read diffusion objects.
+	 *
+	 * @param User $user Current user
+	 * @return bool
+	 */
+	private function userCanReadDiffusion($user)
+	{
+		if (!is_object($user)) {
+			return false;
+		}
+
+		return (!empty($user->admin)
+			|| $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read'));
+	}
+
+	/**
+	 * Check if user can write diffusion objects.
+	 *
+	 * @param User $user Current user
+	 * @return bool
+	 */
+	private function userCanWriteDiffusion($user)
+	{
+		if (!is_object($user)) {
+			return false;
+		}
+
+		return (!empty($user->admin)
+			|| $user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| $user->hasRight('diffusion', 'diffusion', 'write')
+			|| $user->hasRight('diffusion', 'write'));
+	}
+
+	/**
 	 * Complete project tabs head to include diffusion count on overview tab.
 	 *
 	 * @param array<string,mixed>	$parameters Hook parameters
@@ -369,7 +405,7 @@ class ActionsDiffusion
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
 			return 0;
 		}
-		$canReadDiffusion = (!empty($user->admin) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->read) || !empty($user->rights->diffusion->read));
+		$canReadDiffusion = $this->userCanReadDiffusion($user);
 		if (empty($canReadDiffusion)) {
 			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
@@ -392,8 +428,8 @@ class ActionsDiffusion
 				'urlnew' => DOL_URL_ROOT . '/custom/diffusion/diffusion_card.php?action=create&projectid=' . (int) $object->id,
 				'lang' => 'diffusion',
 				'buttonnew' => $langs->trans('NewDiffusion'),
-				'testnew' => ((!empty($user->admin) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->write) || !empty($user->rights->diffusion->write))),
-				'test' => ((!empty($user->admin) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->read) || !empty($user->rights->diffusion->read))),
+				'testnew' => ($this->userCanWriteDiffusion($user)),
+				'test' => ($this->userCanReadDiffusion($user)),
 			),
 		);
 
@@ -421,7 +457,7 @@ class ActionsDiffusion
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
 			return 0;
 		}
-		$canReadDiffusion = (!empty($user->admin) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->diffusion->read) || !empty($user->rights->diffusion->read) || !empty($user->rights->diffusion->read));
+		$canReadDiffusion = $this->userCanReadDiffusion($user);
 		if (empty($canReadDiffusion)) {
 			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
@@ -438,7 +474,7 @@ class ActionsDiffusion
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/diffusion.class.php');
 
-		$canWriteDiffusion = (!empty($user->admin) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->write) || !empty($user->rights->diffusion->write));
+		$canWriteDiffusion = $this->userCanWriteDiffusion($user);
 		if ($action === 'unlinkdiffusionfromproject' && !empty($canWriteDiffusion)) {
 			$diffusionId = GETPOSTINT('diffusionid');
 			$diffusionunlink = new Diffusion($this->db);
@@ -498,7 +534,7 @@ class ActionsDiffusion
 		if (!empty($referentValue['buttonnew'])) {
 			$buttonTitle = $langs->trans($referentValue['buttonnew']);
 		}
-		$canCreate = (!empty($user->admin) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->write) || !empty($user->rights->diffusion->write));
+		$canCreate = $this->userCanWriteDiffusion($user);
 		if (array_key_exists('testnew', $referentValue)) {
 			$canCreate = !empty($referentValue['testnew']);
 		}
@@ -554,7 +590,7 @@ class ActionsDiffusion
 				}
 
 				$unlinkButton = '';
-				if ((!empty($user->admin) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->diffusion->write) || !empty($user->rights->diffusion->write) || !empty($user->rights->diffusion->write))) {
+				if ($this->userCanWriteDiffusion($user)) {
 					$urlunlink = $_SERVER['PHP_SELF'] . '?id=' . ((int) $object->id) . '&action=unlinkdiffusionfromproject&diffusionid=' . ((int) $obj->rowid) . '&token=' . newToken() . '#table_diffusion';
 					$unlinkButton = '<a href="' . dol_escape_htmltag($urlunlink) . '" class="reposition"><span class="fas fa-unlink" title="' . dol_escape_htmltag($langs->trans('Unlink')) . '"></span></a>';
 				}

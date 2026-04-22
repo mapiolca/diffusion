@@ -54,6 +54,7 @@ CreateDiffusionContact = Diffusionskontakte erstellen/aktualisieren
 DeleteDiffusionContact = Diffusionskontakte löschen
 
 Diffusion = Diffusion
+Diffusion@diffusion = Diffusion
 ShowDiffusion = Diffusion anzeigen
 ModuleDiffusionName = Diffusionen
 DiffusionsLieesAuProjet = Liste der mit dem Projekt verknüpften Aussendungen
