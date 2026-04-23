@@ -321,7 +321,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 			    $heightforinfotot = $this->estimateSummaryHeight($contactSummaries, $attachmentSummaries);
 				$heightforfreetext = getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Height reserved to output the free text on last page
-				$heightforfooter = $this->marge_basse + (getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 12 : 22); // Height reserved to output the footer (value include bottom margin)
+				$heightforfooter = $this->marge_basse + (getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 22 : 12); // Height reserved to output the footer (value include bottom margin)
 
 				if (class_exists('TCPDF')) {
 					$pdf->setPrintHeader(false);
@@ -1094,10 +1094,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function renderDescriptionWithPagination(&$pdf, $object, $outputlangs, $descriptionText, $startY, $startYNewPage, $width, $heightforfooter, $defaultFontSize, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
+		$reservedFooterHeight = $heightforfooter + 2;
 		$pdf->SetFont('', '', $defaultFontSize);
 		$pdf->SetXY($this->marge_gauche, $startY);
 		$lineHeight = 4;
-		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
 		$descriptionText = trim((string) $descriptionText);
 		$descriptionText = str_replace(array("\\r\\n", "\\n", "\\r"), "\n", $descriptionText);
 
@@ -1107,44 +1108,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 		if (dol_textishtml($descriptionText)) {
 			$descriptionHtml = convertBackOfficeMediasLinksToPublicLinks($descriptionText);
-			$pageposbeforedesc = $pdf->getPage();
-			$posybefore = $pdf->GetY();
-
-			$pdf->setTopMargin($startYNewPage);
-			$pdf->startTransaction();
-			$pdf->SetAutoPageBreak(true, $heightforfooter);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
-			$pageposafterdesc = $pdf->getPage();
-			$posyafter = $pdf->GetY();
-
-			if ($pageposafterdesc > $pageposbeforedesc) {
-				$pdf = $pdf->rollbackTransaction(true);
-
-				while ($pagenb < $pageposafterdesc) {
-					$pdf->AddPage();
-					$pagenb++;
-					if (!empty($tplidx)) {
-						$pdf->useTemplate($tplidx);
-					}
-					if ($repeatPageHeadOnExtraPages) {
-						$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
-					}
-					$pdf->setTopMargin($startYNewPage);
-				}
-
-				$pdf->setPage($pageposbeforedesc);
-				$pdf->setTopMargin($startYNewPage);
-				$pdf->SetAutoPageBreak(true, $heightforfooter);
-				$pdf->SetFont('', '', $defaultFontSize);
-				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $posybefore, $descriptionHtml, 0, 1, false, true, 'L', true);
-				$pageposafterdesc = $pdf->getPage();
-				$posyafter = $pdf->GetY();
-			} else {
-				$pdf->commitTransaction();
-			}
-
-			$pagenb = max($pagenb, $pageposafterdesc);
-			$pdf->setPage($pageposafterdesc);
+			$descriptionHtml = $this->normalizeDescriptionHtmlForPdf($descriptionHtml, (float) $width);
+			$posyafter = $this->renderHtmlDescriptionWithTableAwarePagination($pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 			$pdf->SetAutoPageBreak(true, 0);
 			return $posyafter;
 		}
@@ -1185,6 +1150,380 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		}
 
 		return $pdf->GetY();
+	}
+
+	/**
+	 * Render HTML description by splitting tables into page-safe chunks.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $descriptionHtml Normalized HTML
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return float
+	 */
+	protected function renderHtmlDescriptionWithTableAwarePagination(&$pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$parts = preg_split('/(<table\b[^>]*>.*?<\/table>)/si', (string) $descriptionHtml, -1, PREG_SPLIT_DELIM_CAPTURE);
+		if (!is_array($parts)) {
+			$parts = array((string) $descriptionHtml);
+		}
+
+		for ($i = 0; $i < count($parts); $i++) {
+			$part = (string) $parts[$i];
+			if ($part === '') {
+				continue;
+			}
+			if (preg_match('/^\s*<table\b/i', $part)) {
+				$this->renderTableHtmlChunked($pdf, $object, $outputlangs, $part, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+				continue;
+			}
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $part, 0, 1, false, true, 'L', true);
+		}
+
+		return $pdf->GetY();
+	}
+
+	/**
+	 * Render one table and split rows across pages while repeating headers.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $tableHtml Table HTML
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function renderTableHtmlChunked(&$pdf, $object, $outputlangs, $tableHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$tableHtml = (string) $tableHtml;
+		$tableHtml = $this->applyColumnWidthsByContentRatio($tableHtml, (float) $width);
+		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			return;
+		}
+
+		$tableOpen = $tableParts[1];
+		$tableInner = $tableParts[2];
+		$tableClose = $tableParts[3];
+		$thead = '';
+		$tbody = $tableInner;
+
+		if (preg_match('/<thead\b[^>]*>.*?<\/thead>/si', $tableInner, $theadMatch)) {
+			$thead = $theadMatch[0];
+			$tbody = preg_replace('/<thead\b[^>]*>.*?<\/thead>/si', '', $tableInner, 1);
+		}
+		$tbody = preg_replace('/<\/?tbody\b[^>]*>/si', '', (string) $tbody);
+		preg_match_all('/<tr\b[^>]*>.*?<\/tr>/si', (string) $tbody, $rowMatches);
+		$rows = isset($rowMatches[0]) ? $rowMatches[0] : array();
+		if (empty($rows)) {
+			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			return;
+		}
+
+		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
+		$bufferY = 0.5;
+		$rowsOnPage = array();
+		$rowCount = count($rows);
+
+		for ($rowIndex = 0; $rowIndex < $rowCount; $rowIndex++) {
+			$candidateRows = $rowsOnPage;
+			$candidateRows[] = $rows[$rowIndex];
+			$candidateHtml = $tableOpen.$thead.'<tbody>'.implode('', $candidateRows).'</tbody>'.$tableClose;
+
+			$pdf->startTransaction();
+			$startPage = $pdf->getPage();
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $candidateHtml, 0, 1, false, true, 'L', true);
+			$endPage = $pdf->getPage();
+			$endY = $pdf->GetY();
+			$pdf = $pdf->rollbackTransaction(true);
+
+			$fitsCurrentPage = ($endPage == $startPage && $endY <= ($pageBottomLimit - $bufferY));
+			if ($fitsCurrentPage) {
+				$rowsOnPage = $candidateRows;
+				continue;
+			}
+
+			if (!empty($rowsOnPage)) {
+				$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $rowsOnPage).'</tbody>'.$tableClose;
+				$pdf->SetAutoPageBreak(false, 0);
+				$pdf->SetFont('', '', $defaultFontSize);
+				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+				$rowsOnPage = array($rows[$rowIndex]);
+				continue;
+			}
+
+			$singleRowHtml = $tableOpen.$thead.'<tbody>'.$rows[$rowIndex].'</tbody>'.$tableClose;
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $singleRowHtml, 0, 1, false, true, 'L', true);
+			if ($rowIndex < ($rowCount - 1)) {
+				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+			}
+			$rowsOnPage = array();
+		}
+
+		if (!empty($rowsOnPage)) {
+			$chunkHtml = $tableOpen.$thead.'<tbody>'.implode('', $rowsOnPage).'</tbody>'.$tableClose;
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+		}
+	}
+
+	/**
+	 * Apply column widths from character-based ratio to occupy available width.
+	 *
+	 * @param string $tableHtml Table HTML
+	 * @param float $tableWidthMm Available table width in mm
+	 * @return string
+	 */
+	protected function applyColumnWidthsByContentRatio($tableHtml, $tableWidthMm)
+	{
+		$tableHtml = (string) $tableHtml;
+		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
+			return $tableHtml;
+		}
+
+		$tableOpen = (string) $tableParts[1];
+		$tableInner = (string) $tableParts[2];
+		$tableClose = (string) $tableParts[3];
+		$rowMatches = array();
+		preg_match_all('/<tr\b[^>]*>.*?<\/tr>/si', $tableInner, $rowMatches);
+		$rows = isset($rowMatches[0]) ? $rowMatches[0] : array();
+		if (empty($rows)) {
+			return $tableHtml;
+		}
+
+		$maxCharsByCol = array();
+		$maxColCount = 0;
+		foreach ($rows as $rowHtml) {
+			$cellMatches = array();
+			preg_match_all('/<(td|th)\b[^>]*>(.*?)<\/\\1>/si', (string) $rowHtml, $cellMatches, PREG_SET_ORDER);
+			$maxColCount = max($maxColCount, count($cellMatches));
+			for ($i = 0; $i < count($cellMatches); $i++) {
+				$cellText = trim((string) html_entity_decode(strip_tags((string) $cellMatches[$i][2]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+				$tokens = preg_split('/\s+/u', $cellText, -1, PREG_SPLIT_NO_EMPTY);
+				$longestTokenChars = 0;
+				if (is_array($tokens)) {
+					for ($t = 0; $t < count($tokens); $t++) {
+						$tokenLen = function_exists('mb_strlen') ? mb_strlen((string) $tokens[$t], 'UTF-8') : strlen((string) $tokens[$t]);
+						$longestTokenChars = max($longestTokenChars, (int) $tokenLen);
+					}
+				}
+				$charCount = max(1, $longestTokenChars);
+				if (!isset($maxCharsByCol[$i])) {
+					$maxCharsByCol[$i] = 0;
+				}
+				$maxCharsByCol[$i] = max((int) $maxCharsByCol[$i], (int) $charCount);
+			}
+		}
+		if ($maxColCount <= 0) {
+			return $tableHtml;
+		}
+
+		$largestColChars = max(1, (int) max($maxCharsByCol));
+		$baseWidths = array();
+		for ($i = 0; $i < $maxColCount; $i++) {
+			$chars = isset($maxCharsByCol[$i]) ? (int) $maxCharsByCol[$i] : 1;
+			$baseWidths[$i] = max(5.0, ($chars / $largestColChars) * 75.0);
+		}
+
+		$sumBase = array_sum($baseWidths);
+		$tableWidthMm = max(20.0, (float) $tableWidthMm);
+		if ($sumBase > $tableWidthMm) {
+			$ratio = $tableWidthMm / $sumBase;
+			for ($i = 0; $i < count($baseWidths); $i++) {
+				$baseWidths[$i] = $baseWidths[$i] * $ratio;
+			}
+		} else {
+			$remainingWidth = $tableWidthMm - $sumBase;
+			$columnCount = count($baseWidths);
+			if ($columnCount > 0) {
+				$extraPerColumn = $remainingWidth / $columnCount;
+				for ($i = 0; $i < $columnCount; $i++) {
+					$baseWidths[$i] += $extraPerColumn;
+				}
+			}
+		}
+
+		$tableOpen = preg_replace('/\bstyle\s*=\s*([\'"]).*?\1/si', '', $tableOpen);
+		$tableOpen = preg_replace('/\bwidth\s*=\s*([\'"]).*?\1/si', '', $tableOpen);
+		$tableOpen = rtrim((string) preg_replace('/>$/', '', $tableOpen));
+		$tableOpen .= ' style="width:'.$tableWidthMm.'mm; max-width:'.$tableWidthMm.'mm; table-layout:fixed; border-collapse:collapse;">';
+
+		$tableInner = preg_replace_callback('/<tr\b[^>]*>.*?<\/tr>/si', function ($rowMatch) use ($baseWidths) {
+			$rowHtml = (string) $rowMatch[0];
+			$cellIndex = 0;
+			return preg_replace_callback('/<(td|th)\b([^>]*)>/si', function ($cellOpenMatch) use (&$cellIndex, $baseWidths) {
+				$tag = (string) $cellOpenMatch[1];
+				$attrs = (string) $cellOpenMatch[2];
+				$colWidth = isset($baseWidths[$cellIndex]) ? (float) $baseWidths[$cellIndex] : 5.0;
+				$cellIndex++;
+				$existingStyle = '';
+				if (preg_match('/\bstyle\s*=\s*([\'"])(.*?)\1/si', $attrs, $styleMatch)) {
+					$existingStyle = trim((string) $styleMatch[2]);
+				}
+				$attrs = preg_replace('/\bwidth\s*=\s*([\'"]).*?\1/si', '', $attrs);
+				$attrs = preg_replace('/\bstyle\s*=\s*([\'"]).*?\1/si', '', $attrs);
+				$widthStyle = 'width:'.round($colWidth, 2).'mm; min-width:'.round($colWidth, 2).'mm; max-width:'.round($colWidth, 2).'mm;';
+				$finalStyle = trim($existingStyle.($existingStyle !== '' ? '; ' : '').$widthStyle);
+				return '<'.$tag.$attrs.' style="'.$finalStyle.'">';
+			}, $rowHtml);
+		}, $tableInner);
+
+		return $tableOpen.$tableInner.$tableClose;
+	}
+
+	/**
+	 * Add a new page for description overflow and reset cursor.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function addPageForDescriptionOverflow(&$pdf, $object, $outputlangs, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$pdf->AddPage();
+		$pagenb++;
+		if (!empty($tplidx)) {
+			$pdf->useTemplate($tplidx);
+		}
+		if ($repeatPageHeadOnExtraPages) {
+			$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
+			$pdf->SetXY($this->marge_gauche, $startYNewPage);
+		} else {
+			$pdf->SetXY($this->marge_gauche, $this->marge_haute + 2);
+		}
+	}
+
+	/**
+	 * Normalize description HTML for TCPDF rendering.
+	 *
+	 * @param string $descriptionHtml Raw HTML
+	 * @param float $availableWidth Available content width in mm
+	 * @return string
+	 */
+	protected function normalizeDescriptionHtmlForPdf($descriptionHtml, $availableWidth)
+	{
+		$descriptionHtml = (string) $descriptionHtml;
+		$maxWidth = max(10, (float) $availableWidth);
+		$maxHeightByRatio = $maxWidth * 0.75;
+		$maxHeight = min(100.0, $maxHeightByRatio);
+		$maxHeight = max(10.0, $maxHeight);
+		$descriptionHtml = $this->normalizeTablesForPdf($descriptionHtml);
+
+		$descriptionHtml = preg_replace('/(<table\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<(?:colgroup|col|tr|td|th)\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\swidth\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sheight\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<(?:colgroup|col|tr|td|th)\b[^>]*?)\sstyle\s*=\s*([\'"]).*?\2/si', '$1', $descriptionHtml);
+		$descriptionHtml = preg_replace('/(<img\b[^>]*?)\sstyle\s*=\s*([\'"])(.*?)\2/si', '$1 style="$3 max-width: '.$maxWidth.'mm; max-height: '.$maxHeight.'mm; width: auto; height: auto;"', $descriptionHtml);
+		$descriptionHtml = preg_replace('/<td\b([^>]*)>/si', '<td$1 style="text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', $descriptionHtml);
+		$descriptionHtml = preg_replace('/<th\b([^>]*)>/si', '<th$1 style="background-color:#e6e6e6; font-weight:bold; text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', $descriptionHtml);
+		$descriptionHtml = preg_replace_callback('/<thead\b[^>]*>.*?<\/thead>/si', function ($matches) {
+			return preg_replace('/<td\b([^>]*)>/si', '<td$1 style="background-color:#e6e6e6; font-weight:bold; text-align:left; vertical-align:middle; border:0.1mm solid #999999; padding:0.8mm;">', (string) $matches[0]);
+		}, $descriptionHtml);
+		$descriptionHtml = $this->normalizeSingleWordCellsForPdf($descriptionHtml);
+
+		$layoutStyle = '<style>
+table{width:auto !important;max-width:'.$maxWidth.'mm !important;table-layout:auto;border-collapse:collapse;border-spacing:0;border:0.1mm solid #999999;}
+thead{display:table-header-group;}
+tbody{display:table-row-group;}
+thead,tbody,tfoot,tr,td,th,col,colgroup{max-width:100% !important;word-wrap:normal;overflow-wrap:normal;word-break:normal;}
+td,th,col{width:auto !important;min-width:0 !important;max-width:100% !important;}
+thead th,thead td{font-weight:bold;background-color:#e6e6e6;color:#000000;}
+td,th{border:0.1mm solid #999999;padding:0.8mm;vertical-align:middle;text-align:left;}
+p,div,span{margin:0;padding:0;}
+img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important;width:auto !important;height:auto !important;}
+</style>';
+
+		return $layoutStyle.$descriptionHtml;
+	}
+
+	/**
+	 * Force compact width for cells that contain a single word.
+	 *
+	 * @param string $html HTML content
+	 * @return string
+	 */
+	protected function normalizeSingleWordCellsForPdf($html)
+	{
+		return preg_replace_callback('/<(td|th)\b([^>]*)>(.*?)<\/\\1>/si', function ($matches) {
+			$cellTag = isset($matches[1]) ? (string) $matches[1] : 'td';
+			$cellAttrs = isset($matches[2]) ? (string) $matches[2] : '';
+			$cellContent = isset($matches[3]) ? (string) $matches[3] : '';
+			$cellText = trim((string) html_entity_decode(strip_tags($cellContent), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+			if ($cellText === '' || preg_match('/\s/u', $cellText)) {
+				return '<'.$cellTag.$cellAttrs.'>'.$cellContent.'</'.$cellTag.'>';
+			}
+			if (preg_match('/\bstyle\s*=\s*([\'"])(.*?)\1/i', $cellAttrs, $styleMatch)) {
+				$newStyle = trim((string) $styleMatch[2]).'; white-space:nowrap; width:1%;';
+				$cellAttrs = preg_replace('/\bstyle\s*=\s*([\'"])(.*?)\1/i', 'style="'.trim($newStyle).'"', $cellAttrs);
+				return '<'.$cellTag.$cellAttrs.'>'.$cellContent.'</'.$cellTag.'>';
+			}
+			return '<'.$cellTag.$cellAttrs.' style="white-space:nowrap; width:1%;">'.$cellContent.'</'.$cellTag.'>';
+		}, (string) $html);
+	}
+
+	/**
+	 * Normalize table blocks for TCPDF pagination rules.
+	 *
+	 * @param string $html HTML content
+	 * @return string
+	 */
+	protected function normalizeTablesForPdf($html)
+	{
+		return preg_replace_callback('/<table\b[^>]*>.*?<\/table>/si', array($this, 'normalizeSingleTableForPdfCallback'), (string) $html);
+	}
+
+	/**
+	 * Ensure table has a repeatable header block when possible.
+	 *
+	 * @param array<int,string> $matches Regex callback matches
+	 * @return string
+	 */
+	protected function normalizeSingleTableForPdfCallback(array $matches)
+	{
+		$tableHtml = isset($matches[0]) ? (string) $matches[0] : '';
+		if ($tableHtml === '' || preg_match('/<thead\b/i', $tableHtml)) {
+			return $tableHtml;
+		}
+		if (!preg_match('/(<tr\b[^>]*>.*?<\/tr>)/si', $tableHtml, $firstRowMatch)) {
+			return $tableHtml;
+		}
+		$firstRow = $firstRowMatch[1];
+		$firstRowAsHeader = preg_replace('/<td\b([^>]*)>/si', '<th$1>', $firstRow);
+		$firstRowAsHeader = preg_replace('/<\/td>/si', '</th>', (string) $firstRowAsHeader);
+		$thead = '<thead>'.$firstRowAsHeader.'</thead>';
+		$tableHtml = preg_replace('/'.preg_quote($firstRow, '/').'/', $thead, $tableHtml, 1);
+		return (string) $tableHtml;
 	}
 
 	/**
