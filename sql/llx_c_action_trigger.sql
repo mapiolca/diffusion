@@ -3,7 +3,7 @@
 -- Populate business events for diffusion module.
 
 UPDATE llx_c_action_trigger
-SET elementtype = 'diffusion'
+SET elementtype = 'diffusion@diffusion'
 WHERE code IN ('DIFFUSION_CREATE', 'DIFFUSION_VALIDATE', 'DIFFUSION_SENDMAIL', 'DIFFUSION_SETDIFFUSED', 'DIFFUSION_BACKTODRAFT', 'DIFFUSION_DELETE');
 
 INSERT INTO llx_c_action_trigger (code, label, description, elementtype, rang)
