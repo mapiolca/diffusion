@@ -641,7 +641,12 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$notificationElementAliases = array('diffusion', 'diffusion@diffusion', 'diffusion');
+		$notificationElementAliases = array(
+			'diffusion_send',
+			'diffusion_send@diffusion',
+			'diffusion',
+			'diffusion@diffusion',
+		);
 		foreach ($notificationElementAliases as $alias) {
 			if (empty($conf->{$alias}) || !is_object($conf->{$alias})) {
 				$conf->{$alias} = new stdClass();
