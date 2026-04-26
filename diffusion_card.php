@@ -1331,7 +1331,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		}
 	}
 
-	$modelmail = 'diffusion@diffusion';
+	$modelmail = 'diffusion';
 	$defaulttopic = 'InformationMessage';
 	$diroutput = $conf->diffusion->multidir_output[$conf->entity];
 	$trackid = 'diffusion'.$object->id;
