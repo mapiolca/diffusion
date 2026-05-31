@@ -258,6 +258,7 @@ class DiffusionContact extends CommonObject
 	 * @param int $diffusionId Diffusion identifier
 	 * @param int $contactId Contact identifier
 	 * @param string $source Source flag (internal/external)
+	 * @param int $typeContactId Stored contact type identifier
 	 * @param int<0,1> $notrigger 0 to execute triggers, 1 to skip them
 	 * @return int<-1,1>			 >0 if OK, <0 if KO
 	 */
@@ -283,6 +284,11 @@ class DiffusionContact extends CommonObject
 		$sql .= ' WHERE fk_diffusion = '.$diffusionId;
 		$sql .= ' AND fk_contact = '.$contactId;
 		$sql .= " AND contact_source = '".$this->db->escape($source)."'";
+		if ($typeContactId > 0) {
+			$sql .= ' AND fk_type_contact = '.$typeContactId;
+		} else {
+			$sql .= ' AND fk_type_contact IS NULL';
+		}
 
 			dol_syslog(__METHOD__." fetch existing link sql=".$sql, LOG_DEBUG);
 		$resql = $this->db->query($sql);
@@ -453,7 +459,7 @@ class DiffusionContact extends CommonObject
 		}
 
 
-        public function removeLink($diffusionId, $contactId, $source, $notrigger = 0)
+        public function removeLink($diffusionId, $contactId, $source, $typeContactId = 0, $notrigger = 0)
         {
                 global $langs, $user, $conf;
 
@@ -461,6 +467,7 @@ class DiffusionContact extends CommonObject
                 $contactId = (int) $contactId;
                 $source = strtolower((string) $source);
                 $source = preg_replace('/[^a-z0-9_]/', '', $source);
+                $typeContactId = (int) $typeContactId;
 
                 if ($diffusionId <= 0 || $contactId <= 0 || empty($source)) {
                         $this->error = $langs->trans('DiffusionContactRemoveError');
@@ -472,6 +479,11 @@ class DiffusionContact extends CommonObject
                 $sql .= ' WHERE fk_diffusion = '.$diffusionId;
                 $sql .= ' AND fk_contact = '.$contactId;
                 $sql .= " AND contact_source = '".$this->db->escape($source)."'";
+                if ($typeContactId > 0) {
+                        $sql .= ' AND fk_type_contact = '.$typeContactId;
+                } else {
+                        $sql .= ' AND fk_type_contact IS NULL';
+                }
 
 			dol_syslog(__METHOD__." delete link sql=".$sql, LOG_DEBUG);
                 if (!$this->db->query($sql)) {
@@ -849,12 +861,13 @@ class DiffusionContact extends CommonObject
                 global $langs, $object, $contactid;
 
                 if (!empty($this->fk_diffusion) && !empty($this->fk_contact) && !empty($this->contact_source)) {
-                        return $this->removeLink($this->fk_diffusion, $this->fk_contact, $this->contact_source, $notrigger);
+                        return $this->removeLink($this->fk_diffusion, $this->fk_contact, $this->contact_source, $this->fk_type_contact, $notrigger);
                 }
 
                 $source = GETPOST('source', 'aZ09');
+                $typeContactId = (GETPOST('typecontact') ? GETPOSTINT('typecontact') : GETPOSTINT('type'));
                 if (!empty($object->id) && !empty($contactid) && !empty($source)) {
-                        return $this->removeLink($object->id, $contactid, $source, $notrigger);
+                        return $this->removeLink($object->id, $contactid, $source, $typeContactId, $notrigger);
                 }
 
                 $this->error = $langs->trans('DiffusionContactRemoveError');
