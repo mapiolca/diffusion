@@ -4,6 +4,7 @@
  * Copyright (C) 2015-2016  Charlie BENKE 	        <charlie@patas-monkey.com>
  * Copyright (C) 2021-2024  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2024		MDW					    <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026       Pierre Ardoin           <developpeur@lesmetiersdubatiment.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -73,6 +74,7 @@ $companystatic = new Societe($db);
 $contactstatic = new Contact($db);
 $userstatic = new User($db);
 $projectstatic = new Project($db);
+$contacttypeobject = (isModEnabled('project') ? $projectstatic : $object);
 
 
 ?>
@@ -131,7 +133,7 @@ if ($permission && $object->status == $object::STATUS_DRAFT) {
 		</div>
 		<div class="tagtd maxwidthonsmartphone">
 		<?php
-		$tmpobject = $projectstatic;
+		$tmpobject = $contacttypeobject;
 		if (($object->element == 'shipping' || $object->element == 'reception') && is_object($objectsrc)) {
 			$tmpobject = $objectsrc;
 		}
@@ -176,7 +178,7 @@ if ($permission && $object->status == $object::STATUS_DRAFT) {
 		</div>
 		<div class="tagtd noborderbottom">
 			<?php
-			$tmpobject = $projectstatic;
+			$tmpobject = $contacttypeobject;
 			if (($object->element == 'shipping' || $object->element == 'reception') && is_object($objectsrc)) {
 				'@phan-var-force Commande|Facture $objectsrc';
 				$tmpobject = $objectsrc;
@@ -241,6 +243,15 @@ if ($resql) {
 		$entry->id = 0;
 		$entry->diffusioncontact_rowid = (int) $obj->diffusioncontact_rowid;
 		$entry->type_id = (int) $obj->fk_type_contact;
+		$entry->native_type_id = 0;
+		if (function_exists('diffusionResolveContactTypeId')) {
+			$mappedtypeid = diffusionResolveContactTypeId($db, $entry->type_id, $source, $object->element, 0);
+			if ($mappedtypeid > 0) {
+				$entry->native_type_id = (int) $mappedtypeid;
+			}
+		} else {
+			$entry->native_type_id = $entry->type_id;
+		}
 		$entry->type = !empty($obj->type_label) ? $obj->type_label : $langs->trans('NotDefined');
 		$entry->nature = ($source == 'internal' ? 'user' : 'thirdparty');
 		$entry->nature_html = ($source == 'internal' ? $langs->trans('User') : $langs->trans('ThirdPartyContact'));
@@ -257,10 +268,10 @@ if ($resql) {
 		$entry->source = $source;
 		$entry->contact_id = (int) $obj->fk_contact;
 
-		$linkkey = $entry->contact_id.'_'.(int) $entry->type_id;
+		$linkkey = $entry->contact_id.'_'.(int) $entry->native_type_id;
 		if (!empty($linkrowidmap[$source][$linkkey])) {
 			$entry->id = (int) $linkrowidmap[$source][$linkkey];
-		} elseif (!empty($linkrowidmap[$source][$entry->contact_id])) {
+		} elseif ($entry->native_type_id <= 0 && !empty($linkrowidmap[$source][$entry->contact_id])) {
 			$entry->id = (int) $linkrowidmap[$source][$entry->contact_id];
 		}
 
@@ -417,6 +428,7 @@ foreach ($list as $entry) {
 		$href .= '&action=deletecontact&token='.newToken();
 		$href .= '&lineid='.((int) $entry->id);
 		$href .= '&source='.$entry->source;
+		$href .= '&typecontact='.((int) $entry->type_id);
 		if ($entry->source == 'internal') {
 			$href .= '&userid='.((int) $entry->contact_id);
 		} elseif ($entry->source == 'external') {

@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.3 (31/05/2026)
+
+- FR: corrige l'intégration aux projets via l'utilisation des types de contacts du module "Projet" plutôt que les types de contacts "Diffusion" quand celui-ci est actif
+- EN: fix projects integration using project contact type when "Project" module is active instead of "Diffusion" contacts type.
+
 ## 1.2.2
 
 - FR: Refonte du rendu PDF de la description HTML avec pagination robuste des tableaux : découpe multi-pages, répétition de l'en-tête à chaque page et respect systématique de la zone avant pied de page.

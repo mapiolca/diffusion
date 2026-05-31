@@ -78,9 +78,10 @@ dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
  * @param int		$typeid		Requested contact type id
  * @param string	$source		Contact source (internal|external)
  * @param string	$element	Object element key
+ * @param int<0,1>	$createifmissing	Create a compatible type when no mapping exists
  * @return int				Compatible contact type id, 0 if none
  */
-function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element)
+function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element, $createifmissing = 1)
 {
 	$typeid = (int) $typeid;
 	$source = ($source === 'internal' ? 'internal' : 'external');
@@ -135,8 +136,18 @@ function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element)
 						}
 					}
 				}
+
+				if (empty($createifmissing)) {
+					return 0;
+				}
+
+				return diffusionCreateContactType($db, $source, $element, (string) $objtype->libelle, (string) $objtype->code);
 			}
 		}
+	}
+
+	if (empty($createifmissing)) {
+		return 0;
 	}
 
 	$sql = 'SELECT rowid';
@@ -170,9 +181,10 @@ function diffusionResolveContactTypeId(DoliDB $db, $typeid, $source, $element)
  * @param string	$source		Contact source (internal|external)
  * @param string	$element	Object element key
  * @param string	$label		Preferred label
+ * @param string	$preferredcode	Preferred code
  * @return int				Created contact type id, 0 on failure
  */
-function diffusionCreateContactType(DoliDB $db, $source, $element, $label = '')
+function diffusionCreateContactType(DoliDB $db, $source, $element, $label = '', $preferredcode = '')
 {
 	$source = ($source === 'internal' ? 'internal' : 'external');
 	$element = preg_replace('/[^a-z0-9_]/i', '', (string) $element);
@@ -181,7 +193,8 @@ function diffusionCreateContactType(DoliDB $db, $source, $element, $label = '')
 		$label = ($source === 'internal' ? 'Intervenant diffusion' : 'Contact diffusion');
 	}
 
-	$basecode = 'DIFFUSION_'.strtoupper($source).'_AUTO';
+	$preferredcode = preg_replace('/[^A-Z0-9_]/', '_', strtoupper((string) $preferredcode));
+	$basecode = ($preferredcode !== '' ? $preferredcode : 'DIFFUSION_'.strtoupper($source).'_AUTO');
 	$code = $basecode;
 	$index = 0;
 	while ($index < 100) {
@@ -209,6 +222,139 @@ function diffusionCreateContactType(DoliDB $db, $source, $element, $label = '')
 	}
 
 	return 0;
+}
+
+/**
+ * Return the contact type element used to store diffusion contact metadata.
+ *
+ * @param CommonObject	$object	Diffusion object
+ * @return string		Contact type element
+ */
+function diffusionGetStoredContactTypeElement($object)
+{
+	if (isModEnabled('project')) {
+		return 'project';
+	}
+
+	return preg_replace('/[^a-z0-9_]/i', '', (string) $object->element);
+}
+
+/**
+ * Validate a contact type id for a source and element.
+ *
+ * @param DoliDB	$db		Database handler
+ * @param int		$typeid		Contact type id
+ * @param string	$source		Contact source (internal|external)
+ * @param string	$element	Object element key
+ * @return int				Validated contact type id, 0 if invalid
+ */
+function diffusionValidateContactTypeId(DoliDB $db, $typeid, $source, $element)
+{
+	$typeid = (int) $typeid;
+	$source = ($source === 'internal' ? 'internal' : 'external');
+	$element = preg_replace('/[^a-z0-9_]/i', '', (string) $element);
+
+	if ($typeid <= 0 || $element === '') {
+		return 0;
+	}
+
+	$sql = 'SELECT rowid';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_type_contact';
+	$sql .= ' WHERE rowid = '.$typeid;
+	$sql .= " AND source = '".$db->escape($source)."'";
+	$sql .= " AND element = '".$db->escape($element)."'";
+
+	$resql = $db->query($sql);
+	if ($resql) {
+		$obj = $db->fetch_object($resql);
+		if (!empty($obj->rowid)) {
+			return (int) $obj->rowid;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Find the native llx_element_contact row id for a contact/source/type tuple.
+ *
+ * @param CommonObject	$object		Diffusion object
+ * @param int		$contactid	Contact/user id
+ * @param string	$source		Contact source
+ * @param int		$typeid		Native contact type id
+ * @return int				Native contact link row id, 0 if not found
+ */
+function diffusionFindNativeContactLinkRowid($object, $contactid, $source, $typeid)
+{
+	$contactid = (int) $contactid;
+	$typeid = (int) $typeid;
+	$source = ($source === 'internal' ? 'internal' : 'external');
+
+	if ($contactid <= 0 || $typeid <= 0) {
+		return 0;
+	}
+
+	$contactlist = $object->liste_contact(-1, $source);
+	foreach ((array) $contactlist as $contactline) {
+		if ((int) $contactline['id'] === $contactid && (int) $contactline['fk_c_type_contact'] === $typeid) {
+			return (int) $contactline['rowid'];
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Check if another stored diffusion contact still uses the same native contact type.
+ *
+ * @param DoliDB	$db		Database handler
+ * @param int		$diffusionid	Diffusion id
+ * @param int		$contactid	Contact/user id
+ * @param string	$source		Contact source
+ * @param int		$nativetypeid	Native contact type id
+ * @param string	$nativeelement	Native object element
+ * @return bool				True if another stored link maps to the native type
+ */
+function diffusionHasStoredContactLinkForNativeType(DoliDB $db, $diffusionid, $contactid, $source, $nativetypeid, $nativeelement)
+{
+	$diffusionid = (int) $diffusionid;
+	$contactid = (int) $contactid;
+	$source = ($source === 'internal' ? 'internal' : 'external');
+	$nativetypeid = (int) $nativetypeid;
+	$nativeelement = preg_replace('/[^a-z0-9_]/i', '', (string) $nativeelement);
+
+	if ($diffusionid <= 0 || $contactid <= 0 || $nativetypeid <= 0 || $nativeelement === '') {
+		return false;
+	}
+
+	$sql = 'SELECT fk_type_contact';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact';
+	$sql .= ' WHERE fk_diffusion = '.$diffusionid;
+	$sql .= ' AND fk_contact = '.$contactid;
+	$sql .= " AND contact_source = '".$db->escape($source)."'";
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		return false;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$storedtypeid = (int) $obj->fk_type_contact;
+		if ($storedtypeid <= 0) {
+			continue;
+		}
+
+		$mappedtypeid = diffusionResolveContactTypeId($db, $storedtypeid, $source, $nativeelement, 0);
+		if ($mappedtypeid === $nativetypeid) {
+			$db->free($resql);
+
+			return true;
+		}
+	}
+
+	$db->free($resql);
+
+	return false;
 }
 
 /**
@@ -512,73 +658,96 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
 if ($action == 'addcontact' && $permissiontoadd) {
 	$contactid = (GETPOST('userid') ? GETPOSTINT('userid') : GETPOSTINT('contactid'));
-	$typeid = (GETPOST('typecontact') ? GETPOST('typecontact') : GETPOST('type'));
+	$typeid = (GETPOST('typecontact') ? GETPOSTINT('typecontact') : GETPOSTINT('type'));
 	$contactSource = GETPOST('source', 'aZ09');
-	$typeid = diffusionResolveContactTypeId($db, $typeid, $contactSource, $object->element);
-	if ($typeid <= 0) {
+	$storedTypeElement = diffusionGetStoredContactTypeElement($object);
+	$storedTypeId = diffusionValidateContactTypeId($db, $typeid, $contactSource, $storedTypeElement);
+	if ($storedTypeId <= 0) {
 		setEventMessages($langs->trans('ErrorNoCompatibleContactTypeForDiffusion'), null, 'errors');
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 		exit;
 	}
-	$result = $object->add_contact($contactid, $typeid, $contactSource);
-        if ($result >= 0) {
-                $diffusioncontactstatic = new DiffusionContact($db);
-                // FR: Synchronise la table dédiée afin d'offrir au PDF toutes les métadonnées nécessaires.
-                // EN: Synchronise the dedicated table so the PDF gets all required metadata.
-                $syncResult = $diffusioncontactstatic->syncLink($object->id, $contactid, $contactSource, (int) $typeid);
+	$nativeTypeId = diffusionResolveContactTypeId($db, $storedTypeId, $contactSource, $object->element);
+	if ($nativeTypeId <= 0) {
+		setEventMessages($langs->trans('ErrorNoCompatibleContactTypeForDiffusion'), null, 'errors');
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+		exit;
+	}
+	$result = $object->add_contact($contactid, $nativeTypeId, $contactSource);
+	if ($result >= 0) {
+		$diffusioncontactstatic = new DiffusionContact($db);
+		// FR: Synchronise la table dédiée afin d'offrir au PDF toutes les métadonnées nécessaires.
+		// EN: Synchronise the dedicated table so the PDF gets all required metadata.
+		$syncResult = $diffusioncontactstatic->syncLink($object->id, $contactid, $contactSource, (int) $storedTypeId);
 
-                if ($syncResult < 0) {
-                        setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
-                } else {
-                        header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-                        exit;
-                }
-        } else {
-                if ($object->error == 'DB_ERROR_RECORD_ALREADY_EXISTS') {
-                        $langs->load('errors');
-                        // FR: Même en cas de doublon sur le lien Dolibarr, on s'assure que la table diffusion soit cohérente.
-                        // EN: Even when Dolibarr reports a duplicate link, keep the diffusion table consistent.
-                        $diffusioncontactstatic = new DiffusionContact($db);
-                        $syncResult = $diffusioncontactstatic->syncLink($object->id, $contactid, $contactSource, (int) $typeid);
-                        if ($syncResult < 0) {
-                                setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
-                        }
-                        setEventMessages($langs->trans('ErrorThisContactIsAlreadyDefinedAsThisType'), null, 'errors');
-                } else {
-                        setEventMessages($object->error, $object->errors, 'errors');
-                }
-        }
+		if ($syncResult < 0) {
+			setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
+		} else {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+	} else {
+		if ($object->error == 'DB_ERROR_RECORD_ALREADY_EXISTS') {
+			$langs->load('errors');
+			// FR: Même en cas de doublon sur le lien Dolibarr, on s'assure que la table diffusion soit cohérente.
+			// EN: Even when Dolibarr reports a duplicate link, keep the diffusion table consistent.
+			$diffusioncontactstatic = new DiffusionContact($db);
+			$syncResult = $diffusioncontactstatic->syncLink($object->id, $contactid, $contactSource, (int) $storedTypeId);
+			if ($syncResult < 0) {
+				setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
+			}
+			setEventMessages($langs->trans('ErrorThisContactIsAlreadyDefinedAsThisType'), null, 'errors');
+		} else {
+			setEventMessages($object->error, $object->errors, 'errors');
+		}
+	}
 } elseif ($action == 'swapstatut' && $permissiontoadd) {
 	// Toggle the status of a contact
 	$result = $object->swapContactStatus(GETPOSTINT('ligne'));
 } elseif ($action == 'deletecontact' && $permissiontoadd) {	// Permission to add on object because this is an update of a link of object, not a deletion of data
 	// Deletes a contact
 	$contactid = (GETPOST('userid') ? GETPOSTINT('userid') : GETPOSTINT('contactid'));
-	$typeid = (GETPOST('typecontact') ? GETPOST('typecontact') : GETPOST('type'));
-		$contactSource = GETPOST('source', 'aZ09');
-		$result = 0;
-		if ($lineid > 0) {
-			$result = $object->delete_contact($lineid);
-		}
+	$typeid = (GETPOST('typecontact') ? GETPOSTINT('typecontact') : GETPOSTINT('type'));
+	$contactSource = GETPOST('source', 'aZ09');
+	$storedTypeId = (int) $typeid;
+	$nativeTypeId = ($storedTypeId > 0 ? diffusionResolveContactTypeId($db, $storedTypeId, $contactSource, $object->element, 0) : 0);
+	$result = 1;
 
-		if ($result >= 0) {
-				$diffusioncontactstatic = new DiffusionContact($db);
-				// FR: Nettoie également la table spécifique pour éviter des reliquats côté génération PDF.
-				// EN: Also clean the specific table to avoid leftovers when generating the PDF.
-                $removeResult = $diffusioncontactstatic->removeLink($object->id, $contactid, $contactSource);
+	if ($result >= 0) {
+		$diffusioncontactstatic = new DiffusionContact($db);
+		// FR: Nettoie également la table spécifique pour éviter des reliquats côté génération PDF.
+		// EN: Also clean the specific table to avoid leftovers when generating the PDF.
+		$removeResult = $diffusioncontactstatic->removeLink($object->id, $contactid, $contactSource, $storedTypeId);
 
-                if ($removeResult < 0) {
-                        setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
-                } else {
-                        header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
-                        exit;
-                }
+		if ($removeResult < 0) {
+			setEventMessages($diffusioncontactstatic->error, $diffusioncontactstatic->errors, 'errors');
 		} else {
-			dol_print_error($db);
+			$hasremainingnativelink = diffusionHasStoredContactLinkForNativeType($db, $object->id, $contactid, $contactSource, $nativeTypeId, $object->element);
+			if (!$hasremainingnativelink) {
+				if ($lineid <= 0 && $nativeTypeId > 0) {
+					$lineid = diffusionFindNativeContactLinkRowid($object, $contactid, $contactSource, $nativeTypeId);
+				}
+				if ($lineid > 0) {
+					$result = $object->delete_contact($lineid);
+				}
+			}
+
+			if ($result >= 0) {
+				header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+				exit;
+			}
+
+			setEventMessages($object->error, $object->errors, 'errors');
 		}
-	} elseif ($action == 'importprojectcontacts' && $permissiontoadd) {
+	} else {
+		dol_print_error($db);
+	}
+} elseif ($action == 'importprojectcontacts' && $permissiontoadd) {
 		dol_syslog(__METHOD__.' start importprojectcontacts for diffusion id='.(int) $object->id, LOG_DEBUG);
-		if (empty($object->fk_project)) {
+		if (!isModEnabled('project')) {
+			dol_syslog(__METHOD__.' importprojectcontacts aborted: project module disabled', LOG_WARNING);
+			setEventMessages($langs->trans('ErrorNoProjectLinkedToDiffusion'), null, 'errors');
+		} elseif (empty($object->fk_project)) {
 			dol_syslog(__METHOD__.' importprojectcontacts aborted: no linked project on diffusion id='.(int) $object->id, LOG_WARNING);
 			setEventMessages($langs->trans('ErrorNoProjectLinkedToDiffusion'), null, 'errors');
 		} else {
@@ -634,26 +803,33 @@ if ($action == 'addcontact' && $permissiontoadd) {
 							continue;
 						}
 
-						$typeid = diffusionResolveContactTypeId($db, $typeid, $source, $object->element);
-						if ($typeid <= 0) {
-							dol_syslog(__METHOD__.' importprojectcontacts skip: failed to build diffusion contact type for source='.$source.' contactid='.$contactid, LOG_WARNING);
+						$storedTypeId = diffusionValidateContactTypeId($db, $typeid, $source, 'project');
+						if ($storedTypeId <= 0) {
+							dol_syslog(__METHOD__.' importprojectcontacts skip: invalid project contact type for source='.$source.' contactid='.$contactid.' typeid='.$typeid, LOG_WARNING);
 							$nberrors++;
 							continue;
 						}
 
-						dol_syslog(__METHOD__.' importprojectcontacts add_contact source='.$source.' contactid='.$contactid.' typeid='.$typeid, LOG_DEBUG);
-						$addresult = $object->add_contact($contactid, $typeid, $source);
+						$nativeTypeId = diffusionResolveContactTypeId($db, $storedTypeId, $source, $object->element);
+						if ($nativeTypeId <= 0) {
+							dol_syslog(__METHOD__.' importprojectcontacts skip: failed to build native diffusion contact type for source='.$source.' contactid='.$contactid.' storedtypeid='.$storedTypeId, LOG_WARNING);
+							$nberrors++;
+							continue;
+						}
+
+						dol_syslog(__METHOD__.' importprojectcontacts add_contact source='.$source.' contactid='.$contactid.' nativetypeid='.$nativeTypeId.' storedtypeid='.$storedTypeId, LOG_DEBUG);
+						$addresult = $object->add_contact($contactid, $nativeTypeId, $source);
 						if ($addresult >= 0 || $object->error === 'DB_ERROR_RECORD_ALREADY_EXISTS') {
 							dol_syslog(__METHOD__.' importprojectcontacts add_contact result='.$addresult.' error='.$object->error, LOG_DEBUG);
-							$syncresult = $diffusioncontactstatic->syncLink($object->id, $contactid, $source, $typeid);
-							dol_syslog(__METHOD__.' importprojectcontacts syncLink result='.$syncresult.' for contactid='.$contactid.' source='.$source.' typeid='.$typeid, LOG_DEBUG);
+							$syncresult = $diffusioncontactstatic->syncLink($object->id, $contactid, $source, $storedTypeId);
+							dol_syslog(__METHOD__.' importprojectcontacts syncLink result='.$syncresult.' for contactid='.$contactid.' source='.$source.' storedtypeid='.$storedTypeId, LOG_DEBUG);
 							if ($syncresult >= 0) {
 								$nbimported++;
 							} else {
 								$nberrors++;
 							}
 						} else {
-							dol_syslog(__METHOD__.' importprojectcontacts add_contact failed for contactid='.$contactid.' source='.$source.' typeid='.$typeid.' error='.$object->error, LOG_ERR);
+							dol_syslog(__METHOD__.' importprojectcontacts add_contact failed for contactid='.$contactid.' source='.$source.' nativetypeid='.$nativeTypeId.' error='.$object->error, LOG_ERR);
 							$nberrors++;
 						}
 					}
@@ -888,7 +1064,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Reserved: add dedicated confirmation popups here for real business actions.
 
-	if ($action == 'ask_import_project_contacts' && $permissiontoadd && !empty($object->fk_project)) {
+	if ($action == 'ask_import_project_contacts' && $permissiontoadd && isModEnabled('project') && !empty($object->fk_project)) {
 		$project = new Project($db);
 		$projectresult = $project->fetch((int) $object->fk_project);
 		if ($projectresult > 0) {
@@ -1171,7 +1347,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				print dolGetButtonAction('', $langs->trans('SendMail'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=presend&token='.newToken().'&mode=init#formmailbeforetitle');
 			}
 
-			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && !empty($object->fk_project) && empty($object->is_template)) {
+			if (empty($user->socid) && $permissiontoadd && $object->status == $object::STATUS_DRAFT && isModEnabled('project') && !empty($object->fk_project) && empty($object->is_template)) {
 				print dolGetButtonAction('', $langs->trans('ImportProjectContacts'), 'default', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=ask_import_project_contacts&token='.newToken());
 			}
 
