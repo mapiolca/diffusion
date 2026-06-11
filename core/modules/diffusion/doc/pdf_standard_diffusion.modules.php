@@ -2166,7 +2166,29 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 	{
 		global $conf;
 		$showdetails = !getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 0 : getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS');
-		return pdf_pagefoot($pdf, $outputlangs, 'DIFFUSION_FREE_TEXT', $this->emetteur, $this->marge_basse, $this->marge_gauche, $this->page_hauteur, $object, $showdetails, $hidefreetext, $this->page_largeur, $this->watermark);
+
+		$oldautopagebreak = $pdf->getAutoPageBreak();
+		$oldbmargin = $pdf->getBreakMargin();
+		$pdf->SetAutoPageBreak(false, 0);
+
+		try {
+			return pdf_pagefoot(
+				$pdf,
+				$outputlangs,
+				'DIFFUSION_FREE_TEXT',
+				$this->emetteur,
+				$this->marge_basse,
+				$this->marge_gauche,
+				$this->page_hauteur,
+				$object,
+				$showdetails,
+				$hidefreetext,
+				$this->page_largeur,
+				$this->watermark
+			);
+		} finally {
+			$pdf->SetAutoPageBreak($oldautopagebreak, $oldbmargin);
+		}
 
 	}
 

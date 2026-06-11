@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.4 (11/06/2026)
+
+- FR: Correction du pied de page du PDF standard Diffusion pour éviter la création de pages supplémentaires lorsque TCPDF déclenche un saut de page automatique pendant le rendu du footer.
+- EN: Fixed the standard Diffusion PDF footer to prevent extra pages when TCPDF triggers an automatic page break while rendering the footer.
+
 ## 1.2.3 (31/05/2026)
 
 - FR: corrige l'intégration aux projets via l'utilisation des types de contacts du module "Projet" plutôt que les types de contacts "Diffusion" quand celui-ci est actif
