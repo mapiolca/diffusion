@@ -2,6 +2,8 @@
 
 ## 1.2.4 (15/06/2026)
 
+- FR: Correction du pied de page du PDF standard Diffusion pour éviter la création de pages supplémentaires lorsque TCPDF déclenche un saut de page automatique pendant le rendu du footer.
+- EN: Fixed the standard Diffusion PDF footer to prevent extra pages when TCPDF triggers an automatic page break while rendering the footer.
 - FR: Correction du sélecteur de projet sur la fiche diffusion pour afficher en édition les projets liés à un tiers comme en création.
 - EN: Fixed the project selector on the diffusion card so projects linked to a third party are available in edit mode as they are in create mode.
 
