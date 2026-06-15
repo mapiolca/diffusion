@@ -563,49 +563,33 @@ class ActionsDiffusion
 		}
 
 		$nbsource = 0;
+		$neutralmirrorsdone = array();
 		while ($obj = $db->fetch_object($resql)) {
 			$nbsource++;
 			$mirrorlabel = self::getNotificationMirrorLabel((string) $obj->label, $targettype);
-			$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel);
-			$uniquewhere = self::getEmailTemplateUniqueWhere($db, (int) $obj->entity, $mirrorlabel, $obj->lang);
 
-			$sqlinsert = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
-			$sqlinsert .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, defaultfortype, enabled, active,";
-			$sqlinsert .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines)";
-			$sqlinsert .= " SELECT ".((int) $obj->entity).", 'diffusion', '".$db->escape($targettype)."',";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->lang).", ".((int) $obj->private).", ".self::sqlNullableInteger($obj->fk_user).", NOW(),";
-			$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlabel).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->enabled).", ".((int) $obj->active).",";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_from).", ".self::sqlNullableString($db, $obj->email_to).",";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_tocc).", ".self::sqlNullableString($db, $obj->email_tobcc).",";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->topic).", ".self::sqlNullableString($db, $obj->joinfiles).",";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->content).", ".self::sqlNullableString($db, $obj->content_lines);
-			$sqlinsert .= " FROM DUAL";
-			$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$uniquewhere.")";
-
-			if (!$db->query($sqlinsert)) {
+			$result = self::syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, $obj->lang);
+			if ($result < 0) {
 				$db->free($resql);
 				return -1;
 			}
 
-			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
-			$sqlupdate .= " SET position = ".self::sqlNullableInteger($obj->position);
-			$sqlupdate .= ", defaultfortype = ".((int) $obj->defaultfortype);
-			$sqlupdate .= ", enabled = ".self::sqlNullableString($db, $obj->enabled);
-			$sqlupdate .= ", active = ".((int) $obj->active);
-			$sqlupdate .= ", email_from = ".self::sqlNullableString($db, $obj->email_from);
-			$sqlupdate .= ", email_to = ".self::sqlNullableString($db, $obj->email_to);
-			$sqlupdate .= ", email_tocc = ".self::sqlNullableString($db, $obj->email_tocc);
-			$sqlupdate .= ", email_tobcc = ".self::sqlNullableString($db, $obj->email_tobcc);
-			$sqlupdate .= ", topic = ".self::sqlNullableString($db, $obj->topic);
-			$sqlupdate .= ", joinfiles = ".self::sqlNullableString($db, $obj->joinfiles);
-			$sqlupdate .= ", content = ".self::sqlNullableString($db, $obj->content);
-			$sqlupdate .= ", content_lines = ".self::sqlNullableString($db, $obj->content_lines);
-			$sqlupdate .= " WHERE ".$where;
+			$neutralkey = self::getEmailTemplateMirrorRuntimeKey($targettype, $obj, $mirrorlabel);
+			if (empty($neutralmirrorsdone[$neutralkey])) {
+				if ($obj->lang !== null) {
+					$result = self::syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, null);
+					if ($result < 0) {
+						$db->free($resql);
+						return -1;
+					}
+				}
 
-			if (!$db->query($sqlupdate)) {
-				$db->free($resql);
-				return -1;
+				$result = self::normalizeNeutralEmailTemplateMirrorDuplicates($db, $obj, $targettype, $mirrorlabel);
+				if ($result < 0) {
+					$db->free($resql);
+					return -1;
+				}
+				$neutralmirrorsdone[$neutralkey] = 1;
 			}
 		}
 
@@ -646,22 +630,159 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Copy or update one visible template row into one hidden notification mirror language.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @param mixed $mirrorlang Hidden mirror language, null for language-neutral fallback
+	 * @return int<-1,1>
+	 */
+	private static function syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, $mirrorlang)
+	{
+		$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, $mirrorlang);
+		$uniquewhere = self::getEmailTemplateUniqueWhere($db, (int) $obj->entity, $mirrorlabel, $mirrorlang);
+
+		$sqlinsert = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
+		$sqlinsert .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, defaultfortype, enabled, active,";
+		$sqlinsert .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines)";
+		$sqlinsert .= " SELECT ".((int) $obj->entity).", 'diffusion', '".$db->escape($targettype)."',";
+		$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlang).", ".((int) $obj->private).", ".self::sqlNullableInteger($obj->fk_user).", NOW(),";
+		$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlabel).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->enabled).", ".((int) $obj->active).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_from).", ".self::sqlNullableString($db, $obj->email_to).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_tocc).", ".self::sqlNullableString($db, $obj->email_tobcc).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->topic).", ".self::sqlNullableString($db, $obj->joinfiles).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->content).", ".self::sqlNullableString($db, $obj->content_lines);
+		$sqlinsert .= " FROM DUAL";
+		$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$uniquewhere.")";
+
+		if (!$db->query($sqlinsert)) {
+			return -1;
+		}
+
+		$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+		$sqlupdate .= " SET position = ".self::sqlNullableInteger($obj->position);
+		$sqlupdate .= ", defaultfortype = ".((int) $obj->defaultfortype);
+		$sqlupdate .= ", enabled = ".self::sqlNullableString($db, $obj->enabled);
+		$sqlupdate .= ", active = ".((int) $obj->active);
+		$sqlupdate .= ", email_from = ".self::sqlNullableString($db, $obj->email_from);
+		$sqlupdate .= ", email_to = ".self::sqlNullableString($db, $obj->email_to);
+		$sqlupdate .= ", email_tocc = ".self::sqlNullableString($db, $obj->email_tocc);
+		$sqlupdate .= ", email_tobcc = ".self::sqlNullableString($db, $obj->email_tobcc);
+		$sqlupdate .= ", topic = ".self::sqlNullableString($db, $obj->topic);
+		$sqlupdate .= ", joinfiles = ".self::sqlNullableString($db, $obj->joinfiles);
+		$sqlupdate .= ", content = ".self::sqlNullableString($db, $obj->content);
+		$sqlupdate .= ", content_lines = ".self::sqlNullableString($db, $obj->content_lines);
+		$sqlupdate .= " WHERE ".$where;
+
+		return $db->query($sqlupdate) ? 1 : -1;
+	}
+
+	/**
+	 * Disable and rename duplicate neutral mirrors left by older MySQL NULL unique-key behavior.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @return int<-1,1>
+	 */
+	private static function normalizeNeutralEmailTemplateMirrorDuplicates($db, $obj, $targettype, $mirrorlabel)
+	{
+		$sql = "SELECT rowid";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE ".self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, null);
+		$sql .= " ORDER BY rowid";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+
+		$keepid = 0;
+		$duplicateids = array();
+		while ($row = $db->fetch_object($resql)) {
+			$rowid = (int) $row->rowid;
+			if (empty($keepid)) {
+				$keepid = $rowid;
+				continue;
+			}
+			$duplicateids[] = $rowid;
+		}
+
+		$db->free($resql);
+
+		foreach ($duplicateids as $rowid) {
+			$archivedlabel = self::getNotificationMirrorDuplicateArchiveLabel($mirrorlabel, $targettype, $rowid);
+			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+			$sqlupdate .= " SET label = ".self::sqlNullableString($db, $archivedlabel).", active = 0";
+			$sqlupdate .= " WHERE rowid = ".$rowid;
+			if (!$db->query($sqlupdate)) {
+				return -1;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Build a runtime key for one hidden notification mirror independent of language.
+	 *
+	 * @param string $targettype Hidden target template type
+	 * @param stdClass $obj Source email template row
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @return string
+	 */
+	private static function getEmailTemplateMirrorRuntimeKey($targettype, $obj, $mirrorlabel)
+	{
+		return serialize(array(
+			$targettype,
+			(int) $obj->entity,
+			(int) $obj->private,
+			($obj->fk_user === null || $obj->fk_user === '') ? null : (int) $obj->fk_user,
+			$mirrorlabel,
+		));
+	}
+
+	/**
+	 * Return a readable archived label for duplicate hidden notification mirrors.
+	 *
+	 * @param string $label Current mirror label
+	 * @param string $targettype Hidden target template type
+	 * @param int $rowid Template row id
+	 * @return string
+	 */
+	private static function getNotificationMirrorDuplicateArchiveLabel($label, $targettype, $rowid)
+	{
+		$suffix = ' [duplicate '.$targettype.' #'.((int) $rowid).']';
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr((string) $label, 0, $maxlabelsize).$suffix;
+	}
+
+	/**
 	 * Build the key used to update one hidden notification template mirror.
 	 *
 	 * @param DoliDB $db Database handler
 	 * @param stdClass $obj Source email template row
 	 * @param string $targettype Hidden target template type
 	 * @param string $mirrorlabel Hidden mirror label
+	 * @param mixed $mirrorlang Hidden mirror language
 	 * @return string SQL where clause
 	 */
-	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel)
+	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, $mirrorlang)
 	{
 		$where = "module = 'diffusion'";
 		$where .= " AND type_template = '".$db->escape($targettype)."'";
 		$where .= " AND entity = ".((int) $obj->entity);
 		$where .= " AND private = ".((int) $obj->private);
 		$where .= " AND label ".self::sqlNullableCondition($db, $mirrorlabel);
-		$where .= " AND lang ".self::sqlNullableCondition($db, $obj->lang);
+		$where .= " AND lang ".self::sqlNullableCondition($db, $mirrorlang);
 		if ($obj->fk_user === null || $obj->fk_user === '') {
 			$where .= " AND fk_user IS NULL";
 		} else {

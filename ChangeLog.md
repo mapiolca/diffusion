@@ -22,6 +22,8 @@
 - EN: Added idempotent merging of legacy visible Diffusion email template types into `diffusion@diffusion`, with archived legacy duplicates and preserved administrator choices.
 - FR: Déclaration explicite des propriétés `trackid` et `diffusion` pour éviter les dépréciations PHP liées aux propriétés dynamiques.
 - EN: Explicitly declared `trackid` and `diffusion` properties to avoid PHP dynamic property deprecation notices.
+- FR: Ajout d'un miroir technique neutre `lang = NULL` pour les modèles de notifications Diffusion afin que `Notify::send()` retrouve le modèle sélectionné quelle que soit la langue du destinataire.
+- EN: Added a language-neutral technical mirror with `lang = NULL` for Diffusion notification templates so `Notify::send()` can find the selected template regardless of recipient language.
 
 ## 1.2.4 (15/06/2026)
 
