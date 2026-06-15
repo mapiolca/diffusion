@@ -59,6 +59,9 @@ class ActionsDiffusion
 	/** @var array<string> Errors */
 	public $errors = array();
 
+	/** @var array<string> Warnings */
+	public $warnings = array();
+
 	/** @var string Output */
 	public $resprints;
 
@@ -1210,7 +1213,7 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$notificationElementAliases = array('diffusion', 'diffusiondoc', 'diffusioncontact');
+		$notificationElementAliases = array('diffusion', 'diffusion@diffusion', 'diffusiondoc', 'diffusioncontact');
 		foreach ($notificationElementAliases as $alias) {
 			if (empty($conf->{$alias}) || !is_object($conf->{$alias})) {
 				$conf->{$alias} = new stdClass();
