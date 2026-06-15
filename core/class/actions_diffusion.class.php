@@ -29,11 +29,14 @@ class ActionsDiffusion
 	/** @var string Identifier used by Multicompany external sharing payload */
 	public const MULTICOMPANY_SHARING_ROOT_KEY = 'diffusion';
 
+	/** @var string Legacy visible email template type used before module picto alignment */
+	public const EMAIL_TEMPLATE_TYPE_LEGACY_DIFFUSION = 'diffusion';
+
 	/** @var string Email template type for manual sending from diffusion cards and lists */
-	public const EMAIL_TEMPLATE_TYPE_MANUAL = 'diffusion';
+	public const EMAIL_TEMPLATE_TYPE_MANUAL = 'diffusion@diffusion';
 
 	/** @var string Single visible email template type for all Diffusion module emails */
-	public const EMAIL_TEMPLATE_TYPE_NOTIFICATION = 'diffusion';
+	public const EMAIL_TEMPLATE_TYPE_NOTIFICATION = 'diffusion@diffusion';
 
 	/** @var string Hidden Dolibarr notification template type for Diffusion objects */
 	public const EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND = 'diffusiondoc_send';
@@ -125,7 +128,7 @@ class ActionsDiffusion
 	public static function getEmailTemplateTypes()
 	{
 		return array(
-			self::EMAIL_TEMPLATE_TYPE_MANUAL => array('label' => 'MailToSendDiffusion', 'picto' => 'fa-paper-plane'),
+			self::EMAIL_TEMPLATE_TYPE_MANUAL => array('label' => 'MailToSendDiffusion', 'picto' => 'diffusion@diffusion'),
 		);
 	}
 
@@ -172,6 +175,7 @@ class ActionsDiffusion
 	public static function getLegacyVisibleEmailTemplateTypes()
 	{
 		return array(
+			self::EMAIL_TEMPLATE_TYPE_LEGACY_DIFFUSION,
 			self::AGENDA_ELEMENTTYPE_DIFFUSION,
 			self::AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT,
 		);

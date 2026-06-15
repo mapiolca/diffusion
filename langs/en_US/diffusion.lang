@@ -31,7 +31,7 @@ Default = Default
 Delete = Delete
 Description = Description
 Diffusion = Diffusion
-Diffusion@diffusion = Diffusion
+Diffusion@diffusion = Diffusions
 Diffusiondoc@diffusion = Diffusion
 Diffusioncontact@diffusion = Diffusion contact
 # FR: Chaînes utilisées pour les sections PDF contacts et pièces jointes.

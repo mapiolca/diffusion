@@ -652,7 +652,7 @@ print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sort
 
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDiffusionRef";
-$modelmail = "diffusion";
+$modelmail = "diffusion@diffusion";
 $objecttmp = new Diffusion($db);
 $trackid = 'xxxx'.$object->id;
 include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
