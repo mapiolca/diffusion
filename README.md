@@ -18,9 +18,9 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Suivi des diffusions générées depuis un modèle (liaison `model_source` et onglet dédié).
 - Ajout et suivi des **documents joints**.
 - Génération/régénération des documents PDF de diffusion.
-- Envoi de diffusion par e-mail avec modèles de courriel natifs.
+- Envoi de diffusion par e-mail avec modèles de courriel natifs sous le type unique **Diffusions**.
 - Création automatique d’événements agenda sur les actions clés (validation, retour brouillon, envoi e-mail, marquage diffusé/remis, suppression).
-- Événements métier exposés aux Notifications natives Dolibarr avec modèles de courriel sélectionnables.
+- Événements métier exposés aux Notifications natives Dolibarr avec modèles de courriel sélectionnables sous le même type **Diffusions**.
 - Compatibilité **Multicompany** (partage possible des diffusions et de la numérotation via options dédiées).
 
 ### Compatibilité
@@ -116,9 +116,9 @@ The module allows you to create distribution records linked to a project, manage
 - Tracking generated distributions from a template (`model_source` linkage and dedicated tab).
 - Add and track **attached documents**.
 - Generate/regenerate distribution PDF documents.
-- Send distributions by email with native email templates.
+- Send distributions by email with native email templates under the single **Diffusions** type.
 - Automatic agenda event creation on key actions (validate, back to draft, email sent, marked as delivered/distributed, delete).
-- Business events exposed to native Dolibarr Notifications with selectable email templates.
+- Business events exposed to native Dolibarr Notifications with selectable email templates under the same **Diffusions** type.
 - **Multicompany** compatibility (optional sharing of distributions and numbering).
 
 ### Compatibility

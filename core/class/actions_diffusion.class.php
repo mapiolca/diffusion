@@ -32,11 +32,20 @@ class ActionsDiffusion
 	/** @var string Email template type for manual sending from diffusion cards and lists */
 	public const EMAIL_TEMPLATE_TYPE_MANUAL = 'diffusion';
 
-	/** @var string Email template type for diffusion business notifications */
-	public const EMAIL_TEMPLATE_TYPE_DIFFUSION = 'diffusiondoc@diffusion';
+	/** @var string Single visible email template type for all Diffusion module emails */
+	public const EMAIL_TEMPLATE_TYPE_NOTIFICATION = 'diffusion';
 
-	/** @var string Email template type for diffusion contact business notifications */
-	public const EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT = 'diffusioncontact@diffusion';
+	/** @var string Hidden Dolibarr notification template type for Diffusion objects */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND = 'diffusiondoc_send';
+
+	/** @var string Hidden Dolibarr notification template type for DiffusionContact objects */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND = 'diffusioncontact_send';
+
+	/** @var string Agenda link element type for Diffusion objects */
+	public const AGENDA_ELEMENTTYPE_DIFFUSION = 'diffusiondoc@diffusion';
+
+	/** @var string Agenda link element type for DiffusionContact objects */
+	public const AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT = 'diffusioncontact@diffusion';
 
 	/** @var DoliDB Database handler */
 	public $db;
@@ -60,20 +69,29 @@ class ActionsDiffusion
 	 */
 	public static function getBusinessEventsDefinition()
 	{
+		$diffusion = array(
+			'notification_elementtype' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+			'agenda_elementtype' => self::AGENDA_ELEMENTTYPE_DIFFUSION,
+		);
+		$diffusioncontact = array(
+			'notification_elementtype' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+			'agenda_elementtype' => self::AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT,
+		);
+
 		return array(
-			'DIFFUSION_CREATE' => array('label' => 'DiffusionTriggerLabelCreate', 'description' => 'DiffusionTriggerDescCreate', 'rang' => 2000, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_VALIDATE' => array('label' => 'DiffusionTriggerLabelValidate', 'description' => 'DiffusionTriggerDescValidate', 'rang' => 2001, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_SENDMAIL' => array('label' => 'DiffusionTriggerLabelSendMail', 'description' => 'DiffusionTriggerDescSendMail', 'rang' => 2002, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_SETDIFFUSED' => array('label' => 'DiffusionTriggerLabelSetDiffused', 'description' => 'DiffusionTriggerDescSetDiffused', 'rang' => 2003, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_BACKTODRAFT' => array('label' => 'DiffusionTriggerLabelBackToDraft', 'description' => 'DiffusionTriggerDescBackToDraft', 'rang' => 2004, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_DELETE' => array('label' => 'DiffusionTriggerLabelDelete', 'description' => 'DiffusionTriggerDescDelete', 'rang' => 2005, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_CANCEL' => array('label' => 'DiffusionTriggerLabelCancel', 'description' => 'DiffusionTriggerDescCancel', 'rang' => 2006, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_REOPEN' => array('label' => 'DiffusionTriggerLabelReopen', 'description' => 'DiffusionTriggerDescReopen', 'rang' => 2007, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSION_DIFFUSION_MODIFY' => array('label' => 'DiffusionTriggerLabelModify', 'description' => 'DiffusionTriggerDescModify', 'rang' => 2008, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
-			'DIFFUSIONCONTACT_INSERT' => array('label' => 'DiffusionContactTriggerLabelInsert', 'description' => 'DiffusionContactTriggerDescInsert', 'rang' => 2010, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
-			'DIFFUSIONCONTACT_DELETELINE' => array('label' => 'DiffusionContactTriggerLabelDeleteLine', 'description' => 'DiffusionContactTriggerDescDeleteLine', 'rang' => 2011, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
-			'DIFFUSIONCONTACT_UPDATELINE' => array('label' => 'DiffusionContactTriggerLabelUpdateLine', 'description' => 'DiffusionContactTriggerDescUpdateLine', 'rang' => 2012, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
-			'DIFFUSIONCONTACT_DELETEALL' => array('label' => 'DiffusionContactTriggerLabelDeleteAll', 'description' => 'DiffusionContactTriggerDescDeleteAll', 'rang' => 2013, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
+			'DIFFUSION_CREATE' => array_merge(array('label' => 'DiffusionTriggerLabelCreate', 'description' => 'DiffusionTriggerDescCreate', 'rang' => 2000), $diffusion),
+			'DIFFUSION_VALIDATE' => array_merge(array('label' => 'DiffusionTriggerLabelValidate', 'description' => 'DiffusionTriggerDescValidate', 'rang' => 2001), $diffusion),
+			'DIFFUSION_SENDMAIL' => array_merge(array('label' => 'DiffusionTriggerLabelSendMail', 'description' => 'DiffusionTriggerDescSendMail', 'rang' => 2002), $diffusion),
+			'DIFFUSION_SETDIFFUSED' => array_merge(array('label' => 'DiffusionTriggerLabelSetDiffused', 'description' => 'DiffusionTriggerDescSetDiffused', 'rang' => 2003), $diffusion),
+			'DIFFUSION_BACKTODRAFT' => array_merge(array('label' => 'DiffusionTriggerLabelBackToDraft', 'description' => 'DiffusionTriggerDescBackToDraft', 'rang' => 2004), $diffusion),
+			'DIFFUSION_DELETE' => array_merge(array('label' => 'DiffusionTriggerLabelDelete', 'description' => 'DiffusionTriggerDescDelete', 'rang' => 2005), $diffusion),
+			'DIFFUSION_CANCEL' => array_merge(array('label' => 'DiffusionTriggerLabelCancel', 'description' => 'DiffusionTriggerDescCancel', 'rang' => 2006), $diffusion),
+			'DIFFUSION_REOPEN' => array_merge(array('label' => 'DiffusionTriggerLabelReopen', 'description' => 'DiffusionTriggerDescReopen', 'rang' => 2007), $diffusion),
+			'DIFFUSION_DIFFUSION_MODIFY' => array_merge(array('label' => 'DiffusionTriggerLabelModify', 'description' => 'DiffusionTriggerDescModify', 'rang' => 2008), $diffusion),
+			'DIFFUSIONCONTACT_INSERT' => array_merge(array('label' => 'DiffusionContactTriggerLabelInsert', 'description' => 'DiffusionContactTriggerDescInsert', 'rang' => 2010), $diffusioncontact),
+			'DIFFUSIONCONTACT_DELETELINE' => array_merge(array('label' => 'DiffusionContactTriggerLabelDeleteLine', 'description' => 'DiffusionContactTriggerDescDeleteLine', 'rang' => 2011), $diffusioncontact),
+			'DIFFUSIONCONTACT_UPDATELINE' => array_merge(array('label' => 'DiffusionContactTriggerLabelUpdateLine', 'description' => 'DiffusionContactTriggerDescUpdateLine', 'rang' => 2012), $diffusioncontact),
+			'DIFFUSIONCONTACT_DELETEALL' => array_merge(array('label' => 'DiffusionContactTriggerLabelDeleteAll', 'description' => 'DiffusionContactTriggerDescDeleteAll', 'rang' => 2013), $diffusioncontact),
 		);
 	}
 
@@ -108,8 +126,6 @@ class ActionsDiffusion
 	{
 		return array(
 			self::EMAIL_TEMPLATE_TYPE_MANUAL => array('label' => 'MailToSendDiffusion', 'picto' => 'fa-paper-plane'),
-			self::EMAIL_TEMPLATE_TYPE_DIFFUSION => array('label' => 'MailToNotifyDiffusion', 'picto' => 'fa-paper-plane'),
-			self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT => array('label' => 'MailToNotifyDiffusionContact', 'picto' => 'fa-address-book'),
 		);
 	}
 
@@ -130,7 +146,7 @@ class ActionsDiffusion
 				'joinfiles' => 1,
 			),
 			'DIFFUSION_NOTIFICATION' => array(
-				'type_template' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION,
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
 				'label' => 'DiffusionEmailTemplateNotificationLabel',
 				'topic' => 'DiffusionEmailTemplateNotificationTopic',
 				'content' => 'DiffusionEmailTemplateNotificationContent',
@@ -138,7 +154,7 @@ class ActionsDiffusion
 				'joinfiles' => 0,
 			),
 			'DIFFUSIONCONTACT_NOTIFICATION' => array(
-				'type_template' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT,
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
 				'label' => 'DiffusionContactEmailTemplateNotificationLabel',
 				'topic' => 'DiffusionContactEmailTemplateNotificationTopic',
 				'content' => 'DiffusionContactEmailTemplateNotificationContent',
@@ -146,6 +162,289 @@ class ActionsDiffusion
 				'joinfiles' => 0,
 			),
 		);
+	}
+
+	/**
+	 * Return legacy visible email template types that must be folded into the single Diffusion type.
+	 *
+	 * @return string[]
+	 */
+	public static function getLegacyVisibleEmailTemplateTypes()
+	{
+		return array(
+			self::AGENDA_ELEMENTTYPE_DIFFUSION,
+			self::AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT,
+		);
+	}
+
+	/**
+	 * Return hidden email template types expected by Dolibarr notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getNotificationMirrorEmailTemplateTypes()
+	{
+		return array(
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND,
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND,
+		);
+	}
+
+	/**
+	 * Migrate legacy visible notification template types into the single visible Diffusion type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function migrateLegacyVisibleEmailTemplateTypes($db)
+	{
+		$legacytypes = array();
+		foreach (self::getLegacyVisibleEmailTemplateTypes() as $type) {
+			$legacytypes[] = "'".$db->escape($type)."'";
+		}
+		if (empty($legacytypes)) {
+			return 1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template IN (".implode(',', $legacytypes).")";
+
+		$resql = $db->query($sql);
+		return $resql ? 1 : -1;
+	}
+
+	/**
+	 * Sync all visible Diffusion templates into hidden Dolibarr notification template types.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function syncAllNotificationEmailTemplateMirrors($db)
+	{
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$result = self::syncEmailTemplateMirror($db, $targettype, '');
+			if ($result < 0) {
+				return $result;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Sync the selected visible template for a notification event into hidden Dolibarr notification template types.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $notifcode Notification trigger code
+	 * @return int<-1,1>
+	 */
+	public static function syncSelectedNotificationEmailTemplateMirrors($db, $notifcode)
+	{
+		if (empty($notifcode) || !in_array($notifcode, self::getNotificationEventCodes(), true)) {
+			return 1;
+		}
+
+		$label = getDolGlobalString($notifcode.'_TEMPLATE');
+		if ($label === '') {
+			return 1;
+		}
+
+		$resultmigrate = self::migrateLegacyVisibleEmailTemplateTypes($db);
+		if ($resultmigrate < 0) {
+			return $resultmigrate;
+		}
+
+		$synced = 0;
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$result = self::syncEmailTemplateMirror($db, $targettype, $label);
+			if ($result < 0) {
+				return $result;
+			}
+			if ($result > 0) {
+				$synced++;
+			}
+		}
+
+		if (empty($synced)) {
+			return self::disableNotificationEmailTemplateMirrors($db, $label);
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Copy or update visible Diffusion templates into one hidden notification type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $targettype Hidden target template type
+	 * @param string $label Optional selected label to sync
+	 * @return int<-1,1> Return 1 if synced, 0 if no source template found, <0 if KO
+	 */
+	private static function syncEmailTemplateMirror($db, $targettype, $label = '')
+	{
+		$sql = "SELECT rowid, entity, lang, private, fk_user, label, position, defaultfortype, enabled, active,";
+		$sql .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		if ($label !== '') {
+			$sql .= " AND label = '".$db->escape($label)."'";
+		}
+		$sql .= " ORDER BY entity, lang, position, rowid";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+
+		$nbsource = 0;
+		while ($obj = $db->fetch_object($resql)) {
+			$nbsource++;
+			$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype);
+
+			$sqlinsert = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
+			$sqlinsert .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, defaultfortype, enabled, active,";
+			$sqlinsert .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines)";
+			$sqlinsert .= " SELECT ".((int) $obj->entity).", 'diffusion', '".$db->escape($targettype)."',";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->lang).", ".((int) $obj->private).", ".self::sqlNullableInteger($obj->fk_user).", NOW(),";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->label).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->enabled).", ".((int) $obj->active).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_from).", ".self::sqlNullableString($db, $obj->email_to).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_tocc).", ".self::sqlNullableString($db, $obj->email_tobcc).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->topic).", ".self::sqlNullableString($db, $obj->joinfiles).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $obj->content).", ".self::sqlNullableString($db, $obj->content_lines);
+			$sqlinsert .= " FROM DUAL";
+			$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$where.")";
+
+			if (!$db->query($sqlinsert)) {
+				$db->free($resql);
+				return -1;
+			}
+
+			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+			$sqlupdate .= " SET position = ".self::sqlNullableInteger($obj->position);
+			$sqlupdate .= ", defaultfortype = ".((int) $obj->defaultfortype);
+			$sqlupdate .= ", enabled = ".self::sqlNullableString($db, $obj->enabled);
+			$sqlupdate .= ", active = ".((int) $obj->active);
+			$sqlupdate .= ", email_from = ".self::sqlNullableString($db, $obj->email_from);
+			$sqlupdate .= ", email_to = ".self::sqlNullableString($db, $obj->email_to);
+			$sqlupdate .= ", email_tocc = ".self::sqlNullableString($db, $obj->email_tocc);
+			$sqlupdate .= ", email_tobcc = ".self::sqlNullableString($db, $obj->email_tobcc);
+			$sqlupdate .= ", topic = ".self::sqlNullableString($db, $obj->topic);
+			$sqlupdate .= ", joinfiles = ".self::sqlNullableString($db, $obj->joinfiles);
+			$sqlupdate .= ", content = ".self::sqlNullableString($db, $obj->content);
+			$sqlupdate .= ", content_lines = ".self::sqlNullableString($db, $obj->content_lines);
+			$sqlupdate .= " WHERE ".$where;
+
+			if (!$db->query($sqlupdate)) {
+				$db->free($resql);
+				return -1;
+			}
+		}
+
+		$db->free($resql);
+
+		return $nbsource > 0 ? 1 : 0;
+	}
+
+	/**
+	 * Disable stale hidden notification template mirrors for a label no longer available under the visible type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $label Template label
+	 * @return int<-1,1>
+	 */
+	private static function disableNotificationEmailTemplateMirrors($db, $label)
+	{
+		$targettypes = array();
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$targettypes[] = "'".$db->escape($targettype)."'";
+		}
+		if (empty($targettypes)) {
+			return 1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " SET active = 0";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template IN (".implode(',', $targettypes).")";
+		$sql .= " AND label = '".$db->escape($label)."'";
+
+		return $db->query($sql) ? 1 : -1;
+	}
+
+	/**
+	 * Build the key used to update one hidden notification template mirror.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @return string SQL where clause
+	 */
+	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype)
+	{
+		$where = "module = 'diffusion'";
+		$where .= " AND type_template = '".$db->escape($targettype)."'";
+		$where .= " AND entity = ".((int) $obj->entity);
+		$where .= " AND private = ".((int) $obj->private);
+		$where .= " AND label ".self::sqlNullableCondition($db, $obj->label);
+		$where .= " AND lang ".self::sqlNullableCondition($db, $obj->lang);
+		if ($obj->fk_user === null || $obj->fk_user === '') {
+			$where .= " AND fk_user IS NULL";
+		} else {
+			$where .= " AND fk_user = ".((int) $obj->fk_user);
+		}
+
+		return $where;
+	}
+
+	/**
+	 * Return a SQL nullable string value.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableString($db, $value)
+	{
+		if ($value === null) {
+			return 'NULL';
+		}
+
+		return "'".$db->escape((string) $value)."'";
+	}
+
+	/**
+	 * Return a SQL nullable integer value.
+	 *
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableInteger($value)
+	{
+		if ($value === null || $value === '') {
+			return 'NULL';
+		}
+
+		return (string) ((int) $value);
+	}
+
+	/**
+	 * Return a SQL condition for a nullable string column.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableCondition($db, $value)
+	{
+		if ($value === null) {
+			return 'IS NULL';
+		}
+
+		return "= '".$db->escape((string) $value)."'";
 	}
 
 	/**
@@ -752,12 +1051,26 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$notificationElementAliases = array('diffusion', 'diffusiondoc', self::EMAIL_TEMPLATE_TYPE_DIFFUSION, 'diffusioncontact', self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT);
+		$notificationElementAliases = array('diffusion', 'diffusiondoc', 'diffusioncontact');
 		foreach ($notificationElementAliases as $alias) {
 			if (empty($conf->{$alias}) || !is_object($conf->{$alias})) {
 				$conf->{$alias} = new stdClass();
 			}
 			$conf->{$alias}->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
+			if (!empty($conf->diffusion->dir_output)) {
+				$conf->{$alias}->dir_output = $conf->diffusion->dir_output;
+			}
+			if (!empty($conf->diffusion->multidir_output)) {
+				$conf->{$alias}->multidir_output = $conf->diffusion->multidir_output;
+			}
+		}
+
+		if (!empty($parameters['notifcode'])) {
+			$result = self::syncSelectedNotificationEmailTemplateMirrors($this->db, (string) $parameters['notifcode']);
+			if ($result < 0) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
 		}
 
 		$events = self::getNotificationEventCodes();

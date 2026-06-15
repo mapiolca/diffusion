@@ -702,11 +702,12 @@ class modDiffusion extends DolibarrModules
 		foreach ($triggers as $code => $triggerconf) {
 			$label = $this->db->escape($langs->transnoentities($triggerconf['label']));
 			$description = $this->db->escape($langs->transnoentities($triggerconf['description']));
-			$elementtype = $this->db->escape((string) $triggerconf['elementtype']);
+			$notificationElementtype = $this->db->escape((string) $triggerconf['notification_elementtype']);
+			$agendaElementtype = $this->db->escape((string) $triggerconf['agenda_elementtype']);
 			$rang = (int) $triggerconf['rang'];
 
 			$sql = "INSERT INTO ".MAIN_DB_PREFIX."c_action_trigger (code, label, description, elementtype, rang)";
-			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', '".$elementtype."', ".$rang;
+			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', '".$notificationElementtype."', ".$rang;
 			$sql .= " FROM DUAL";
 			$sql .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_action_trigger WHERE code = '".$this->db->escape($code)."')";
 
@@ -717,7 +718,7 @@ class modDiffusion extends DolibarrModules
 			}
 
 			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_action_trigger";
-			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = '".$elementtype."', rang = ".$rang;
+			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = '".$notificationElementtype."', rang = ".$rang;
 			$sqlupdate .= " WHERE code = '".$this->db->escape($code)."'";
 
 			$resql = $this->db->query($sqlupdate);
@@ -727,7 +728,7 @@ class modDiffusion extends DolibarrModules
 			}
 
 			$sqlupdateagenda = "UPDATE ".MAIN_DB_PREFIX."actioncomm";
-			$sqlupdateagenda .= " SET elementtype = '".$elementtype."'";
+			$sqlupdateagenda .= " SET elementtype = '".$agendaElementtype."'";
 			$sqlupdateagenda .= " WHERE code = '".$this->db->escape($code)."'";
 			$sqlupdateagenda .= " AND elementtype = 'diffusion@diffusion'";
 
@@ -757,6 +758,12 @@ class modDiffusion extends DolibarrModules
 		}
 
 		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+
+		$resultmigrate = ActionsDiffusion::migrateLegacyVisibleEmailTemplateTypes($this->db);
+		if ($resultmigrate < 0) {
+			$this->error = $this->db->lasterror();
+			return -2;
+		}
 
 		$templates = ActionsDiffusion::getDefaultEmailTemplatesDefinition();
 		$langcodes = array('fr_FR', 'en_US');
@@ -792,9 +799,15 @@ class modDiffusion extends DolibarrModules
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$this->error = $this->db->lasterror();
-					return -2;
+					return -3;
 				}
 			}
+		}
+
+		$resultsync = ActionsDiffusion::syncAllNotificationEmailTemplateMirrors($this->db);
+		if ($resultsync < 0) {
+			$this->error = $this->db->lasterror();
+			return -4;
 		}
 
 		return 1;

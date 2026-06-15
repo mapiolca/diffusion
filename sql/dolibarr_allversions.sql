@@ -10,12 +10,17 @@ ALTER TABLE llx_diffusion ADD COLUMN fk_user_exped integer;
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_fk_user_exped (fk_user_exped);
 
 UPDATE llx_c_action_trigger
-SET elementtype = 'diffusiondoc@diffusion'
+SET elementtype = 'diffusion'
 WHERE code IN ('DIFFUSION_CREATE', 'DIFFUSION_VALIDATE', 'DIFFUSION_SENDMAIL', 'DIFFUSION_SETDIFFUSED', 'DIFFUSION_BACKTODRAFT', 'DIFFUSION_DELETE', 'DIFFUSION_CANCEL', 'DIFFUSION_REOPEN', 'DIFFUSION_DIFFUSION_MODIFY');
 
 UPDATE llx_c_action_trigger
-SET elementtype = 'diffusioncontact@diffusion'
+SET elementtype = 'diffusion'
 WHERE code IN ('DIFFUSIONCONTACT_INSERT', 'DIFFUSIONCONTACT_DELETELINE', 'DIFFUSIONCONTACT_UPDATELINE', 'DIFFUSIONCONTACT_DELETEALL');
+
+UPDATE llx_c_email_templates
+SET type_template = 'diffusion'
+WHERE module = 'diffusion'
+AND type_template IN ('diffusiondoc@diffusion', 'diffusioncontact@diffusion');
 
 UPDATE llx_actioncomm
 SET elementtype = 'diffusiondoc@diffusion'

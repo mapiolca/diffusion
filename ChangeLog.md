@@ -12,6 +12,8 @@
 - EN: Completed native Notifications and Agenda hooks/triggers with substitutions for email templates.
 - FR: Correction des événements Agenda Diffusion avec type natif `AC_OTH_AUTO`, clé `actioncomm.id`, `elementtype` aligné et modèles d'e-mails par défaut pour l'envoi manuel et les notifications.
 - EN: Fixed Diffusion Agenda events with native `AC_OTH_AUTO` type, `actioncomm.id` key, aligned `elementtype`, and default email templates for manual sending and notifications.
+- FR: Regroupement des modèles de courriel du module sous le type unique `diffusion`, avec migration des anciens types visibles et synchronisation technique cachée pour les Notifications natives Dolibarr.
+- EN: Grouped module email templates under the single `diffusion` type, with migration from previous visible types and hidden technical synchronization for native Dolibarr Notifications.
 
 ## 1.2.4 (15/06/2026)
 

@@ -134,7 +134,7 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 		}
 
 		$eventdef = ActionsDiffusion::getBusinessEventDefinition($action);
-		$elementtype = !empty($eventdef['elementtype']) ? (string) $eventdef['elementtype'] : 'diffusiondoc@diffusion';
+		$elementtype = !empty($eventdef['agenda_elementtype']) ? (string) $eventdef['agenda_elementtype'] : ActionsDiffusion::AGENDA_ELEMENTTYPE_DIFFUSION;
 		$sql = "SELECT id FROM ".MAIN_DB_PREFIX."actioncomm";
 		$sql .= " WHERE elementtype = '".$this->db->escape($elementtype)."'";
 		$sql .= " AND fk_element = ".((int) $object->id);
