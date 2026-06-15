@@ -20,18 +20,21 @@
  *
  * @param array<string,string> $substitutionarray Substitution array
  * @param Translate $langs Output language
- * @param CommonObject $object Current object
+ * @param CommonObject|null $object Current object, null when Dolibarr builds email template help
  * @param mixed $parameters Extra parameters
  * @return void
  */
 function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $object, $parameters = null)
 {
-	if (empty($object) || !is_object($object)) {
-		return;
-	}
-
 	if (is_object($langs)) {
 		$langs->loadLangs(array('diffusion@diffusion'));
+	}
+
+	if (empty($object) || !is_object($object)) {
+		if (diffusion_is_substitution_catalog_mode($parameters)) {
+			diffusion_register_available_substitution_keys($substitutionarray, $langs);
+		}
+		return;
 	}
 
 	$isDiffusion = (!empty($object->element) && $object->element === 'diffusiondoc')
@@ -143,6 +146,104 @@ function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $objec
 }
 
 /**
+ * Check whether Dolibarr is building the help/catalog of available email variables.
+ *
+ * @param mixed $parameters Extra parameters
+ * @return bool
+ */
+function diffusion_is_substitution_catalog_mode($parameters)
+{
+	if (!is_array($parameters) || empty($parameters['mode'])) {
+		return empty($parameters);
+	}
+
+	return in_array((string) $parameters['mode'], array('formemail', 'formemailwithlines', 'formemailforlines', 'emailing'), true);
+}
+
+/**
+ * Register Diffusion substitution keys for Dolibarr email template help.
+ *
+ * @param array<string,string> $substitutionarray Substitution array
+ * @param Translate $langs Output language
+ * @return void
+ */
+function diffusion_register_available_substitution_keys(&$substitutionarray, $langs)
+{
+	foreach (diffusion_get_available_substitution_keys($langs) as $key => $label) {
+		$substitutionarray[$key] = $label;
+	}
+}
+
+/**
+ * Return Diffusion substitution keys with translated labels.
+ *
+ * @param Translate|null $langs Output language
+ * @return array<string,string>
+ */
+function diffusion_get_available_substitution_keys($langs = null)
+{
+	if (is_object($langs)) {
+		$langs->loadLangs(array('diffusion@diffusion'));
+	}
+
+	$translationkeys = array(
+		'__DIFFUSION_REF__' => 'DiffusionSubstitutionDiffusionRef',
+		'__DIFFUSION_LABEL__' => 'DiffusionSubstitutionDiffusionLabel',
+		'__DIFFUSION_DESCRIPTION__' => 'DiffusionSubstitutionDiffusionDescription',
+		'__DIFFUSION_STATUS__' => 'DiffusionSubstitutionDiffusionStatus',
+		'__DIFFUSION_URL__' => 'DiffusionSubstitutionDiffusionUrl',
+		'__DIFFUSION_PROJECT_REF__' => 'DiffusionSubstitutionDiffusionProjectRef',
+		'__DIFFUSION_PROJECT_LABEL__' => 'DiffusionSubstitutionDiffusionProjectLabel',
+		'__DIFFUSION_THIRDPARTY_NAME__' => 'DiffusionSubstitutionDiffusionThirdpartyName',
+		'__DIFFUSION_AUTHOR_FULLNAME__' => 'DiffusionSubstitutionDiffusionAuthorFullname',
+		'__DIFFUSION_AUTHOR_EMAIL__' => 'DiffusionSubstitutionDiffusionAuthorEmail',
+		'__DIFFUSIONCONTACT_ID__' => 'DiffusionSubstitutionDiffusionContactId',
+		'__DIFFUSIONCONTACT_FK_DIFFUSION__' => 'DiffusionSubstitutionDiffusionContactFkDiffusion',
+		'__DIFFUSIONCONTACT_CONTACT_ID__' => 'DiffusionSubstitutionDiffusionContactContactId',
+		'__DIFFUSIONCONTACT_SOURCE__' => 'DiffusionSubstitutionDiffusionContactSource',
+		'__DIFFUSIONCONTACT_NAME__' => 'DiffusionSubstitutionDiffusionContactName',
+		'__DIFFUSIONCONTACT_EMAIL__' => 'DiffusionSubstitutionDiffusionContactEmail',
+		'__DIFFUSIONCONTACT_MAIL_STATUS__' => 'DiffusionSubstitutionDiffusionContactMailStatus',
+		'__DIFFUSIONCONTACT_LETTER_STATUS__' => 'DiffusionSubstitutionDiffusionContactLetterStatus',
+		'__DIFFUSIONCONTACT_HAND_STATUS__' => 'DiffusionSubstitutionDiffusionContactHandStatus',
+		'__DIFFUSIONCONTACT_URL__' => 'DiffusionSubstitutionDiffusionContactUrl',
+	);
+
+	$keys = array();
+	foreach ($translationkeys as $key => $translationkey) {
+		$keys[$key] = is_object($langs) ? $langs->transnoentitiesnoconv($translationkey) : $translationkey;
+	}
+
+	return $keys;
+}
+
+/**
+ * Return HTML help for Diffusion substitution keys.
+ *
+ * @param Translate|null $langs Output language
+ * @return string
+ */
+function diffusion_get_available_substitution_help_html($langs = null)
+{
+	if (is_object($langs)) {
+		$langs->loadLangs(array('diffusion@diffusion'));
+	}
+
+	$title = is_object($langs) ? $langs->transnoentitiesnoconv('DiffusionSubstitutionHelpTitle') : 'Diffusion variables';
+	$intro = is_object($langs) ? $langs->transnoentitiesnoconv('DiffusionSubstitutionHelpIntro') : 'You can use the following substitution keys:';
+
+	$out = '<strong>'.dol_escape_htmltag($title).'</strong><br>';
+	$out .= dol_escape_htmltag($intro).'<br><br>';
+	$out .= '<span class="small">';
+	foreach (diffusion_get_available_substitution_keys($langs) as $key => $label) {
+		$out .= dol_escape_htmltag($key).' -> '.dol_escape_htmltag($label).'<br>';
+	}
+	$out .= '</span>';
+
+	return $out;
+}
+
+/**
  * Return a translated Diffusion status label for notification substitutions.
  *
  * @param mixed $status Diffusion status
@@ -198,7 +299,7 @@ function diffusion_get_binary_status_label_for_substitution($status, $langs)
  *
  * @param array<string,string> $substitutionarray Substitution array
  * @param Translate $langs Output language
- * @param CommonObject $object Current object
+ * @param CommonObject|null $object Current object, null when Dolibarr builds email template help
  * @param mixed $parameters Extra parameters
  * @return void
  */

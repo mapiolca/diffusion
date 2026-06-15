@@ -93,12 +93,70 @@ if (empty($dolibarr_nocache)) {
 } else {
 	header('Cache-Control: no-cache');
 }
+
+$diffusionSubstitutionHelpHtml = '';
+dol_include_once('/diffusion/core/substitutions/functions_diffusion.lib.php');
+if (function_exists('diffusion_get_available_substitution_help_html')) {
+	if (empty($langs) || !is_object($langs)) {
+		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+
+		$langs = new Translate('', $conf);
+		$defaultlang = '';
+		if (!empty($_SESSION['dol_lang'])) {
+			$defaultlang = $_SESSION['dol_lang'];
+		} elseif (function_exists('getDolGlobalString')) {
+			$defaultlang = getDolGlobalString('MAIN_LANG_DEFAULT');
+		} elseif (!empty($conf->global->MAIN_LANG_DEFAULT)) {
+			$defaultlang = $conf->global->MAIN_LANG_DEFAULT;
+		}
+		$langs->setDefaultLang($defaultlang ?: 'en_US');
+	}
+
+	$diffusionSubstitutionHelpHtml = diffusion_get_available_substitution_help_html($langs);
+}
 ?>
 
 /* Javascript library of module Diffusion */
 
+var diffusionSubstitutionHelpHtml = <?php echo json_encode($diffusionSubstitutionHelpHtml, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
+function diffusionAppendSubstitutionHelp(existingHtml) {
+	'use strict';
+
+	existingHtml = existingHtml || '';
+	if (!diffusionSubstitutionHelpHtml || existingHtml.indexOf('__DIFFUSION_REF__') !== -1) {
+		return existingHtml;
+	}
+
+	return existingHtml + '<br><br>' + diffusionSubstitutionHelpHtml;
+}
+
+function diffusionEnhanceEmailTemplateSubstitutionTooltips() {
+	'use strict';
+
+	if (window.location.pathname.indexOf('/admin/mails_templates.php') === -1) {
+		return;
+	}
+
+	jQuery('#idfortooltiponclick_topic, #idfortooltiponclick_content, #idfortooltiponclick_content_lines').each(function () {
+		var $tooltip = jQuery(this);
+		$tooltip.html(diffusionAppendSubstitutionHelp($tooltip.html()));
+	});
+
+	jQuery('.classfortooltip[title], .classfortooltiponclick[title]').each(function () {
+		var $element = jQuery(this);
+		var title = $element.attr('title') || '';
+
+		if (title && (title.indexOf('__REF__') !== -1 || title.indexOf('__ID__') !== -1 || title.indexOf('Available') !== -1)) {
+			$element.attr('title', diffusionAppendSubstitutionHelp(title));
+		}
+	});
+}
+
 jQuery(document).ready(function () {
 	'use strict';
+
+	diffusionEnhanceEmailTemplateSubstitutionTooltips();
 
 	if (!jQuery('body').hasClass('page-notification')) {
 		return;

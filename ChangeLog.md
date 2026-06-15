@@ -26,6 +26,10 @@
 - EN: Added a language-neutral technical mirror with `lang = NULL` for Diffusion notification templates so `Notify::send()` can find the selected template regardless of recipient language.
 - FR: Correction du point d'entrée Dolibarr v20 des substitutions Diffusion et localisation des libellés de statut dans la langue de notification.
 - EN: Fixed the Dolibarr v20 Diffusion substitution entry point and localized status labels with the notification language.
+- FR: Déclaration des variables de substitution Diffusion dans l'aide native des modèles de courriel, avec libellés français et anglais.
+- EN: Declared Diffusion substitution variables in native email template help, with French and English labels.
+- FR: Ajout de l'aide native des variables Diffusion dans les modèles de courriel et les descriptions de modèles, avec substitution de la description à la création depuis modèle.
+- EN: Added native Diffusion variable help in email templates and template descriptions, with description substitution when creating from a template.
 
 ## 1.2.4 (15/06/2026)
 

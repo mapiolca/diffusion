@@ -70,6 +70,7 @@ dol_include_once('/diffusion/class/diffusion.class.php');
 dol_include_once('/diffusion/class/diffusioncontact.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
+dol_include_once('/diffusion/core/substitutions/functions_diffusion.lib.php');
 
 /**
  * Resolve a contact type id compatible with current diffusion element/source.
@@ -540,10 +541,13 @@ if (empty($reshook)) {
 		setEventMessages($langs->trans('ErrorActionNotAllowedOnDiffusionTemplate'), null, 'errors');
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 		exit;
-	}
+		}
 
-	// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
-	include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
+		// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
+		if ($action == 'add') {
+			$object->model_source = GETPOSTINT('model_source') ?: GETPOSTINT('fromtemplateid');
+		}
+		include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
 	// Actions when linking object each other
 	include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
@@ -836,6 +840,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 	$object->label = GETPOST('label');
 	$object->fk_project = GETPOSTINT('fk_project') ?: GETPOSTINT('projectid');
 	$object->description = GETPOST('description', 'none');
+	$object->model_source = GETPOSTINT('model_source') ?: GETPOSTINT('fromtemplateid');
 
 	//$id = $object->create($user, $db); 
 }
@@ -847,6 +852,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 $form = new Form($db);
 $formfile = new FormFile($db);
 $formproject = new FormProjets($db);
+$diffusionSubstitutionHelp = function_exists('diffusion_get_available_substitution_help_html') ? diffusion_get_available_substitution_help_html($langs) : '';
 
 //$title = $langs->trans("Diffusion")." - ".$langs->trans('Card');
 $title = $object->ref." - ".$langs->trans('Card');
@@ -957,7 +963,11 @@ if ($action == 'create') {
 
 	// Description
 	print '<tr class="field_description">';
-	print '<td class="titlefieldcreate tdtop">'.$langs->trans('Description').'</td>';
+	print '<td class="titlefieldcreate tdtop">'.$langs->trans('Description');
+	if ($diffusionSubstitutionHelp !== '') {
+		print ' '.$form->textwithpicto('', $diffusionSubstitutionHelp, 1, 'help', '', 0, 2, 'diffusiondescriptionvariables');
+	}
+	print '</td>';
 	print '<td class="valuefieldcreate">';
 	$description = GETPOST('description', 'none');
 	if ($description === '') {
@@ -1225,7 +1235,11 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		print '<div class="clearboth"></div>';
 		print '<table class="border centpercent tableforfield">';
 		print '<tr class="field_description">';
-		print '<td>'.$descriptionFieldDef['label'].'</td>';
+		print '<td>'.$descriptionFieldDef['label'];
+		if ($inlineEditable && $diffusionSubstitutionHelp !== '') {
+			print ' '.$form->textwithpicto('', $diffusionSubstitutionHelp, 1, 'help', '', 0, 2, 'diffusiondescriptionvariablesedit');
+		}
+		print '</td>';
 		print '<td class="valuefield wordbreak">';
 		if ($inlineEditable) {
 			print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'">';
