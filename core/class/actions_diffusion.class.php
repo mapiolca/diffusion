@@ -29,6 +29,15 @@ class ActionsDiffusion
 	/** @var string Identifier used by Multicompany external sharing payload */
 	public const MULTICOMPANY_SHARING_ROOT_KEY = 'diffusion';
 
+	/** @var string Email template type for manual sending from diffusion cards and lists */
+	public const EMAIL_TEMPLATE_TYPE_MANUAL = 'diffusion';
+
+	/** @var string Email template type for diffusion business notifications */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSION = 'diffusiondoc@diffusion';
+
+	/** @var string Email template type for diffusion contact business notifications */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT = 'diffusioncontact@diffusion';
+
 	/** @var DoliDB Database handler */
 	public $db;
 
@@ -43,6 +52,101 @@ class ActionsDiffusion
 
 	/** @var array<string,mixed> Hook results */
 	public $results = array();
+
+	/**
+	 * Return the centralized list of business events exposed by the module.
+	 *
+	 * @return array<string,array<string,int|string>>
+	 */
+	public static function getBusinessEventsDefinition()
+	{
+		return array(
+			'DIFFUSION_CREATE' => array('label' => 'DiffusionTriggerLabelCreate', 'description' => 'DiffusionTriggerDescCreate', 'rang' => 2000, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_VALIDATE' => array('label' => 'DiffusionTriggerLabelValidate', 'description' => 'DiffusionTriggerDescValidate', 'rang' => 2001, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_SENDMAIL' => array('label' => 'DiffusionTriggerLabelSendMail', 'description' => 'DiffusionTriggerDescSendMail', 'rang' => 2002, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_SETDIFFUSED' => array('label' => 'DiffusionTriggerLabelSetDiffused', 'description' => 'DiffusionTriggerDescSetDiffused', 'rang' => 2003, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_BACKTODRAFT' => array('label' => 'DiffusionTriggerLabelBackToDraft', 'description' => 'DiffusionTriggerDescBackToDraft', 'rang' => 2004, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_DELETE' => array('label' => 'DiffusionTriggerLabelDelete', 'description' => 'DiffusionTriggerDescDelete', 'rang' => 2005, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_CANCEL' => array('label' => 'DiffusionTriggerLabelCancel', 'description' => 'DiffusionTriggerDescCancel', 'rang' => 2006, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_REOPEN' => array('label' => 'DiffusionTriggerLabelReopen', 'description' => 'DiffusionTriggerDescReopen', 'rang' => 2007, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSION_DIFFUSION_MODIFY' => array('label' => 'DiffusionTriggerLabelModify', 'description' => 'DiffusionTriggerDescModify', 'rang' => 2008, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION),
+			'DIFFUSIONCONTACT_INSERT' => array('label' => 'DiffusionContactTriggerLabelInsert', 'description' => 'DiffusionContactTriggerDescInsert', 'rang' => 2010, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
+			'DIFFUSIONCONTACT_DELETELINE' => array('label' => 'DiffusionContactTriggerLabelDeleteLine', 'description' => 'DiffusionContactTriggerDescDeleteLine', 'rang' => 2011, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
+			'DIFFUSIONCONTACT_UPDATELINE' => array('label' => 'DiffusionContactTriggerLabelUpdateLine', 'description' => 'DiffusionContactTriggerDescUpdateLine', 'rang' => 2012, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
+			'DIFFUSIONCONTACT_DELETEALL' => array('label' => 'DiffusionContactTriggerLabelDeleteAll', 'description' => 'DiffusionContactTriggerDescDeleteAll', 'rang' => 2013, 'elementtype' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT),
+		);
+	}
+
+	/**
+	 * Return one business event definition.
+	 *
+	 * @param string $code Business trigger code
+	 * @return array<string,int|string>
+	 */
+	public static function getBusinessEventDefinition($code)
+	{
+		$events = self::getBusinessEventsDefinition();
+		return !empty($events[$code]) ? $events[$code] : array();
+	}
+
+	/**
+	 * Return business event codes supported by native notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getNotificationEventCodes()
+	{
+		return array_keys(self::getBusinessEventsDefinition());
+	}
+
+	/**
+	 * Return email template types exposed by the module.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	public static function getEmailTemplateTypes()
+	{
+		return array(
+			self::EMAIL_TEMPLATE_TYPE_MANUAL => array('label' => 'MailToSendDiffusion', 'picto' => 'fa-paper-plane'),
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSION => array('label' => 'MailToNotifyDiffusion', 'picto' => 'fa-paper-plane'),
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT => array('label' => 'MailToNotifyDiffusionContact', 'picto' => 'fa-address-book'),
+		);
+	}
+
+	/**
+	 * Return default email templates to create at module activation.
+	 *
+	 * @return array<string,array<string,int|string>>
+	 */
+	public static function getDefaultEmailTemplatesDefinition()
+	{
+		return array(
+			'DIFFUSION_MANUAL_SEND' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_MANUAL,
+				'label' => 'DiffusionEmailTemplateManualLabel',
+				'topic' => 'DiffusionEmailTemplateManualTopic',
+				'content' => 'DiffusionEmailTemplateManualContent',
+				'position' => 100,
+				'joinfiles' => 1,
+			),
+			'DIFFUSION_NOTIFICATION' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_DIFFUSION,
+				'label' => 'DiffusionEmailTemplateNotificationLabel',
+				'topic' => 'DiffusionEmailTemplateNotificationTopic',
+				'content' => 'DiffusionEmailTemplateNotificationContent',
+				'position' => 110,
+				'joinfiles' => 0,
+			),
+			'DIFFUSIONCONTACT_NOTIFICATION' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT,
+				'label' => 'DiffusionContactEmailTemplateNotificationLabel',
+				'topic' => 'DiffusionContactEmailTemplateNotificationTopic',
+				'content' => 'DiffusionContactEmailTemplateNotificationContent',
+				'position' => 120,
+				'joinfiles' => 0,
+			),
+		);
+	}
 
 	/**
 	 * Constructor
@@ -179,9 +283,12 @@ class ActionsDiffusion
 
 		$langs->load('diffusion@diffusion');
 
-		$this->results = array(
-			'diffusion' => img_picto('', 'fa-paper-plane', 'class="pictofixedwidth"') . dol_escape_htmltag($langs->trans('MailToSendDiffusion')),
-		);
+		$this->results = array();
+		foreach (self::getEmailTemplateTypes() as $type => $typeconf) {
+			$picto = !empty($typeconf['picto']) ? $typeconf['picto'] : 'email';
+			$label = !empty($typeconf['label']) ? $typeconf['label'] : $type;
+			$this->results[$type] = img_picto('', $picto, 'class="pictofixedwidth"') . dol_escape_htmltag($langs->trans($label));
+		}
 
 		return 0;
 	}
@@ -645,7 +752,7 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$notificationElementAliases = array('diffusion', 'diffusion@diffusion', 'diffusion');
+		$notificationElementAliases = array('diffusion', 'diffusiondoc', self::EMAIL_TEMPLATE_TYPE_DIFFUSION, 'diffusioncontact', self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT);
 		foreach ($notificationElementAliases as $alias) {
 			if (empty($conf->{$alias}) || !is_object($conf->{$alias})) {
 				$conf->{$alias} = new stdClass();
@@ -653,21 +760,7 @@ class ActionsDiffusion
 			$conf->{$alias}->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
 		}
 
-		$events = array(
-			'DIFFUSION_CREATE',
-			'DIFFUSION_VALIDATE',
-			'DIFFUSION_SENDMAIL',
-			'DIFFUSION_SETDIFFUSED',
-			'DIFFUSION_BACKTODRAFT',
-			'DIFFUSION_DELETE',
-			'DIFFUSION_CANCEL',
-			'DIFFUSION_REOPEN',
-			'DIFFUSION_DIFFUSION_MODIFY',
-			'DIFFUSIONCONTACT_INSERT',
-			'DIFFUSIONCONTACT_DELETELINE',
-			'DIFFUSIONCONTACT_UPDATELINE',
-			'DIFFUSIONCONTACT_DELETEALL',
-		);
+		$events = self::getNotificationEventCodes();
 
 		if (!empty($hookmanager->resArray['arrayofnotifsupported']) && is_array($hookmanager->resArray['arrayofnotifsupported'])) {
 			$events = array_merge($hookmanager->resArray['arrayofnotifsupported'], $events);

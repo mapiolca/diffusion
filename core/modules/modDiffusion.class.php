@@ -670,6 +670,11 @@ class modDiffusion extends DolibarrModules
 			if ($resultregister < 0) {
 				return -1;
 			}
+
+			$resultregistertemplates = $this->registerDiffusionEmailTemplates();
+			if ($resultregistertemplates < 0) {
+				return -1;
+			}
 		}
 
 		return $result;
@@ -685,29 +690,23 @@ class modDiffusion extends DolibarrModules
 		global $langs;
 
 		$langs->load('diffusion@diffusion');
+		dol_include_once('/diffusion/class/actions_diffusion.class.php');
 
-		$triggers = array(
-			'DIFFUSION_CREATE' => array('DiffusionTriggerLabelCreate', 'DiffusionTriggerDescCreate', 2000),
-			'DIFFUSION_VALIDATE' => array('DiffusionTriggerLabelValidate', 'DiffusionTriggerDescValidate', 2001),
-			'DIFFUSION_SENDMAIL' => array('DiffusionTriggerLabelSendMail', 'DiffusionTriggerDescSendMail', 2002),
-			'DIFFUSION_SETDIFFUSED' => array('DiffusionTriggerLabelSetDiffused', 'DiffusionTriggerDescSetDiffused', 2003),
-			'DIFFUSION_BACKTODRAFT' => array('DiffusionTriggerLabelBackToDraft', 'DiffusionTriggerDescBackToDraft', 2004),
-			'DIFFUSION_DELETE' => array('DiffusionTriggerLabelDelete', 'DiffusionTriggerDescDelete', 2005),
-			'DIFFUSION_CANCEL' => array('DiffusionTriggerLabelCancel', 'DiffusionTriggerDescCancel', 2006),
-			'DIFFUSION_REOPEN' => array('DiffusionTriggerLabelReopen', 'DiffusionTriggerDescReopen', 2007),
-			'DIFFUSION_DIFFUSION_MODIFY' => array('DiffusionTriggerLabelModify', 'DiffusionTriggerDescModify', 2008),
-			'DIFFUSIONCONTACT_INSERT' => array('DiffusionContactTriggerLabelInsert', 'DiffusionContactTriggerDescInsert', 2010),
-			'DIFFUSIONCONTACT_DELETELINE' => array('DiffusionContactTriggerLabelDeleteLine', 'DiffusionContactTriggerDescDeleteLine', 2011),
-			'DIFFUSIONCONTACT_UPDATELINE' => array('DiffusionContactTriggerLabelUpdateLine', 'DiffusionContactTriggerDescUpdateLine', 2012),
-			'DIFFUSIONCONTACT_DELETEALL' => array('DiffusionContactTriggerLabelDeleteAll', 'DiffusionContactTriggerDescDeleteAll', 2013),
-		);
+		if (!class_exists('ActionsDiffusion')) {
+			$this->error = 'ActionsDiffusion class not found';
+			return -1;
+		}
+
+		$triggers = ActionsDiffusion::getBusinessEventsDefinition();
 
 		foreach ($triggers as $code => $triggerconf) {
-			$label = $this->db->escape($langs->transnoentities($triggerconf[0]));
-			$description = $this->db->escape($langs->transnoentities($triggerconf[1]));
+			$label = $this->db->escape($langs->transnoentities($triggerconf['label']));
+			$description = $this->db->escape($langs->transnoentities($triggerconf['description']));
+			$elementtype = $this->db->escape((string) $triggerconf['elementtype']);
+			$rang = (int) $triggerconf['rang'];
 
 			$sql = "INSERT INTO ".MAIN_DB_PREFIX."c_action_trigger (code, label, description, elementtype, rang)";
-			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', 'diffusion@diffusion', ".((int) $triggerconf[2]);
+			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', '".$elementtype."', ".$rang;
 			$sql .= " FROM DUAL";
 			$sql .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_action_trigger WHERE code = '".$this->db->escape($code)."')";
 
@@ -718,13 +717,83 @@ class modDiffusion extends DolibarrModules
 			}
 
 			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_action_trigger";
-			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = 'diffusion@diffusion', rang = ".((int) $triggerconf[2]);
+			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = '".$elementtype."', rang = ".$rang;
 			$sqlupdate .= " WHERE code = '".$this->db->escape($code)."'";
 
 			$resql = $this->db->query($sqlupdate);
 			if (!$resql) {
 				$this->error = $this->db->lasterror();
 				return -2;
+			}
+
+			$sqlupdateagenda = "UPDATE ".MAIN_DB_PREFIX."actioncomm";
+			$sqlupdateagenda .= " SET elementtype = '".$elementtype."'";
+			$sqlupdateagenda .= " WHERE code = '".$this->db->escape($code)."'";
+			$sqlupdateagenda .= " AND elementtype = 'diffusion@diffusion'";
+
+			$resql = $this->db->query($sqlupdateagenda);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -3;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Register default Diffusion email templates without selecting them as notification defaults.
+	 *
+	 * @return int<-1,1> Return 1 if OK, <0 if KO
+	 */
+	private function registerDiffusionEmailTemplates()
+	{
+		global $conf;
+
+		dol_include_once('/diffusion/class/actions_diffusion.class.php');
+		if (!class_exists('ActionsDiffusion')) {
+			$this->error = 'ActionsDiffusion class not found';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+
+		$templates = ActionsDiffusion::getDefaultEmailTemplatesDefinition();
+		$langcodes = array('fr_FR', 'en_US');
+		$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+
+		foreach ($langcodes as $langcode) {
+			$outputlangs = new Translate('', $conf);
+			$outputlangs->setDefaultLang($langcode);
+			$outputlangs->loadLangs(array('diffusion@diffusion'));
+
+			foreach ($templates as $templateconf) {
+				$typeTemplate = $this->db->escape((string) $templateconf['type_template']);
+				$label = $this->db->escape($outputlangs->transnoentities((string) $templateconf['label']));
+				$topic = $this->db->escape($outputlangs->transnoentities((string) $templateconf['topic']));
+				$content = $this->db->escape($outputlangs->transnoentities((string) $templateconf['content']));
+				$joinfiles = (int) $templateconf['joinfiles'];
+				$position = (int) $templateconf['position'];
+
+				$sql = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
+				$sql .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)";
+				$sql .= " SELECT ".$entity.", 'diffusion', '".$typeTemplate."', '".$this->db->escape($langcode)."', 0, NULL, NOW(),";
+				$sql .= " '".$label."', ".$position.", 1, 'isModEnabled(\"diffusion\")', '".$joinfiles."', '".$topic."', '".$content."'";
+				$sql .= " FROM DUAL";
+				$sql .= " WHERE NOT EXISTS (";
+				$sql .= "SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates";
+				$sql .= " WHERE module = 'diffusion'";
+				$sql .= " AND type_template = '".$typeTemplate."'";
+				$sql .= " AND lang = '".$this->db->escape($langcode)."'";
+				$sql .= " AND label = '".$label."'";
+				$sql .= " AND entity = ".$entity;
+				$sql .= ")";
+
+				$resql = $this->db->query($sql);
+				if (!$resql) {
+					$this->error = $this->db->lasterror();
+					return -2;
+				}
 			}
 		}
 

@@ -23,6 +23,7 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
 require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
+require_once __DIR__.'/../../class/actions_diffusion.class.php';
 
 
 /**
@@ -132,31 +133,40 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 			return 0;
 		}
 
-		$elementtype = (!empty($object->element) && $object->element === 'diffusioncontact') ? 'diffusioncontact@diffusion' : 'diffusion@diffusion';
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."actioncomm";
+		$eventdef = ActionsDiffusion::getBusinessEventDefinition($action);
+		$elementtype = !empty($eventdef['elementtype']) ? (string) $eventdef['elementtype'] : 'diffusiondoc@diffusion';
+		$sql = "SELECT id FROM ".MAIN_DB_PREFIX."actioncomm";
 		$sql .= " WHERE elementtype = '".$this->db->escape($elementtype)."'";
 		$sql .= " AND fk_element = ".((int) $object->id);
-		$sql .= " AND code = '".$this->db->escape($action)."'";
-		$sql .= " LIMIT 1";
-		$resql = $this->db->query($sql);
-		if ($resql && $this->db->num_rows($resql) > 0) {
+			$sql .= " AND code = '".$this->db->escape($action)."'";
+			$sql .= " LIMIT 1";
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+			if ($this->db->num_rows($resql) > 0) {
+				$this->db->free($resql);
+				return 0;
+			}
 			$this->db->free($resql);
-			return 0;
-		}
-		if ($resql) {
-			$this->db->free($resql);
-		}
 
 		$agenda = new ActionComm($this->db);
-		$agenda->type_code = $action;
+		$agenda->type_code = 'AC_OTH_AUTO';
 		$agenda->code = $action;
 		$agenda->label = $langs->trans('Notify_'.$action);
+		$agenda->note_private = !empty($object->actionmsg) ? (string) $object->actionmsg : $agenda->label;
 		$agenda->datep = dol_now();
 		$agenda->datef = $agenda->datep;
 		$agenda->percentage = -1;
 		$agenda->elementtype = $elementtype;
 		$agenda->fk_element = (int) $object->id;
-		$agenda->userownerid = (int) $user->id;
+		$agenda->userownerid = !empty($user->id) ? (int) $user->id : (!empty($object->fk_user_creat) ? (int) $object->fk_user_creat : 0);
+		if (!empty($object->socid)) {
+			$agenda->socid = (int) $object->socid;
+		} elseif (!empty($object->fk_soc)) {
+			$agenda->socid = (int) $object->fk_soc;
+		}
 		if (!empty($object->fk_project)) {
 			$agenda->fk_project = (int) $object->fk_project;
 		}

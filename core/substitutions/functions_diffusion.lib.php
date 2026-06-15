@@ -32,37 +32,108 @@ function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $ob
 
 	$isDiffusion = (!empty($object->element) && $object->element === 'diffusiondoc')
 		|| (!empty($object->table_element) && $object->table_element === 'diffusion');
-	if (!$isDiffusion) {
+	$isDiffusionContact = (!empty($object->element) && $object->element === 'diffusioncontact')
+		|| (!empty($object->table_element) && $object->table_element === 'diffusion_contact');
+	if (!$isDiffusion && !$isDiffusionContact) {
 		return;
 	}
 
-	$url = '';
-	if (!empty($object->id)) {
-		$url = dol_buildpath('/diffusion/diffusion_card.php', 2).'?id='.(int) $object->id;
+	$fillDiffusionSubstitutions = function ($diffusion) use (&$substitutionarray, $langs) {
+		$url = '';
+		if (!empty($diffusion->id)) {
+			$url = dol_buildpath('/diffusion/diffusion_card.php', 2).'?id='.(int) $diffusion->id;
+		}
+
+		$substitutionarray['__DIFFUSION_REF__'] = !empty($diffusion->ref) ? (string) $diffusion->ref : '';
+		$substitutionarray['__DIFFUSION_LABEL__'] = !empty($diffusion->label) ? (string) $diffusion->label : '';
+		$substitutionarray['__DIFFUSION_DESCRIPTION__'] = !empty($diffusion->description) ? dol_string_nohtmltag((string) $diffusion->description) : '';
+		$substitutionarray['__DIFFUSION_STATUS__'] = method_exists($diffusion, 'getLibStatut') ? dol_string_nohtmltag($diffusion->getLibStatut(0)) : '';
+		$substitutionarray['__DIFFUSION_URL__'] = $url;
+		$substitutionarray['__DIFFUSION_PROJECT_REF__'] = '';
+		$substitutionarray['__DIFFUSION_PROJECT_LABEL__'] = '';
+		$substitutionarray['__DIFFUSION_THIRDPARTY_NAME__'] = '';
+		$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = '';
+		$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = '';
+
+		$thirdpartyid = 0;
+		if (!empty($diffusion->socid)) {
+			$thirdpartyid = (int) $diffusion->socid;
+		} elseif (!empty($diffusion->fk_soc)) {
+			$thirdpartyid = (int) $diffusion->fk_soc;
+		}
+
+		if (!empty($diffusion->fk_project)) {
+			require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+			$project = new Project($diffusion->db);
+			if ($project->fetch((int) $diffusion->fk_project) > 0) {
+				$substitutionarray['__DIFFUSION_PROJECT_REF__'] = (string) $project->ref;
+				$substitutionarray['__DIFFUSION_PROJECT_LABEL__'] = (string) $project->title;
+				if (empty($thirdpartyid) && !empty($project->socid)) {
+					$thirdpartyid = (int) $project->socid;
+				}
+			}
+		}
+
+		if (!empty($thirdpartyid)) {
+			require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+			$thirdparty = new Societe($diffusion->db);
+			if ($thirdparty->fetch($thirdpartyid) > 0) {
+				$substitutionarray['__DIFFUSION_THIRDPARTY_NAME__'] = (string) $thirdparty->name;
+			}
+		}
+
+		if (!empty($diffusion->fk_user_creat)) {
+			require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+			$author = new User($diffusion->db);
+			if ($author->fetch((int) $diffusion->fk_user_creat) > 0) {
+				$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = $author->getFullName($langs);
+				$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = (string) $author->email;
+			}
+		}
+	};
+
+	if ($isDiffusion) {
+		$fillDiffusionSubstitutions($object);
+		return;
 	}
 
-	$substitutionarray['__DIFFUSION_REF__'] = !empty($object->ref) ? (string) $object->ref : '';
-	$substitutionarray['__DIFFUSION_LABEL__'] = !empty($object->label) ? (string) $object->label : '';
-	$substitutionarray['__DIFFUSION_STATUS__'] = method_exists($object, 'getLibStatut') ? dol_string_nohtmltag($object->getLibStatut(0)) : '';
-	$substitutionarray['__DIFFUSION_URL__'] = $url;
-	$substitutionarray['__DIFFUSION_PROJECT_REF__'] = '';
-	$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = '';
-	$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = '';
+	$diffusionid = !empty($object->fk_diffusion) ? (int) $object->fk_diffusion : 0;
+	$substitutionarray['__DIFFUSIONCONTACT_ID__'] = !empty($object->id) ? (string) $object->id : '';
+	$substitutionarray['__DIFFUSIONCONTACT_FK_DIFFUSION__'] = $diffusionid > 0 ? (string) $diffusionid : '';
+	$substitutionarray['__DIFFUSIONCONTACT_CONTACT_ID__'] = !empty($object->fk_contact) ? (string) $object->fk_contact : '';
+	$substitutionarray['__DIFFUSIONCONTACT_SOURCE__'] = !empty($object->contact_source) ? (string) $object->contact_source : '';
+	$substitutionarray['__DIFFUSIONCONTACT_NAME__'] = '';
+	$substitutionarray['__DIFFUSIONCONTACT_EMAIL__'] = '';
+	$substitutionarray['__DIFFUSIONCONTACT_MAIL_STATUS__'] = isset($object->mail_status) ? (string) $object->mail_status : '';
+	$substitutionarray['__DIFFUSIONCONTACT_LETTER_STATUS__'] = isset($object->letter_status) ? (string) $object->letter_status : '';
+	$substitutionarray['__DIFFUSIONCONTACT_HAND_STATUS__'] = isset($object->hand_status) ? (string) $object->hand_status : '';
+	$substitutionarray['__DIFFUSIONCONTACT_URL__'] = $diffusionid > 0 ? dol_buildpath('/diffusion/diffusion_card.php', 2).'?id='.$diffusionid : '';
 
-	if (!empty($object->fk_project)) {
-		require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
-		$project = new Project($object->db);
-		if ($project->fetch((int) $object->fk_project) > 0) {
-			$substitutionarray['__DIFFUSION_PROJECT_REF__'] = (string) $project->ref;
+	if (!empty($object->fk_contact)) {
+		if (!empty($object->contact_source) && $object->contact_source === 'internal') {
+			require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
+			$contactuser = new User($object->db);
+			if ($contactuser->fetch((int) $object->fk_contact) > 0) {
+				$substitutionarray['__DIFFUSIONCONTACT_NAME__'] = $contactuser->getFullName($langs);
+				$substitutionarray['__DIFFUSIONCONTACT_EMAIL__'] = (string) $contactuser->email;
+			}
+		} else {
+			require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
+			$contact = new Contact($object->db);
+			if ($contact->fetch((int) $object->fk_contact) > 0) {
+				$substitutionarray['__DIFFUSIONCONTACT_NAME__'] = $contact->getFullName($langs);
+				$substitutionarray['__DIFFUSIONCONTACT_EMAIL__'] = (string) $contact->email;
+			}
 		}
 	}
 
-	if (!empty($object->fk_user_creat)) {
-		require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
-		$author = new User($object->db);
-		if ($author->fetch((int) $object->fk_user_creat) > 0) {
-			$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = $author->getFullName($langs);
-			$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = (string) $author->email;
+	if ($diffusionid > 0) {
+		dol_include_once('/diffusion/class/diffusion.class.php');
+		if (class_exists('Diffusion')) {
+			$diffusion = new Diffusion($object->db);
+			if ($diffusion->fetch($diffusionid) > 0) {
+				$fillDiffusionSubstitutions($diffusion);
+			}
 		}
 	}
 }

@@ -10,6 +10,8 @@
 - EN: Strengthened CSRF, server-side permissions, whitelisted Ajax updates, Multicompany integration and document paths based on `getMultidirOutput()`.
 - FR: Complément des hooks/triggers Notifications et Agenda natifs avec substitutions pour les modèles d'e-mails.
 - EN: Completed native Notifications and Agenda hooks/triggers with substitutions for email templates.
+- FR: Correction des événements Agenda Diffusion avec type natif `AC_OTH_AUTO`, clé `actioncomm.id`, `elementtype` aligné et modèles d'e-mails par défaut pour l'envoi manuel et les notifications.
+- EN: Fixed Diffusion Agenda events with native `AC_OTH_AUTO` type, `actioncomm.id` key, aligned `elementtype`, and default email templates for manual sending and notifications.
 
 ## 1.2.4 (15/06/2026)
 

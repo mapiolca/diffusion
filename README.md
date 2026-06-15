@@ -18,8 +18,9 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Suivi des diffusions générées depuis un modèle (liaison `model_source` et onglet dédié).
 - Ajout et suivi des **documents joints**.
 - Génération/régénération des documents PDF de diffusion.
-- Envoi de diffusion par e-mail.
+- Envoi de diffusion par e-mail avec modèles de courriel natifs.
 - Création automatique d’événements agenda sur les actions clés (validation, retour brouillon, envoi e-mail, marquage diffusé/remis, suppression).
+- Événements métier exposés aux Notifications natives Dolibarr avec modèles de courriel sélectionnables.
 - Compatibilité **Multicompany** (partage possible des diffusions et de la numérotation via options dédiées).
 
 ### Compatibilité
@@ -28,8 +29,8 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Dépendances module :
 	- **Projet** (`modProjet`)
 	- **Tiers** (`modSociete`)
-- Version minimum Dolibarr déclarée : **19+**.
-- Version PHP minimum déclarée : **7.1+**.
+- Version minimum Dolibarr déclarée : **20+**.
+- Version PHP minimum déclarée : **8.0+**.
 
 ### Installation
 
@@ -56,7 +57,7 @@ Copiez le dossier du module dans :
 Le module propose une page de configuration dans l’administration pour :
 
 - définir les options de numérotation et de modèles document,
-- ajuster les comportements automatiques (événements agenda),
+- ajuster les comportements automatiques (événements agenda et notifications),
 - paramétrer les options de partage multicompany.
 
 ### Permissions
@@ -115,8 +116,9 @@ The module allows you to create distribution records linked to a project, manage
 - Tracking generated distributions from a template (`model_source` linkage and dedicated tab).
 - Add and track **attached documents**.
 - Generate/regenerate distribution PDF documents.
-- Send distributions by email.
+- Send distributions by email with native email templates.
 - Automatic agenda event creation on key actions (validate, back to draft, email sent, marked as delivered/distributed, delete).
+- Business events exposed to native Dolibarr Notifications with selectable email templates.
 - **Multicompany** compatibility (optional sharing of distributions and numbering).
 
 ### Compatibility
@@ -125,8 +127,8 @@ The module allows you to create distribution records linked to a project, manage
 - Module dependencies:
 	- **Project** (`modProjet`)
 	- **Third Party** (`modSociete`)
-- Declared minimum Dolibarr version: **19+**.
-- Declared minimum PHP version: **7.1+**.
+- Declared minimum Dolibarr version: **20+**.
+- Declared minimum PHP version: **8.0+**.
 
 ### Installation
 
@@ -153,7 +155,7 @@ Copy the module folder into:
 The module provides an admin setup page to:
 
 - define numbering and document model options,
-- adjust automatic behaviors (agenda events),
+- adjust automatic behaviors (agenda events and notifications),
 - configure multicompany sharing options.
 
 ### Permissions
