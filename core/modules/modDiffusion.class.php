@@ -759,10 +759,16 @@ class modDiffusion extends DolibarrModules
 
 		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
 
+		$resultnormalize = ActionsDiffusion::normalizeNotificationEmailTemplateMirrorLabels($this->db);
+		if ($resultnormalize < 0) {
+			$this->error = $this->db->lasterror();
+			return -2;
+		}
+
 		$resultmigrate = ActionsDiffusion::migrateLegacyVisibleEmailTemplateTypes($this->db);
 		if ($resultmigrate < 0) {
 			$this->error = $this->db->lasterror();
-			return -2;
+			return -3;
 		}
 
 		$templates = ActionsDiffusion::getDefaultEmailTemplatesDefinition();
@@ -789,9 +795,7 @@ class modDiffusion extends DolibarrModules
 				$sql .= " FROM DUAL";
 				$sql .= " WHERE NOT EXISTS (";
 				$sql .= "SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates";
-				$sql .= " WHERE module = 'diffusion'";
-				$sql .= " AND type_template = '".$typeTemplate."'";
-				$sql .= " AND lang = '".$this->db->escape($langcode)."'";
+				$sql .= " WHERE lang = '".$this->db->escape($langcode)."'";
 				$sql .= " AND label = '".$label."'";
 				$sql .= " AND entity = ".$entity;
 				$sql .= ")";
@@ -799,15 +803,9 @@ class modDiffusion extends DolibarrModules
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$this->error = $this->db->lasterror();
-					return -3;
+					return -4;
 				}
 			}
-		}
-
-		$resultsync = ActionsDiffusion::syncAllNotificationEmailTemplateMirrors($this->db);
-		if ($resultsync < 0) {
-			$this->error = $this->db->lasterror();
-			return -4;
 		}
 
 		return 1;

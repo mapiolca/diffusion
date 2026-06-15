@@ -216,18 +216,47 @@ class ActionsDiffusion
 	}
 
 	/**
-	 * Sync all visible Diffusion templates into hidden Dolibarr notification template types.
+	 * Normalize old hidden notification mirrors created without a technical label suffix.
 	 *
 	 * @param DoliDB $db Database handler
 	 * @return int<-1,1>
 	 */
-	public static function syncAllNotificationEmailTemplateMirrors($db)
+	public static function normalizeNotificationEmailTemplateMirrorLabels($db)
 	{
 		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
-			$result = self::syncEmailTemplateMirror($db, $targettype, '');
-			if ($result < 0) {
-				return $result;
+			$sql = "SELECT rowid, entity, label, lang";
+			$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND type_template = '".$db->escape($targettype)."'";
+
+			$resql = $db->query($sql);
+			if (!$resql) {
+				return -1;
 			}
+
+			while ($obj = $db->fetch_object($resql)) {
+				$label = (string) $obj->label;
+				$mirrorlabel = self::getNotificationMirrorLabel($label, $targettype);
+				if ($label === $mirrorlabel) {
+					continue;
+				}
+
+				$targetlabel = $mirrorlabel;
+				if (self::emailTemplateLabelExists($db, (int) $obj->entity, $targetlabel, $obj->lang, (int) $obj->rowid)) {
+					$targetlabel = self::getNotificationMirrorLabel($label, $targettype.'-'.$obj->rowid);
+				}
+
+				$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+				$sqlupdate .= " SET label = ".self::sqlNullableString($db, $targetlabel);
+				$sqlupdate .= " WHERE rowid = ".((int) $obj->rowid);
+
+				if (!$db->query($sqlupdate)) {
+					$db->free($resql);
+					return -1;
+				}
+			}
+
+			$db->free($resql);
 		}
 
 		return 1;
@@ -238,9 +267,10 @@ class ActionsDiffusion
 	 *
 	 * @param DoliDB $db Database handler
 	 * @param string $notifcode Notification trigger code
+	 * @param CommonObject|null $object Notification object
 	 * @return int<-1,1>
 	 */
-	public static function syncSelectedNotificationEmailTemplateMirrors($db, $notifcode)
+	public static function syncSelectedNotificationEmailTemplateMirrors($db, $notifcode, $object = null)
 	{
 		if (empty($notifcode) || !in_array($notifcode, self::getNotificationEventCodes(), true)) {
 			return 1;
@@ -250,28 +280,96 @@ class ActionsDiffusion
 		if ($label === '') {
 			return 1;
 		}
+		$visiblelabel = self::getVisibleLabelFromNotificationMirrorLabel($label);
+
+		$resultnormalize = self::normalizeNotificationEmailTemplateMirrorLabels($db);
+		if ($resultnormalize < 0) {
+			return $resultnormalize;
+		}
 
 		$resultmigrate = self::migrateLegacyVisibleEmailTemplateTypes($db);
 		if ($resultmigrate < 0) {
 			return $resultmigrate;
 		}
 
-		$synced = 0;
-		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
-			$result = self::syncEmailTemplateMirror($db, $targettype, $label);
-			if ($result < 0) {
-				return $result;
-			}
-			if ($result > 0) {
-				$synced++;
-			}
+		$targettype = self::getNotificationMirrorEmailTemplateTypeForContext($notifcode, $object);
+		$result = self::syncEmailTemplateMirror($db, $targettype, $visiblelabel);
+		if ($result < 0) {
+			return $result;
+		}
+		if ($result === 0) {
+			return self::disableNotificationEmailTemplateMirrors($db, $visiblelabel);
 		}
 
-		if (empty($synced)) {
-			return self::disableNotificationEmailTemplateMirrors($db, $label);
+		global $conf;
+		if (is_object($conf) && !empty($conf->global) && is_object($conf->global)) {
+			$conf->global->{$notifcode.'_TEMPLATE'} = self::getNotificationMirrorLabel($visiblelabel, $targettype);
 		}
 
 		return 1;
+	}
+
+	/**
+	 * Return hidden template type expected by Dolibarr for a notification context.
+	 *
+	 * @param string $notifcode Notification trigger code
+	 * @param CommonObject|null $object Notification object
+	 * @return string
+	 */
+	private static function getNotificationMirrorEmailTemplateTypeForContext($notifcode, $object = null)
+	{
+		if (is_object($object) && !empty($object->element)) {
+			$typefromobject = (string) $object->element.'_send';
+			if (in_array($typefromobject, self::getNotificationMirrorEmailTemplateTypes(), true)) {
+				return $typefromobject;
+			}
+		}
+
+		if (strpos($notifcode, 'DIFFUSIONCONTACT_') === 0) {
+			return self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND;
+		}
+
+		return self::EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND;
+	}
+
+	/**
+	 * Return the hidden mirror label used to avoid Dolibarr unique key conflicts.
+	 *
+	 * @param string $label Visible email template label
+	 * @param string $targettype Hidden target template type
+	 * @return string
+	 */
+	private static function getNotificationMirrorLabel($label, $targettype)
+	{
+		$suffix = ' ['.$targettype.']';
+		if (substr($label, -strlen($suffix)) === $suffix) {
+			return $label;
+		}
+
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr((string) $label, 0, $maxlabelsize).$suffix;
+	}
+
+	/**
+	 * Return visible template label when the runtime value already contains a hidden mirror suffix.
+	 *
+	 * @param string $label Current template label
+	 * @return string
+	 */
+	private static function getVisibleLabelFromNotificationMirrorLabel($label)
+	{
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$suffix = ' ['.$targettype.']';
+			if (substr($label, -strlen($suffix)) === $suffix) {
+				return substr($label, 0, -strlen($suffix));
+			}
+		}
+
+		return $label;
 	}
 
 	/**
@@ -302,21 +400,23 @@ class ActionsDiffusion
 		$nbsource = 0;
 		while ($obj = $db->fetch_object($resql)) {
 			$nbsource++;
-			$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype);
+			$mirrorlabel = self::getNotificationMirrorLabel((string) $obj->label, $targettype);
+			$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel);
+			$uniquewhere = self::getEmailTemplateUniqueWhere($db, (int) $obj->entity, $mirrorlabel, $obj->lang);
 
 			$sqlinsert = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
 			$sqlinsert .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, defaultfortype, enabled, active,";
 			$sqlinsert .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines)";
 			$sqlinsert .= " SELECT ".((int) $obj->entity).", 'diffusion', '".$db->escape($targettype)."',";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->lang).", ".((int) $obj->private).", ".self::sqlNullableInteger($obj->fk_user).", NOW(),";
-			$sqlinsert .= " ".self::sqlNullableString($db, $obj->label).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
+			$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlabel).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->enabled).", ".((int) $obj->active).",";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_from).", ".self::sqlNullableString($db, $obj->email_to).",";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_tocc).", ".self::sqlNullableString($db, $obj->email_tobcc).",";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->topic).", ".self::sqlNullableString($db, $obj->joinfiles).",";
 			$sqlinsert .= " ".self::sqlNullableString($db, $obj->content).", ".self::sqlNullableString($db, $obj->content_lines);
 			$sqlinsert .= " FROM DUAL";
-			$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$where.")";
+			$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$uniquewhere.")";
 
 			if (!$db->query($sqlinsert)) {
 				$db->free($resql);
@@ -366,11 +466,16 @@ class ActionsDiffusion
 			return 1;
 		}
 
+		$mirrorlabels = array();
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$mirrorlabels[] = "'".$db->escape(self::getNotificationMirrorLabel($label, $targettype))."'";
+		}
+
 		$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
 		$sql .= " SET active = 0";
 		$sql .= " WHERE module = 'diffusion'";
 		$sql .= " AND type_template IN (".implode(',', $targettypes).")";
-		$sql .= " AND label = '".$db->escape($label)."'";
+		$sql .= " AND label IN (".implode(',', $mirrorlabels).")";
 
 		return $db->query($sql) ? 1 : -1;
 	}
@@ -381,15 +486,16 @@ class ActionsDiffusion
 	 * @param DoliDB $db Database handler
 	 * @param stdClass $obj Source email template row
 	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
 	 * @return string SQL where clause
 	 */
-	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype)
+	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel)
 	{
 		$where = "module = 'diffusion'";
 		$where .= " AND type_template = '".$db->escape($targettype)."'";
 		$where .= " AND entity = ".((int) $obj->entity);
 		$where .= " AND private = ".((int) $obj->private);
-		$where .= " AND label ".self::sqlNullableCondition($db, $obj->label);
+		$where .= " AND label ".self::sqlNullableCondition($db, $mirrorlabel);
 		$where .= " AND lang ".self::sqlNullableCondition($db, $obj->lang);
 		if ($obj->fk_user === null || $obj->fk_user === '') {
 			$where .= " AND fk_user IS NULL";
@@ -398,6 +504,55 @@ class ActionsDiffusion
 		}
 
 		return $where;
+	}
+
+	/**
+	 * Build the native unique key condition for email templates.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param int $entity Entity id
+	 * @param string $label Template label
+	 * @param mixed $lang Template language
+	 * @return string SQL where clause
+	 */
+	private static function getEmailTemplateUniqueWhere($db, $entity, $label, $lang)
+	{
+		$where = "entity = ".((int) $entity);
+		$where .= " AND label ".self::sqlNullableCondition($db, $label);
+		$where .= " AND lang ".self::sqlNullableCondition($db, $lang);
+
+		return $where;
+	}
+
+	/**
+	 * Check whether an email template label already exists for Dolibarr native unique key.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param int $entity Entity id
+	 * @param string $label Template label
+	 * @param mixed $lang Template language
+	 * @param int $excludeid Row id to exclude
+	 * @return bool
+	 */
+	private static function emailTemplateLabelExists($db, $entity, $label, $lang, $excludeid = 0)
+	{
+		$sql = "SELECT rowid";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE ".self::getEmailTemplateUniqueWhere($db, $entity, $label, $lang);
+		if ($excludeid > 0) {
+			$sql .= " AND rowid <> ".((int) $excludeid);
+		}
+		$sql .= " LIMIT 1";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return true;
+		}
+
+		$exists = ($db->num_rows($resql) > 0);
+		$db->free($resql);
+
+		return $exists;
 	}
 
 	/**
@@ -1066,7 +1221,7 @@ class ActionsDiffusion
 		}
 
 		if (!empty($parameters['notifcode'])) {
-			$result = self::syncSelectedNotificationEmailTemplateMirrors($this->db, (string) $parameters['notifcode']);
+			$result = self::syncSelectedNotificationEmailTemplateMirrors($this->db, (string) $parameters['notifcode'], $object);
 			if ($result < 0) {
 				$this->error = $this->db->lasterror();
 				return -1;

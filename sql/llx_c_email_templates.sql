@@ -14,7 +14,7 @@ SELECT 1, 'diffusion', 'diffusion', 'fr_FR', 0, NULL, NOW(), 'Envoi d''une diffu
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'fr_FR' AND label = 'Envoi d''une diffusion'
+	WHERE entity = 1 AND lang = 'fr_FR' AND label = 'Envoi d''une diffusion'
 );
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
@@ -24,7 +24,7 @@ SELECT 1, 'diffusion', 'diffusion', 'en_US', 0, NULL, NOW(), 'Send a diffusion',
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'en_US' AND label = 'Send a diffusion'
+	WHERE entity = 1 AND lang = 'en_US' AND label = 'Send a diffusion'
 );
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
@@ -34,7 +34,7 @@ SELECT 1, 'diffusion', 'diffusion', 'fr_FR', 0, NULL, NOW(), 'Notification diffu
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'fr_FR' AND label = 'Notification diffusion'
+	WHERE entity = 1 AND lang = 'fr_FR' AND label = 'Notification diffusion'
 );
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
@@ -44,7 +44,7 @@ SELECT 1, 'diffusion', 'diffusion', 'en_US', 0, NULL, NOW(), 'Diffusion notifica
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'en_US' AND label = 'Diffusion notification'
+	WHERE entity = 1 AND lang = 'en_US' AND label = 'Diffusion notification'
 );
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
@@ -54,7 +54,7 @@ SELECT 1, 'diffusion', 'diffusion', 'fr_FR', 0, NULL, NOW(), 'Notification conta
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'fr_FR' AND label = 'Notification contact de diffusion'
+	WHERE entity = 1 AND lang = 'fr_FR' AND label = 'Notification contact de diffusion'
 );
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
@@ -64,5 +64,5 @@ SELECT 1, 'diffusion', 'diffusion', 'en_US', 0, NULL, NOW(), 'Diffusion contact 
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
-	WHERE entity = 1 AND module = 'diffusion' AND type_template = 'diffusion' AND lang = 'en_US' AND label = 'Diffusion contact notification'
+	WHERE entity = 1 AND lang = 'en_US' AND label = 'Diffusion contact notification'
 );

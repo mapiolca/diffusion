@@ -14,6 +14,8 @@
 - EN: Fixed Diffusion Agenda events with native `AC_OTH_AUTO` type, `actioncomm.id` key, aligned `elementtype`, and default email templates for manual sending and notifications.
 - FR: Regroupement des modèles de courriel du module sous le type unique `diffusion`, avec migration des anciens types visibles et synchronisation technique cachée pour les Notifications natives Dolibarr.
 - EN: Grouped module email templates under the single `diffusion` type, with migration from previous visible types and hidden technical synchronization for native Dolibarr Notifications.
+- FR: Correction de l'activation des modèles de courriel en respectant la clé unique native `entity, label, lang` et en suffixant les miroirs techniques cachés.
+- EN: Fixed email template activation by respecting the native `entity, label, lang` unique key and suffixing hidden technical mirrors.
 
 ## 1.2.4 (15/06/2026)
 
