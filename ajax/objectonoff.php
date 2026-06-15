@@ -110,7 +110,7 @@ if (!empty($user->socid)) {
 // Check is done on $user->rights->element->create or $user->rights->element->subelement->create (because $action = 'set')
 if (preg_match('/stat[u][st]$/', $field) || ($field == 'evenunsubscribe' && $object->table_element == 'mailing')) {
 	if ($object->element === 'diffusioncontact') {
-		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'))) {
+		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'write') || $user->hasRight('diffusion', 'diffusiondoc', 'write'))) {
 			httponly_accessforbidden('Not enough permissions');
 		}
 	} else {
@@ -148,7 +148,11 @@ if (($action == 'set') && !empty($id)) {	// Test on permission already done in h
 	if ($triggerkey == 'PRODUCT_UPDATE') {
 		$triggerkey = 'PRODUCT_MODIFY';
 	}
-	$update = $object->update($user, $field, $value, $object->table_element, $id);
+	if ($object->element === 'diffusioncontact') {
+		$update = $object->updateStatusField($id, $field, $value, $user);
+	} else {
+		$update = $object->update($user, $field, $value, $object->table_element, $id);
+	}
 
 	
 

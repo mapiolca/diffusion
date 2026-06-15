@@ -1,5 +1,16 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3.0 (15/06/2026)
+
+- FR: Correction de la métadonnée native d'activation Dolibarr en laissant `_init()` / `_remove()` gérer `MAIN_MODULE_DIFFUSION`, ce qui restaure l'affichage de la dernière version d'activation.
+- EN: Fixed native Dolibarr activation metadata by letting `_init()` / `_remove()` manage `MAIN_MODULE_DIFFUSION`, restoring the last activation version display.
+- FR: Alignement du socle de compatibilité sur Dolibarr v20 et PHP 8.0, avec ajout d'une page de réglages Compatibilité centralisée.
+- EN: Aligned compatibility baseline to Dolibarr v20 and PHP 8.0, with a new centralized Compatibility settings page.
+- FR: Renforcement CSRF, droits serveur, mises à jour Ajax whitelistees, intégration Multicompany et chemins documentaires basés sur `getMultidirOutput()`.
+- EN: Strengthened CSRF, server-side permissions, whitelisted Ajax updates, Multicompany integration and document paths based on `getMultidirOutput()`.
+- FR: Complément des hooks/triggers Notifications et Agenda natifs avec substitutions pour les modèles d'e-mails.
+- EN: Completed native Notifications and Agenda hooks/triggers with substitutions for email templates.
+
 ## 1.2.4 (15/06/2026)
 
 - FR: Correction du sélecteur de projet sur la fiche diffusion pour afficher en édition les projets liés à un tiers comme en création.

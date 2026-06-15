@@ -76,7 +76,7 @@ class modDiffusion extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@diffusion'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.2.4';
+		$this->version = '1.3.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -131,7 +131,7 @@ class modDiffusion extends DolibarrModules
 			// Set this to 1 if module has its own login method file (core/login)
 			'login' => 0,
 			// Set this to 1 if module has its own substitution function file (core/substitutions)
-			'substitutions' => 0,
+			'substitutions' => 1,
 			// Set this to 1 if module has its own menus handler directory (core/menus)
 			'menus' => 0,
 			// Set this to 1 if module overwrite template dir (core/tpl)
@@ -191,8 +191,8 @@ class modDiffusion extends DolibarrModules
 		$this->langfiles = array("diffusion@diffusion");
 
 		// Prerequisites
-		$this->phpmin = array(7, 1); // Minimum version of PHP required by module
-		$this->need_dolibarr_version = array(19, -3); // Minimum version of Dolibarr required by module
+		$this->phpmin = array(8, 0); // Minimum version of PHP required by module
+		$this->need_dolibarr_version = array(20, 0); // Minimum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
 		// Messages at activation
@@ -345,7 +345,6 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'delete';
 		$r++;
-		/*
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
 		$this->rights[$r][1] = 'ReadDiffusionContact';
 		$this->rights[$r][4] = 'diffusioncontact';
@@ -361,7 +360,6 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusioncontact';
 		$this->rights[$r][5] = 'delete';
 		$r++;
-		*/
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -589,6 +587,17 @@ class modDiffusion extends DolibarrModules
 		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
 			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN model_source integer");
 		}
+		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion_contact LIKE 'entity'");
+		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion_contact ADD COLUMN entity integer DEFAULT 1 NOT NULL");
+			$this->db->query("UPDATE ".MAIN_DB_PREFIX."diffusion_contact as dc INNER JOIN ".MAIN_DB_PREFIX."diffusion as d ON d.rowid = dc.fk_diffusion SET dc.entity = d.entity");
+		}
+		$this->ensureDiffusionRefEntityUniqueIndex();
+		$this->ensureDiffusionIndex('diffusion', 'idx_diffusion_date_creation', 'date_creation');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_entity', 'entity');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_diffusion', 'fk_diffusion');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_contact', 'fk_contact');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_type_contact', 'fk_type_contact');
 
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -643,8 +652,6 @@ class modDiffusion extends DolibarrModules
 			if (!getDolGlobalInt('DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED')) {
 				dolibarr_set_const($this->db, 'DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED', '1', 'yesno', 0, '', $conf->entity);
 			}
-			dolibarr_set_const($this->db, 'MAIN_MODULE_DIFFUSION', '1', 'chaine', 0, '', $conf->entity);
-
 			dol_include_once('/diffusion/class/actions_diffusion.class.php');
 
 			$externalmodule = json_decode((string) ($conf->global->MULTICOMPANY_EXTERNAL_MODULES_SHARING ?? ''), true);
@@ -686,6 +693,13 @@ class modDiffusion extends DolibarrModules
 			'DIFFUSION_SETDIFFUSED' => array('DiffusionTriggerLabelSetDiffused', 'DiffusionTriggerDescSetDiffused', 2003),
 			'DIFFUSION_BACKTODRAFT' => array('DiffusionTriggerLabelBackToDraft', 'DiffusionTriggerDescBackToDraft', 2004),
 			'DIFFUSION_DELETE' => array('DiffusionTriggerLabelDelete', 'DiffusionTriggerDescDelete', 2005),
+			'DIFFUSION_CANCEL' => array('DiffusionTriggerLabelCancel', 'DiffusionTriggerDescCancel', 2006),
+			'DIFFUSION_REOPEN' => array('DiffusionTriggerLabelReopen', 'DiffusionTriggerDescReopen', 2007),
+			'DIFFUSION_DIFFUSION_MODIFY' => array('DiffusionTriggerLabelModify', 'DiffusionTriggerDescModify', 2008),
+			'DIFFUSIONCONTACT_INSERT' => array('DiffusionContactTriggerLabelInsert', 'DiffusionContactTriggerDescInsert', 2010),
+			'DIFFUSIONCONTACT_DELETELINE' => array('DiffusionContactTriggerLabelDeleteLine', 'DiffusionContactTriggerDescDeleteLine', 2011),
+			'DIFFUSIONCONTACT_UPDATELINE' => array('DiffusionContactTriggerLabelUpdateLine', 'DiffusionContactTriggerDescUpdateLine', 2012),
+			'DIFFUSIONCONTACT_DELETEALL' => array('DiffusionContactTriggerLabelDeleteAll', 'DiffusionContactTriggerDescDeleteAll', 2013),
 		);
 
 		foreach ($triggers as $code => $triggerconf) {
@@ -718,6 +732,79 @@ class modDiffusion extends DolibarrModules
 	}
 
 	/**
+	 * Create a missing index during module upgrade.
+	 *
+	 * @param string $table Table without prefix
+	 * @param string $index Index name
+	 * @param string $columns SQL column list
+	 * @return int<-1,1>
+	 */
+	private function ensureDiffusionIndex($table, $index, $columns)
+	{
+		$sql = "SHOW INDEX FROM ".MAIN_DB_PREFIX.$table." WHERE Key_name = '".$this->db->escape($index)."'";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		if ($this->db->num_rows($resql) > 0) {
+			$this->db->free($resql);
+			return 1;
+		}
+		$this->db->free($resql);
+
+		$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX.$table." ADD INDEX ".$index." (".$columns.")");
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Ensure the diffusion reference unique key includes entity.
+	 *
+	 * @return int<-1,1>
+	 */
+	private function ensureDiffusionRefEntityUniqueIndex()
+	{
+		$sql = "SHOW INDEX FROM ".MAIN_DB_PREFIX."diffusion WHERE Key_name = 'uk_diffusion_ref'";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$columns = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$columns[(int) $obj->Seq_in_index] = $obj->Column_name;
+		}
+		$this->db->free($resql);
+		ksort($columns);
+
+		if ($columns === array(1 => 'ref', 2 => 'entity')) {
+			return 1;
+		}
+
+		if (!empty($columns)) {
+			$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion DROP INDEX uk_diffusion_ref");
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+		}
+
+		$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD UNIQUE INDEX uk_diffusion_ref (ref, entity)");
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
 	 *	Function called when module is disabled.
 	 *	Remove from database constants, boxes and permissions from Dolibarr database.
 	 *	Data directories are not deleted
@@ -741,8 +828,6 @@ class modDiffusion extends DolibarrModules
 
 		$jsonformat = json_encode($externalmodule);
 		dolibarr_set_const($this->db, 'MULTICOMPANY_EXTERNAL_MODULES_SHARING', $jsonformat, 'chaine', 0, '', $conf->entity);
-		dolibarr_del_const($this->db, 'MAIN_MODULE_DIFFUSION', $conf->entity);
-
 		$sql = array();
 		return $this->_remove($sql, $options);
 	}

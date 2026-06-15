@@ -92,11 +92,14 @@ function diffusionPrepareHead($object)
 		if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
 			$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
 		}
-		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".$object->element."/".dol_sanitizeFileName($object->ref);
+		$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+		if (empty($upload_dir)) {
+			$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".$object->element."/".dol_sanitizeFileName($object->ref);
+		}
 		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta|_preview.*\.png)$'));
 		$nbLinks = Link::count($db, $object->element, $object->id);
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_document.php", 1).'?id='.$object->id;
-		$head[$h][1] = $langs->trans('Documents');
+		$head[$h][1] = $langs->trans('AttachedFiles');
 		if (($nbFiles + $nbLinks) > 0) {
 			$head[$h][1] .= '<span class="badge marginleftonlyshort">'.($nbFiles + $nbLinks).'</span>';
 		}
@@ -106,7 +109,7 @@ function diffusionPrepareHead($object)
 
 	if ($showtabofpageagenda) {
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_agenda.php", 1).'?id='.$object->id;
-		$head[$h][1] = $langs->trans("Events");
+		$head[$h][1] = $langs->trans("EventsAgenda");
 		$head[$h][2] = 'agenda';
 		$h++;
 	}

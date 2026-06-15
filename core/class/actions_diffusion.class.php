@@ -52,7 +52,7 @@ class ActionsDiffusion
 	public function __construct($db)
 	{
 		$this->db = $db;
-		dol_syslog(__METHOD__ . " hook class initialized from class/actions_diffusion.class.php", LOG_WARNING);
+		dol_syslog(__METHOD__ . " hook class initialized from class/actions_diffusion.class.php", LOG_DEBUG);
 	}
 
 	/**
@@ -488,7 +488,11 @@ class ActionsDiffusion
 					setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
 				}
 			}
-			$queryParams = $_GET;
+			$queryParams = array();
+			$queryString = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_QUERY);
+			if (!empty($queryString)) {
+				parse_str($queryString, $queryParams);
+			}
 			unset($queryParams['action']);
 			unset($queryParams['diffusionid']);
 			unset($queryParams['token']);
@@ -656,6 +660,13 @@ class ActionsDiffusion
 			'DIFFUSION_SETDIFFUSED',
 			'DIFFUSION_BACKTODRAFT',
 			'DIFFUSION_DELETE',
+			'DIFFUSION_CANCEL',
+			'DIFFUSION_REOPEN',
+			'DIFFUSION_DIFFUSION_MODIFY',
+			'DIFFUSIONCONTACT_INSERT',
+			'DIFFUSIONCONTACT_DELETELINE',
+			'DIFFUSIONCONTACT_UPDATELINE',
+			'DIFFUSIONCONTACT_DELETEALL',
 		);
 
 		if (!empty($hookmanager->resArray['arrayofnotifsupported']) && is_array($hookmanager->resArray['arrayofnotifsupported'])) {
@@ -736,10 +747,4 @@ class ActionsDiffusion
 		return 1;
 	}
 
-}
-
-if (!class_exists('ActionsDiffusion')) {
-	class ActionsDiffusion extends ActionsDiffusion
-	{
-	}
 }

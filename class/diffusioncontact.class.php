@@ -123,6 +123,7 @@ class DiffusionContact extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
+		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "isModEnabled('multicompany')", 'position' => 1, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => "1"),
 		"fk_contact" => array("type" => "integer", "label" => "fk_contact", "enabled" => "1", 'position' => 2, 'notnull' => 0, "visible" => "0",),
                 "fk_diffusion" => array("type" => "integer", "label" => "fk_diffusion", "enabled" => "1", 'position' => 1, 'notnull' => 0, "visible" => "0",),
                 "fk_type_contact" => array("type" => "integer", "label" => "fk_type_contact", "enabled" => "1", 'position' => 2, 'notnull' => 0, "visible" => "0",),
@@ -133,6 +134,7 @@ class DiffusionContact extends CommonObject
 		"fk_user_modif" => array("type" => "integer:user:user/class/user.class.php", "label" => "UserModif", "enabled" => "1", 'position' => 511, 'notnull' => 0, "visible" => "0",),
 	);
 	public $rowid;
+	public $entity;
         public $fk_contact;
         public $fk_diffusion;
         public $fk_type_contact;
@@ -190,7 +192,7 @@ class DiffusionContact extends CommonObject
                 global $conf, $langs;
 
                 $this->db = $db;
-                $this->ismultientitymanaged = 0;
+                $this->ismultientitymanaged = 1;
                 $this->isextrafieldmanaged = 1;
 
                 $entity = !empty($conf->entity) ? (int) $conf->entity : 1;
@@ -323,9 +325,21 @@ class DiffusionContact extends CommonObject
 			return 1;
 		}
 
+		$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+		$sqlentity = 'SELECT entity FROM '.MAIN_DB_PREFIX.'diffusion WHERE rowid = '.$diffusionId;
+		$resqlentity = $this->db->query($sqlentity);
+		if ($resqlentity) {
+			$objentity = $this->db->fetch_object($resqlentity);
+			if (!empty($objentity->entity)) {
+				$entity = (int) $objentity->entity;
+			}
+			$this->db->free($resqlentity);
+		}
+
 		$insertSql = 'INSERT INTO '.MAIN_DB_PREFIX.'diffusion_contact';
-		$insertSql .= ' (fk_diffusion, fk_contact, contact_source, fk_type_contact, mail_status, letter_status, hand_status, fk_user_modif)';
+		$insertSql .= ' (entity, fk_diffusion, fk_contact, contact_source, fk_type_contact, mail_status, letter_status, hand_status, fk_user_modif)';
 		$insertSql .= ' VALUES (';
+		$insertSql .= $entity.',';
 		$insertSql .= $diffusionId.',';
 		$insertSql .= $contactId.", '".$this->db->escape($source)."',";
 		$insertSql .= ($typeContactId > 0 ? $typeContactId : 'NULL').',';
@@ -614,77 +628,9 @@ class DiffusionContact extends CommonObject
 	 * @param	int<0,1>	$nolines		0=Default to load extrafields, 1=No extrafields
 	 * @return	int<-1,1>					Return integer <0 if KO, 0 if not found, >0 if OK
 	 */
-	public function fetch()
+	public function fetch($id = 0, $ref = null, $noextrafields = 0, $nolines = 0)
 	{
-		global $langs, $user, $conf, $object, $entry;
-
-		$element = "diffusioncontact";
-		$table_element = "diffusion_contact";
-		$module = "diffusion";
-
-		$this->db->begin();
-
-		$sql = "SELECT * FROM `".MAIN_DB_PREFIX."diffusion_contact`" ;
-		$sql.= " WHERE `fk_contact`='".$entry->contact_id."'";
-		$sql.= " AND `fk_diffusion`='".$object->id."'";
-		$sql.= " AND `contact_source`='".$entry->source."'";
-
-        //var_dump($sql);
-
-        dol_syslog("DiffusionContact::fetch sql=".$sql);
-
-	    $resql = $this->db->query($sql);
-	    
-	   if ($resql = 1)
-		{
-            $num = $this->db->num_rows($resql);
-            $i = 0;
-
-            //var_dump($num);
-
-            if ($num)
-			{
-                while ($i < $num)
-				{
-        			$obj = $this->db->fetch_object($resql);
-
-        			//var_dump($obj);
-					
-					$this->lines[$i]			= $obj;
-					$this->lines[$i]->id		= trim($obj->rowid);
-					$this->lines[$i]->mail_status		= trim($obj->mail_status);
-					$this->lines[$i]->letter_status		= trim($obj->letter_status);
-					$this->lines[$i]->hand_status		= trim($obj->hand_status);
-                    $i++;
-                }
-            }
-
-            $result = array(
-            	'id' => $this->lines[0]->id,
-            	'module' => $module,
-            	'element'=> $element,
-            	'table_element' =>$table_element,
-            	'fields' => $object->fields,
-            	'diffusion' => $object->id,
-            	'mail_status' => $this->lines[0]->mail_status,
-            	'letter_status' => $this->lines[0]->letter_status,
-            	'hand_status'=> $this->lines[0]->hand_status,
-
-            );
-
-			return $result;
-		}
-		else
-		{
-			$this->error = $this->db->error()." sql=".$sql;
-			return -1;
-		}
-
-		//$result = $this->fetchCommon($id, $ref, '', $noextrafields);
-		//if ($result > 0 && !empty($this->table_element_line) && empty($nolines)) {
-		//	$this->fetchLines($noextrafields);
-		//}
-		//return $result;
+		return $this->fetchCommon((int) $id, $ref, '', $noextrafields);
 	}
 
 	/**
@@ -729,7 +675,7 @@ class DiffusionContact extends CommonObject
 			$sql.= " LEFT JOIN ".$this->db->prefix().$this->table_element."_extrafields as te ON te.fk_object = t.rowid";
 		}
 		if (isset($this->ismultientitymanaged) && $this->ismultientitymanaged == 1) {
-			$sql.= " WHERE t.entity IN (".getEntity($this->element).")";
+			$sql.= " WHERE t.entity IN (".getEntity('diffusion').")";
 		} else {
 			$sql.= " WHERE 1 = 1";
 		}
@@ -788,45 +734,65 @@ class DiffusionContact extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
-		global $langs, $conf, $object, $field, $value, $id;
+		return $this->updateCommon($user, $notrigger);
+	}
 
-		dol_syslog(__METHOD__, LOG_DEBUG);
+	/**
+	 * Update a delivery method status from Ajax after field whitelisting.
+	 *
+	 * @param int $id Link id
+	 * @param string $field Allowed status field
+	 * @param int $value New status value
+	 * @param User $user Current user
+	 * @param int<0,1> $notrigger 1 to skip triggers
+	 * @return int<-1,1>
+	 */
+	public function updateStatusField($id, $field, $value, User $user, $notrigger = 0)
+	{
+		global $langs, $conf;
 
-		$sql = "UPDATE ".MAIN_DB_PREFIX."$object->table_element";
-		$sql .= " SET ".$field." = ".((int) $value);
-		$sql .= " , fk_user_modif = ".((int) $user->id);
-		$sql .= " WHERE rowid = ".((int) $id);
+		$id = (int) $id;
+		$value = (int) $value;
+		$allowedfields = array('mail_status', 'letter_status', 'hand_status');
 
-		dol_syslog("DiffusionContact::update sql=".$sql);
+		if ($id <= 0 || !in_array($field, $allowedfields, true) || !in_array($value, array(0, 1), true)) {
+			$this->error = 'ErrorBadParameters';
+			return -1;
+		}
 
 		$this->db->begin();
 
-		try {
-			$resql = $this->db->query($sql);
-			if (!$resql) {
-				throw new Exception($this->db->lasterror());
-			}
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
+		$sql .= " SET ".$field." = ".$value;
+		$sql .= ", fk_user_modif = ".((int) $user->id);
+		$sql .= " WHERE rowid = ".$id;
+		$sql .= " AND entity IN (".getEntity('diffusion').")";
 
-			// Trigger call
-			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
-			$interface = new Interfaces($this->db);
-			$result2 = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
-			if ($result2 < 0) {
-				$this->errors = $interface->errors;
-				throw new Exception(!empty($interface->error) ? $interface->error : implode(', ', $this->errors));
-			}
-			// End trigger call
-
-			$this->db->commit();
-			return 1;
-		} catch (Exception $e) {
-			$this->error = $e->getMessage();
-			dol_syslog("DiffusionContact::update ".$this->error, LOG_ERR);
+		dol_syslog(__METHOD__." sql=".$sql, LOG_DEBUG);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
 			$this->db->rollback();
 			return -1;
 		}
 
-		//return $this->updateCommon($user, $notrigger);
+		$this->fetch($id);
+
+		if (!$notrigger) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
+			$interface = new Interfaces($this->db);
+			$result = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
+			if ($result < 0) {
+				$this->errors = $interface->errors;
+				$this->error = !empty($interface->error) ? $interface->error : implode(', ', $this->errors);
+				$this->db->rollback();
+				return -1;
+			}
+		}
+
+		$this->db->commit();
+
+		return 1;
 	}
 
 

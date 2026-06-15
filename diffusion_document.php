@@ -158,21 +158,16 @@ if ($id > 0 || !empty($ref)) {
 	}
 
 	$objref = dol_sanitizeFileName($object->ref);
-	$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+	if (empty($upload_dir)) {
+		$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+	}
 	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
 }
 
 // Permissions
-// (There are several ways to check permission.)
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-	$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd  = 1;
-}
+$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
+$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();

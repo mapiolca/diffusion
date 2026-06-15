@@ -229,7 +229,7 @@ class Diffusion extends CommonObject
 			$diffusionRightsMigrationDone = true;
 		}
 
-                $this->ismultientitymanaged = 0;
+                $this->ismultientitymanaged = 1;
                 $this->isextrafieldmanaged = 1;
 
                 $entity = !empty($conf->entity) ? (int) $conf->entity : 1;
@@ -602,7 +602,7 @@ class Diffusion extends CommonObject
 			$sql .= " LEFT JOIN ".$this->db->prefix().$this->table_element."_extrafields as te ON te.fk_object = t.rowid";
 		}
 		if (isset($this->ismultientitymanaged) && $this->ismultientitymanaged == 1) {
-			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
+			$sql .= " WHERE t.entity IN (".getEntity('diffusion').")";
 		} else {
 			$sql .= " WHERE 1 = 1";
 		}

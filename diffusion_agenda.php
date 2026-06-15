@@ -79,6 +79,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 dol_include_once('/diffusion/class/diffusion.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
@@ -151,19 +152,14 @@ if ($id > 0 || !empty($ref)) {
 	if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
 		$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
 	}
-	$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element.'/'.dol_sanitizeFileName($object->ref);
+	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+	if (empty($upload_dir)) {
+		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element.'/'.dol_sanitizeFileName($object->ref);
+	}
 }
 
-// There is several ways to check permission.
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-	$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'));
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd = 1;
-}
+$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
+$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'));
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();

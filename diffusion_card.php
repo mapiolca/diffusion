@@ -392,15 +392,8 @@ if (!empty($backtopagejsfields)) {
 }
 
 // Handle confirmation popup submit for project contacts import.
-$hasprojectcontactsrequest = false;
-if (is_array($_REQUEST)) {
-	foreach ($_REQUEST as $requestkey => $requestvalue) {
-		if (strpos((string) $requestkey, 'projectcontacts_') === 0 || $requestkey === 'projectcontacts' || $requestkey === 'projectcontacts[]') {
-			$hasprojectcontactsrequest = true;
-			break;
-		}
-	}
-}
+$projectcontactsrequest = GETPOST('projectcontacts', 'array');
+$hasprojectcontactsrequest = is_array($projectcontactsrequest) && count($projectcontactsrequest) > 0;
 if (($action === 'confirm_importprojectcontacts' || $action === 'ask_import_project_contacts') && ($confirm === 'yes' || $hasprojectcontactsrequest)) {
 	dol_syslog(__METHOD__.' remap action '.$action.' to importprojectcontacts (confirm='.$confirm.', hasprojectcontactsrequest='.(int) $hasprojectcontactsrequest.')', LOG_DEBUG);
 	$action = 'importprojectcontacts';
@@ -465,7 +458,10 @@ if (!isset($conf->diffusion->enabled)) {
 }
 
 $objref = dol_sanitizeFileName($object->ref);
-$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+if (empty($upload_dir)) {
+	$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+}
 dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
 //include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
@@ -763,19 +759,6 @@ if ($action == 'addcontact' && $permissiontoadd) {
 				if (empty($selectedcontacts)) {
 					$selectedcontacts = GETPOST('projectcontacts[]', 'array');
 					dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from projectcontacts[]='.count((array) $selectedcontacts), LOG_DEBUG);
-				}
-				if (empty($selectedcontacts) && !empty($_REQUEST) && is_array($_REQUEST)) {
-					$selectedcontacts = array();
-					foreach ($_REQUEST as $postkey => $postvalue) {
-						if (strpos((string) $postkey, 'projectcontacts_') === 0 && !empty($postvalue)) {
-							if (strpos((string) $postvalue, ':') !== false) {
-								$selectedcontacts[] = (string) $postvalue;
-							} elseif (preg_match('/^projectcontacts_(internal|external)_([0-9]+)_([0-9]+)$/', (string) $postkey, $matches)) {
-								$selectedcontacts[] = $matches[1].':'.$matches[2].':'.$matches[3];
-							}
-						}
-					}
-					dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from request scan='.count((array) $selectedcontacts), LOG_DEBUG);
 				}
 				if (empty($selectedcontacts)) {
 					dol_syslog(__METHOD__.' importprojectcontacts aborted: no selected contacts after parsing request', LOG_WARNING);
@@ -1485,27 +1468,6 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	}
 
 	// Presend form
-
-	if ($action == 'presend' && getDolGlobalInt('MAIN_MAIL_ENABLED_USER_DEST_SELECT') && !GETPOSTISSET('receiveruser')) {
-		$sql = 'SELECT DISTINCT dc.fk_contact';
-		$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
-		$sql .= ' WHERE dc.fk_diffusion = '.((int) $object->id);
-		$sql .= " AND dc.contact_source = 'internal'";
-		$sql .= ' AND dc.mail_status = 1';
-
-		$resql = $db->query($sql);
-		if ($resql) {
-			$receiveruser = array();
-			while ($obj = $db->fetch_object($resql)) {
-				$receiveruser[] = (int) $obj->fk_contact;
-			}
-
-			if (!empty($receiveruser)) {
-				$_POST['receiveruser'] = $receiveruser;
-				$_REQUEST['receiveruser'] = $receiveruser;
-			}
-		}
-	}
 
 	$modelmail = 'diffusion';
 	$defaulttopic = 'InformationMessage';

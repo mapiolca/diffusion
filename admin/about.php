@@ -52,6 +52,7 @@ if (!$res) {
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once '../lib/diffusion.lib.php';
+require_once '../class/diffusioncompatibility.class.php';
 require_once '../core/modules/modDiffusion.class.php';
 
 // Load translations required by this page.
@@ -64,10 +65,11 @@ if (empty($user->admin)) {
 
 $moduleDescriptor = new modDiffusion($db);
 $title = $langs->trans('DiffusionAbout');
+$linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?search_keyword='.urlencode('diffusion').'">'.$langs->trans('BackToModuleList').'</a>';
 
 llxHeader('', $title);
 
-print load_fiche_titre($title, '', 'info');
+print load_fiche_titre($title, $linkback, 'info');
 $head = diffusionAdminPrepareHead();
 print dol_get_fiche_head($head, 'about', $title, -1, 'diffusion@diffusion');
 
@@ -85,6 +87,9 @@ print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAbou
 print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutFamily').'</td><td>'.dol_escape_htmltag($moduleDescriptor->family).'</td></tr>';
 print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutDescription').'</td><td>'.dol_escape_htmltag($langs->trans($moduleDescriptor->description)).'</td></tr>';
 print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('DiffusionAboutMaintainer').'</td><td>'.dol_escape_htmltag($moduleDescriptor->editor_name).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('Compatibility').'</td><td>'.$langs->trans('DiffusionAboutCompatibilityValue', DiffusionCompatibility::MIN_DOLIBARR_VERSION, DiffusionCompatibility::MIN_PHP_VERSION).'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('Dependencies').'</td><td>'.$langs->trans('DiffusionAboutDependenciesValue').'</td></tr>';
+print '<tr class="oddeven"><td class="titlefield">'.$langs->trans('License').'</td><td>'.$langs->trans('DiffusionAboutLicenseValue').'</td></tr>';
 print '</table>';
 print '</div>';
 print '</div>';
@@ -102,6 +107,15 @@ print '</div>';
 print '</div>';
 
 print '</div>';
+
+print '<br>';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><th>'.$langs->trans('DiffusionAboutFeatures').'</th></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('DiffusionAboutFeatureDocuments').'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('DiffusionAboutFeatureContacts').'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('DiffusionAboutFeatureNotifications').'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('DiffusionAboutFeatureMulticompany').'</td></tr>';
+print '</table>';
 
 print dol_get_fiche_end();
 

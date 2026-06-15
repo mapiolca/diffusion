@@ -84,7 +84,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 * @var array{0:int,1:int} Minimum version of PHP required by module.
 	 * e.g.: PHP ≥ 7.0 = array(7, 0)
 	 */
-	public $phpmin = array(7, 0);
+	public $phpmin = array(8, 0);
 
 	/**
 	 * Dolibarr version of the loaded document
@@ -567,7 +567,13 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	protected function prepareDocumentPaths($object)
 	{
 		$entity = !empty($object->entity) ? (int) $object->entity : 1;
-		$multidir = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion'.'/'.$object->element;
+		$moduleoutput = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+		if (empty($moduleoutput)) {
+			global $conf;
+			$baseoutput = !empty($conf->diffusion->multidir_output[$entity]) ? $conf->diffusion->multidir_output[$entity] : DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
+			$moduleoutput = $baseoutput.'/'.$object->element.'/'.dol_sanitizeFileName($object->ref);
+		}
+		$multidir = dirname($moduleoutput);
 		if (empty($multidir)) {
 			return null;
 		}
@@ -585,7 +591,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			return null;
 		}
 
-		$dir = $multidir.'/'.$objectref;
+		$dir = $moduleoutput;
 
 		return array(
 			'dir' => $dir,

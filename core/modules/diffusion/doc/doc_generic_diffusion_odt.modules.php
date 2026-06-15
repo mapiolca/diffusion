@@ -52,7 +52,7 @@ class doc_generic_diffusion_odt extends ModelePDFDiffusion
 	 * @var array{0:int,1:int} Minimum version of PHP required by module.
 	 * e.g.: PHP ≥ 7.0 = array(7, 0)
 	 */
-	public $phpmin = array(7, 0);
+	public $phpmin = array(8, 0);
 
 	/**
 	 * @var string Version, possible values are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated' or a version string like 'x.y.z'''|'development'|'dolibarr'|'experimental' Dolibarr version of the loaded document
@@ -291,10 +291,13 @@ class doc_generic_diffusion_odt extends ModelePDFDiffusion
 			if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
 				$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
 			}
-			$dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element;
 			$objectref = dol_sanitizeFileName($object->ref);
-			if (!preg_match('/specimen/i', $objectref)) {
-				$dir .= "/".$objectref;
+			$dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+			if (empty($dir)) {
+				$dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element;
+				if (!preg_match('/specimen/i', $objectref)) {
+					$dir .= "/".$objectref;
+				}
 			}
 			$file = $dir."/".$objectref.".odt";
 

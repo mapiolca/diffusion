@@ -22,6 +22,7 @@
  */
 
 require_once DOL_DOCUMENT_ROOT.'/core/triggers/dolibarrtriggers.class.php';
+require_once DOL_DOCUMENT_ROOT.'/comm/action/class/actioncomm.class.php';
 
 
 /**
@@ -61,11 +62,26 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 			case 'DIFFUSION_VALIDATE':
 			case 'DIFFUSION_SETDIFFUSED':
 			case 'DIFFUSION_BACKTODRAFT':
+			case 'DIFFUSION_CANCEL':
+			case 'DIFFUSION_REOPEN':
+			case 'DIFFUSION_DIFFUSION_MODIFY':
 			case 'DIFFUSION_DELETE':
-				// Business events are consumed by Notification and Agenda modules.
+			case 'DIFFUSIONCONTACT_INSERT':
+			case 'DIFFUSIONCONTACT_DELETELINE':
+			case 'DIFFUSIONCONTACT_UPDATELINE':
+			case 'DIFFUSIONCONTACT_DELETEALL':
+				$result = $this->createAgendaEvent($action, $object, $user, $langs, $conf);
+				if ($result < 0) {
+					return -1;
+				}
 				return 0;
 
 			case 'DIFFUSION_SENDMAIL':
+				$result = $this->createAgendaEvent($action, $object, $user, $langs, $conf);
+				if ($result < 0) {
+					return -1;
+				}
+
 				// Automatically mark validated diffusion as sent when email sending succeeds.
 				if (empty(getDolGlobalInt('DIFFUSION_AUTO_SET_SENT_ON_MAIL'))) {
 					return 0;
@@ -92,5 +108,66 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Create a native Agenda event when enabled from Dolibarr Agenda setup.
+	 *
+	 * @param string $action Trigger code
+	 * @param object $object Trigger object
+	 * @param User $user Current user
+	 * @param Translate $langs Lang object
+	 * @param Conf $conf Global config
+	 * @return int<-1,1>
+	 */
+	private function createAgendaEvent($action, $object, $user, $langs, $conf)
+	{
+		if (!isModEnabled('agenda') || !getDolGlobalInt('MAIN_AGENDA_ACTIONAUTO_'.$action)) {
+			return 0;
+		}
+		if (empty($object) || !is_object($object) || empty($object->id)) {
+			return 0;
+		}
+		if (!class_exists('ActionComm')) {
+			return 0;
+		}
+
+		$elementtype = (!empty($object->element) && $object->element === 'diffusioncontact') ? 'diffusioncontact@diffusion' : 'diffusion@diffusion';
+		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."actioncomm";
+		$sql .= " WHERE elementtype = '".$this->db->escape($elementtype)."'";
+		$sql .= " AND fk_element = ".((int) $object->id);
+		$sql .= " AND code = '".$this->db->escape($action)."'";
+		$sql .= " LIMIT 1";
+		$resql = $this->db->query($sql);
+		if ($resql && $this->db->num_rows($resql) > 0) {
+			$this->db->free($resql);
+			return 0;
+		}
+		if ($resql) {
+			$this->db->free($resql);
+		}
+
+		$agenda = new ActionComm($this->db);
+		$agenda->type_code = $action;
+		$agenda->code = $action;
+		$agenda->label = $langs->trans('Notify_'.$action);
+		$agenda->datep = dol_now();
+		$agenda->datef = $agenda->datep;
+		$agenda->percentage = -1;
+		$agenda->elementtype = $elementtype;
+		$agenda->fk_element = (int) $object->id;
+		$agenda->userownerid = (int) $user->id;
+		if (!empty($object->fk_project)) {
+			$agenda->fk_project = (int) $object->fk_project;
+		}
+
+		$result = $agenda->create($user);
+		if ($result < 0) {
+			$this->error = $agenda->error;
+			$this->errors = $agenda->errors;
+			return -1;
+		}
+
+		return 1;
 	}
 }
