@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.2.4 (15/06/2026)
+
+- FR: Correction du sélecteur de projet sur la fiche diffusion pour afficher en édition les projets liés à un tiers comme en création.
+- EN: Fixed the project selector on the diffusion card so projects linked to a third party are available in edit mode as they are in create mode.
+
 ## 1.2.3 (31/05/2026)
 
 - FR: corrige l'intégration aux projets via l'utilisation des types de contacts du module "Projet" plutôt que les types de contacts "Diffusion" quand celui-ci est actif

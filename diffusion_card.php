@@ -851,7 +851,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 	//$db->begin();
 	$object->ref = GETPOST('ref');
 	$object->label = GETPOST('label');
-	$object->fk_project = GETPOSTINT('projectid');
+	$object->fk_project = GETPOSTINT('fk_project') ?: GETPOSTINT('projectid');
 	$object->description = GETPOST('description', 'none');
 
 	//$id = $object->create($user, $db); 
@@ -954,9 +954,7 @@ if ($action == 'create') {
 	if (isModEnabled('project') && is_object($formproject)) {
 		$langs->load("projects");
 		$socidforproject = GETPOSTINT('socid');
-		if (empty($socidforproject) && !empty($object->socid)) {
-			$socidforproject = (int) $object->socid;
-		}
+		$socidforproject = ($socidforproject > 0 ? $socidforproject : -1);
 		$fk_project = GETPOSTINT('fk_project');
 		if (empty($fk_project) && !empty($object->fk_project)) {
 			$fk_project = (int) $object->fk_project;
@@ -1152,11 +1150,13 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$langs->load("projects");
 		$morehtmlref .= '<br>';
 		if ($permissiontoadd) {
+			$socidforproject = GETPOSTINT('socid');
+			$socidforproject = ($socidforproject > 0 ? $socidforproject : -1);
 			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"');
 			if ($action != 'classify') {
 				$morehtmlref .= '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=classify&token='.newToken().'&id='.$object->id.'">'.img_edit($langs->transnoentitiesnoconv('SetProject')).'</a> ';
 			}
-			$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $object->socid, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
+			$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $socidforproject, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
 		} elseif (!empty($object->fk_project)) {
 			$proj = new Project($db);
 			$proj->fetch($object->fk_project);
