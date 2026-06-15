@@ -124,6 +124,29 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Force native notification trigger rows to use the single visible Diffusion element type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function repairNotificationActionTriggerElementTypes($db)
+	{
+		$codes = array();
+		foreach (self::getNotificationEventCodes() as $code) {
+			$codes[] = "'".$db->escape($code)."'";
+		}
+		if (empty($codes)) {
+			return 1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."c_action_trigger";
+		$sql .= " SET elementtype = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		$sql .= " WHERE code IN (".implode(',', $codes).")";
+
+		return $db->query($sql) ? 1 : -1;
+	}
+
+	/**
 	 * Return email template types exposed by the module.
 	 *
 	 * @return array<string,array<string,string>>
@@ -205,21 +228,86 @@ class ActionsDiffusion
 	 */
 	public static function migrateLegacyVisibleEmailTemplateTypes($db)
 	{
-		$legacytypes = array();
-		foreach (self::getLegacyVisibleEmailTemplateTypes() as $type) {
-			$legacytypes[] = "'".$db->escape($type)."'";
+		$visibletypes = array_merge(array(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION), self::getLegacyVisibleEmailTemplateTypes());
+		$visibletypes = array_values(array_unique($visibletypes));
+
+		$quotedtypes = array();
+		foreach ($visibletypes as $type) {
+			$quotedtypes[] = "'".$db->escape($type)."'";
 		}
-		if (empty($legacytypes)) {
+		if (empty($quotedtypes)) {
 			return 1;
 		}
 
-		$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
-		$sql .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		$sql = "SELECT rowid, entity, label, lang, type_template, active, position";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
 		$sql .= " WHERE module = 'diffusion'";
-		$sql .= " AND type_template IN (".implode(',', $legacytypes).")";
+		$sql .= " AND type_template IN (".implode(',', $quotedtypes).")";
+		$sql .= " ORDER BY entity, label, lang, rowid";
 
 		$resql = $db->query($sql);
-		return $resql ? 1 : -1;
+		if (!$resql) {
+			return -1;
+		}
+
+		$groups = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$row = array(
+				'rowid' => (int) $obj->rowid,
+				'entity' => (int) $obj->entity,
+				'label' => $obj->label,
+				'lang' => $obj->lang,
+				'type_template' => (string) $obj->type_template,
+				'active' => (int) $obj->active,
+				'position' => ($obj->position === null ? null : (int) $obj->position),
+			);
+
+			$key = self::getEmailTemplateUniqueRuntimeKey((int) $obj->entity, $obj->label, $obj->lang);
+			if (empty($groups[$key])) {
+				$groups[$key] = array();
+			}
+			$groups[$key][] = $row;
+		}
+		$db->free($resql);
+
+		foreach ($groups as $rows) {
+			$keeperindex = self::getVisibleEmailTemplateKeeperIndex($rows);
+
+			foreach ($rows as $index => $row) {
+				if ($index === $keeperindex) {
+					if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION) {
+						continue;
+					}
+
+					$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+					$sqlupdate .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+					$sqlupdate .= " WHERE rowid = ".((int) $row['rowid']);
+
+					if (!$db->query($sqlupdate)) {
+						return -1;
+					}
+
+					continue;
+				}
+
+				$archivedlabel = self::getLegacyVisibleEmailTemplateArchiveLabel($row['label'], $row['type_template'], (int) $row['rowid']);
+				if (self::emailTemplateLabelExists($db, (int) $row['entity'], $archivedlabel, $row['lang'], (int) $row['rowid'])) {
+					$archivedlabel = self::getLegacyVisibleEmailTemplateArchiveLabel($row['label'], $row['type_template'].'-'.((int) $row['rowid']), (int) $row['rowid']);
+				}
+
+				$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+				$sqlupdate .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+				$sqlupdate .= ", label = ".self::sqlNullableString($db, $archivedlabel);
+				$sqlupdate .= ", active = 0";
+				$sqlupdate .= " WHERE rowid = ".((int) $row['rowid']);
+
+				if (!$db->query($sqlupdate)) {
+					return -1;
+				}
+			}
+		}
+
+		return 1;
 	}
 
 	/**
@@ -377,6 +465,76 @@ class ActionsDiffusion
 		}
 
 		return $label;
+	}
+
+	/**
+	 * Build a runtime key matching Dolibarr native email template uniqueness.
+	 *
+	 * @param int $entity Entity id
+	 * @param mixed $label Template label
+	 * @param mixed $lang Template language
+	 * @return string
+	 */
+	private static function getEmailTemplateUniqueRuntimeKey($entity, $label, $lang)
+	{
+		return serialize(array(
+			(int) $entity,
+			$label === null ? null : (string) $label,
+			$lang === null ? null : (string) $lang,
+		));
+	}
+
+	/**
+	 * Choose the visible template row to keep when legacy rows collide on entity, label and lang.
+	 *
+	 * @param array<int,array<string,mixed>> $rows Template rows sharing the same native unique key
+	 * @return int Array index to keep
+	 */
+	private static function getVisibleEmailTemplateKeeperIndex($rows)
+	{
+		foreach ($rows as $index => $row) {
+			if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION && !empty($row['active'])) {
+				return $index;
+			}
+		}
+
+		foreach ($rows as $index => $row) {
+			if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION) {
+				return $index;
+			}
+		}
+
+		foreach ($rows as $index => $row) {
+			if (!empty($row['active'])) {
+				return $index;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Return a readable archived label for a duplicate legacy visible template.
+	 *
+	 * @param mixed $label Current template label
+	 * @param string $typeTemplate Previous template type
+	 * @param int $rowid Template row id
+	 * @return string
+	 */
+	private static function getLegacyVisibleEmailTemplateArchiveLabel($label, $typeTemplate, $rowid)
+	{
+		$suffix = ' [legacy '.$typeTemplate.' #'.((int) $rowid).']';
+		$baselabel = (string) $label;
+		if ($baselabel === '') {
+			$baselabel = 'Diffusion email template';
+		}
+
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr($baselabel, 0, $maxlabelsize).$suffix;
 	}
 
 	/**

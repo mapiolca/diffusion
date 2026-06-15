@@ -18,6 +18,10 @@
 - EN: Fixed email template activation by respecting the native `entity, label, lang` unique key and suffixing hidden technical mirrors.
 - FR: Restauration du picto Diffusion dans les Notifications natives en utilisant `diffusion@diffusion` comme type visible unique des modèles de courriel.
 - EN: Restored the Diffusion picto in native Notifications by using `diffusion@diffusion` as the single visible email template type.
+- FR: Fusion idempotente des anciens types visibles de modèles de courriel Diffusion vers `diffusion@diffusion`, avec archivage des doublons hérités et conservation des choix administrateur.
+- EN: Added idempotent merging of legacy visible Diffusion email template types into `diffusion@diffusion`, with archived legacy duplicates and preserved administrator choices.
+- FR: Déclaration explicite des propriétés `trackid` et `diffusion` pour éviter les dépréciations PHP liées aux propriétés dynamiques.
+- EN: Explicitly declared `trackid` and `diffusion` properties to avoid PHP dynamic property deprecation notices.
 
 ## 1.2.4 (15/06/2026)
 

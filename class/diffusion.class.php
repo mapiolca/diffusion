@@ -66,6 +66,11 @@ class Diffusion extends CommonObject
 	public $modulepart;
 
 	/**
+	 * @var string Tracking id used by Dolibarr mail forms
+	 */
+	public $trackid;
+
+	/**
 	 * @var string Output directory for documents
 	 */
 

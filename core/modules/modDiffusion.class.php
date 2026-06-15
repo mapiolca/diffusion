@@ -739,6 +739,12 @@ class modDiffusion extends DolibarrModules
 			}
 		}
 
+		$resultrepair = ActionsDiffusion::repairNotificationActionTriggerElementTypes($this->db);
+		if ($resultrepair < 0) {
+			$this->error = $this->db->lasterror();
+			return -4;
+		}
+
 		return 1;
 	}
 

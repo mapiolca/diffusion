@@ -65,6 +65,11 @@ class DiffusionContact extends CommonObject
 	public $modulepart;
 
 	/**
+	 * @var int Parent diffusion id used by inline status switches
+	 */
+	public $diffusion;
+
+	/**
 	 * @var string Output directory for documents
 	 */
 
