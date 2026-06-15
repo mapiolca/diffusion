@@ -24,6 +24,8 @@
 - EN: Explicitly declared `trackid` and `diffusion` properties to avoid PHP dynamic property deprecation notices.
 - FR: Ajout d'un miroir technique neutre `lang = NULL` pour les modèles de notifications Diffusion afin que `Notify::send()` retrouve le modèle sélectionné quelle que soit la langue du destinataire.
 - EN: Added a language-neutral technical mirror with `lang = NULL` for Diffusion notification templates so `Notify::send()` can find the selected template regardless of recipient language.
+- FR: Correction du point d'entrée Dolibarr v20 des substitutions Diffusion et localisation des libellés de statut dans la langue de notification.
+- EN: Fixed the Dolibarr v20 Diffusion substitution entry point and localized status labels with the notification language.
 
 ## 1.2.4 (15/06/2026)
 

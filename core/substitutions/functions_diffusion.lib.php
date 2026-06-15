@@ -24,10 +24,14 @@
  * @param mixed $parameters Extra parameters
  * @return void
  */
-function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $object, $parameters = null)
+function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $object, $parameters = null)
 {
 	if (empty($object) || !is_object($object)) {
 		return;
+	}
+
+	if (is_object($langs)) {
+		$langs->loadLangs(array('diffusion@diffusion'));
 	}
 
 	$isDiffusion = (!empty($object->element) && $object->element === 'diffusiondoc')
@@ -47,7 +51,7 @@ function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $ob
 		$substitutionarray['__DIFFUSION_REF__'] = !empty($diffusion->ref) ? (string) $diffusion->ref : '';
 		$substitutionarray['__DIFFUSION_LABEL__'] = !empty($diffusion->label) ? (string) $diffusion->label : '';
 		$substitutionarray['__DIFFUSION_DESCRIPTION__'] = !empty($diffusion->description) ? dol_string_nohtmltag((string) $diffusion->description) : '';
-		$substitutionarray['__DIFFUSION_STATUS__'] = method_exists($diffusion, 'getLibStatut') ? dol_string_nohtmltag($diffusion->getLibStatut(0)) : '';
+		$substitutionarray['__DIFFUSION_STATUS__'] = isset($diffusion->status) ? diffusion_get_status_label_for_substitution($diffusion->status, $langs) : '';
 		$substitutionarray['__DIFFUSION_URL__'] = $url;
 		$substitutionarray['__DIFFUSION_PROJECT_REF__'] = '';
 		$substitutionarray['__DIFFUSION_PROJECT_LABEL__'] = '';
@@ -104,9 +108,9 @@ function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $ob
 	$substitutionarray['__DIFFUSIONCONTACT_SOURCE__'] = !empty($object->contact_source) ? (string) $object->contact_source : '';
 	$substitutionarray['__DIFFUSIONCONTACT_NAME__'] = '';
 	$substitutionarray['__DIFFUSIONCONTACT_EMAIL__'] = '';
-	$substitutionarray['__DIFFUSIONCONTACT_MAIL_STATUS__'] = isset($object->mail_status) ? (string) $object->mail_status : '';
-	$substitutionarray['__DIFFUSIONCONTACT_LETTER_STATUS__'] = isset($object->letter_status) ? (string) $object->letter_status : '';
-	$substitutionarray['__DIFFUSIONCONTACT_HAND_STATUS__'] = isset($object->hand_status) ? (string) $object->hand_status : '';
+	$substitutionarray['__DIFFUSIONCONTACT_MAIL_STATUS__'] = isset($object->mail_status) ? diffusion_get_binary_status_label_for_substitution($object->mail_status, $langs) : '';
+	$substitutionarray['__DIFFUSIONCONTACT_LETTER_STATUS__'] = isset($object->letter_status) ? diffusion_get_binary_status_label_for_substitution($object->letter_status, $langs) : '';
+	$substitutionarray['__DIFFUSIONCONTACT_HAND_STATUS__'] = isset($object->hand_status) ? diffusion_get_binary_status_label_for_substitution($object->hand_status, $langs) : '';
 	$substitutionarray['__DIFFUSIONCONTACT_URL__'] = $diffusionid > 0 ? dol_buildpath('/diffusion/diffusion_card.php', 2).'?id='.$diffusionid : '';
 
 	if (!empty($object->fk_contact)) {
@@ -136,4 +140,69 @@ function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $ob
 			}
 		}
 	}
+}
+
+/**
+ * Return a translated Diffusion status label for notification substitutions.
+ *
+ * @param mixed $status Diffusion status
+ * @param Translate $langs Output language
+ * @return string
+ */
+function diffusion_get_status_label_for_substitution($status, $langs)
+{
+	if ($status === null || $status === '') {
+		return '';
+	}
+
+	$statuskeys = array(
+		0 => 'DiffusionStatusDraft',
+		1 => 'DiffusionStatusValidated',
+		6 => 'DiffusionStatusSent',
+		9 => 'DiffusionStatusCanceled',
+	);
+
+	$status = (int) $status;
+	if (isset($statuskeys[$status]) && is_object($langs)) {
+		return $langs->transnoentitiesnoconv($statuskeys[$status]);
+	}
+
+	return (string) $status;
+}
+
+/**
+ * Return a translated active/inactive label for contact notification substitutions.
+ *
+ * @param mixed $status Boolean-like status
+ * @param Translate $langs Output language
+ * @return string
+ */
+function diffusion_get_binary_status_label_for_substitution($status, $langs)
+{
+	if ($status === null || $status === '') {
+		return '';
+	}
+
+	if (is_object($langs)) {
+		return $langs->transnoentitiesnoconv(((int) $status) ? 'Enabled' : 'Disabled');
+	}
+
+	return (string) $status;
+}
+
+/**
+ * Backward-compatible substitution entry point for older local calls.
+ *
+ * Dolibarr v20 calls diffusion_completesubstitutionarray() for
+ * functions_diffusion.lib.php.
+ *
+ * @param array<string,string> $substitutionarray Substitution array
+ * @param Translate $langs Output language
+ * @param CommonObject $object Current object
+ * @param mixed $parameters Extra parameters
+ * @return void
+ */
+function complete_substitutions_array_diffusion(&$substitutionarray, $langs, $object, $parameters = null)
+{
+	diffusion_completesubstitutionarray($substitutionarray, $langs, $object, $parameters);
 }
