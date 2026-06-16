@@ -1088,15 +1088,15 @@ class ActionsDiffusion
 			return 0;
 		}
 
-		$entity = !empty($object->entity) ? (int) $object->entity : 0;
-		$baseoutput = self::getDiffusionOutputDirForEntity($entity);
-		$objectref = dol_sanitizeFileName($object->ref);
-		$uploadDir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-		if (empty($uploadDir) || strpos((string) $uploadDir, 'error-diroutput-not-defined') === 0) {
-			$uploadDir = $baseoutput.'/'.$objectref;
+		dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
+		if (!function_exists('diffusionGetDocumentUploadDir') || !function_exists('diffusionGetDocumentRelativePath')) {
+			return 0;
 		}
+
+		$relativePath = diffusionGetDocumentRelativePath($object);
+		$uploadDir = diffusionGetDocumentUploadDir($object);
 		$uploadDir = rtrim((string) $uploadDir, '/\\').'/';
-		$fileUrl = DOL_URL_ROOT.'/document.php?modulepart=diffusion&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$objectref.'/');
+		$fileUrl = DOL_URL_ROOT.'/document.php?modulepart='.diffusionGetDocumentModulepart().'&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$relativePath);
 
 		if (empty($parameters['options']) || !is_array($parameters['options'])) {
 			$parameters['options'] = array();
@@ -1104,7 +1104,7 @@ class ActionsDiffusion
 		$parameters['options']['upload_dir'] = $uploadDir;
 		$parameters['options']['upload_url'] = $fileUrl;
 		$parameters['options']['image_versions']['thumbnail']['upload_dir'] = $uploadDir.'thumbs/';
-		$parameters['options']['image_versions']['thumbnail']['upload_url'] = DOL_URL_ROOT.'/document.php?modulepart=diffusion&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$objectref.'/thumbs/');
+		$parameters['options']['image_versions']['thumbnail']['upload_url'] = DOL_URL_ROOT.'/document.php?modulepart='.diffusionGetDocumentModulepart().'&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$relativePath.'thumbs/');
 
 		$this->results = array('options' => $parameters['options']);
 

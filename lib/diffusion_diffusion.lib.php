@@ -82,22 +82,11 @@ function diffusionPrepareHead($object)
 	if ($showtabofpagedocument) {
 		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 		require_once DOL_DOCUMENT_ROOT.'/core/class/link.class.php';
-		$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-		if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-			$conf->diffusion = new stdClass();
+		$upload_dir = diffusionGetDocumentUploadDir($object);
+		if (!empty($upload_dir)) {
+			diffusionMigrateFlatDocumentDirectory($db, $object);
 		}
-		if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-			$conf->diffusion->multidir_output = array();
-		}
-		if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
-			$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-		}
-		$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-		if (empty($upload_dir)) {
-			$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".dol_sanitizeFileName($object->ref);
-		}
-		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)'));
-		$nbFiles += count(diffusionGetLegacyDocumentFileArray($object, $upload_dir));
+		$nbFiles = (!empty($upload_dir) && is_dir(dol_osencode($upload_dir))) ? count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)')) : 0;
 		$nbLinks = Link::count($db, $object->element, $object->id);
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_document.php", 1).'?id='.$object->id;
 		$head[$h][1] = $langs->trans('AttachedFiles');
@@ -297,76 +286,276 @@ function diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user)
 }
 
 /**
- * Return the document directory of a diffusion for its owning entity.
+ * Return the Dolibarr document modulepart used by Diffusion files.
+ *
+ * @return string Modulepart
+ */
+function diffusionGetDocumentModulepart()
+{
+	return 'diffusion';
+}
+
+/**
+ * Return the document permission segment used below the modulepart directory.
+ *
+ * @return string Document element
+ */
+function diffusionGetDocumentElement()
+{
+	return 'diffusiondoc';
+}
+
+/**
+ * Return the output base directory of the diffusion module for the object owning entity.
  *
  * @param Diffusion $object Diffusion object
- * @return string           Absolute document directory
+ * @return string           Absolute module document directory
  */
-function diffusionGetDocumentUploadDir($object)
+function diffusionGetDocumentBaseOutputDir($object)
 {
 	global $conf;
 
-	if (!is_object($object) || empty($object->ref)) {
+	if (!is_object($object)) {
 		return '';
 	}
 
-	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
 	$entityfordoc = !empty($object->entity) ? (int) $object->entity : (int) $conf->entity;
+	if ($entityfordoc <= 0) {
+		$entityfordoc = 1;
+	}
+
 	if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
 		$conf->diffusion = new stdClass();
 	}
 	if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
 		$conf->diffusion->multidir_output = array();
 	}
+
+	$defaultoutput = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/'.diffusionGetDocumentModulepart();
 	if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
-		$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
+		$conf->diffusion->multidir_output[$entityfordoc] = ($entityfordoc > 1 ? $defaultoutput : (!empty($conf->diffusion->dir_output) ? $conf->diffusion->dir_output : $defaultoutput));
+	}
+	if (!isset($conf->diffusion->enabled)) {
+		$conf->diffusion->enabled = 1;
 	}
 
-	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-	if (empty($upload_dir) || strpos((string) $upload_dir, 'error-diroutput-not-defined') === 0) {
-		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.dol_sanitizeFileName($object->ref);
-	}
-
-	return rtrim((string) $upload_dir, '/\\');
+	return rtrim((string) $conf->diffusion->multidir_output[$entityfordoc], '/\\');
 }
 
 /**
- * Return the legacy Diffusion document directory used before the storage path was aligned on modulepart.
+ * Return the relative canonical document path for document.php and FormFile links.
  *
- * @param Diffusion $object     Diffusion object
- * @param string    $upload_dir Current absolute upload directory
- * @return string               Absolute legacy document directory
+ * @param Diffusion $object Diffusion object
+ * @return string           Relative path with trailing slash
  */
-function diffusionGetLegacyDocumentUploadDir($object, $upload_dir = '')
+function diffusionGetDocumentRelativePath($object)
 {
 	if (!is_object($object) || empty($object->ref)) {
 		return '';
 	}
 
-	if (empty($upload_dir)) {
-		$upload_dir = diffusionGetDocumentUploadDir($object);
-	}
-	if (empty($upload_dir)) {
-		return '';
-	}
-
-	return rtrim(dirname(rtrim((string) $upload_dir, '/\\')).'/diffusiondoc/'.dol_sanitizeFileName($object->ref), '/\\');
+	return diffusionGetDocumentElement().'/'.dol_sanitizeFileName($object->ref).'/';
 }
 
 /**
- * Return the relative legacy path for document.php and FormFile links.
+ * Return the canonical document directory of a diffusion for its owning entity.
+ *
+ * @param Diffusion $object Diffusion object
+ * @return string           Absolute document directory
+ */
+function diffusionGetDocumentUploadDir($object)
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return '';
+	}
+
+	$baseoutput = diffusionGetDocumentBaseOutputDir($object);
+	$relativepath = diffusionGetDocumentRelativePath($object);
+	if (empty($baseoutput) || empty($relativepath)) {
+		return '';
+	}
+
+	return rtrim($baseoutput.'/'.trim($relativepath, '/'), '/\\');
+}
+
+/**
+ * Return the old flat Diffusion document directory used by previous 1.3.0 builds.
+ *
+ * @param Diffusion $object Diffusion object
+ * @return string           Absolute flat document directory
+ */
+function diffusionGetFlatDocumentUploadDir($object)
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return '';
+	}
+
+	$baseoutput = diffusionGetDocumentBaseOutputDir($object);
+	if (empty($baseoutput)) {
+		return '';
+	}
+
+	return rtrim($baseoutput.'/'.dol_sanitizeFileName($object->ref), '/\\');
+}
+
+/**
+ * Return the old flat relative path used by previous 1.3.0 builds.
+ *
+ * @param Diffusion $object Diffusion object
+ * @return string           Relative path with trailing slash
+ */
+function diffusionGetFlatDocumentRelativePath($object)
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return '';
+	}
+
+	return dol_sanitizeFileName($object->ref).'/';
+}
+
+/**
+ * Return the old flat Diffusion document directory kept for migration compatibility.
+ *
+ * @param Diffusion $object     Diffusion object
+ * @param string    $upload_dir Current absolute upload directory, unused
+ * @return string               Absolute flat document directory
+ */
+function diffusionGetLegacyDocumentUploadDir($object, $upload_dir = '')
+{
+	return diffusionGetFlatDocumentUploadDir($object);
+}
+
+/**
+ * Return the old flat relative path kept for migration compatibility.
  *
  * @param Diffusion $object Diffusion object
  * @return string           Relative path with trailing slash
  */
 function diffusionGetLegacyDocumentRelativePath($object)
 {
-	if (!is_object($object) || empty($object->ref)) {
-		return '';
+	return diffusionGetFlatDocumentRelativePath($object);
+}
+
+/**
+ * Return a path relative to DOL_DATA_ROOT.
+ *
+ * @param string $path Absolute path
+ * @return string      Relative path without trailing slash
+ */
+function diffusionGetDocumentPathRelativeToDataRoot($path)
+{
+	$relativepath = preg_replace('/^'.preg_quote(DOL_DATA_ROOT, '/').'/', '', (string) $path);
+	$relativepath = preg_replace('/[\\/]$/', '', (string) $relativepath);
+	$relativepath = preg_replace('/^[\\/]/', '', (string) $relativepath);
+
+	return (string) $relativepath;
+}
+
+/**
+ * Move files from the old flat directory to the canonical permission-aware directory.
+ *
+ * @param DoliDB    $db     Database handler
+ * @param Diffusion $object Diffusion object
+ * @return int              Number of moved entries, <0 on error
+ */
+function diffusionMigrateFlatDocumentDirectory($db, $object)
+{
+	global $conf;
+
+	if (!is_object($db) || !is_object($object) || empty($object->id) || empty($object->ref)) {
+		return 0;
 	}
 
-	return 'diffusiondoc/'.dol_sanitizeFileName($object->ref).'/';
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	$canonicaldir = diffusionGetDocumentUploadDir($object);
+	$flatdir = diffusionGetFlatDocumentUploadDir($object);
+	if (empty($canonicaldir) || empty($flatdir) || rtrim($canonicaldir, '/\\') === rtrim($flatdir, '/\\')) {
+		return 0;
+	}
+	if (!is_dir(dol_osencode($flatdir))) {
+		return 0;
+	}
+	if (!is_dir(dol_osencode($canonicaldir)) && dol_mkdir($canonicaldir) < 0) {
+		dol_syslog(__METHOD__.' failed to create canonical document directory '.$canonicaldir, LOG_ERR);
+		return -1;
+	}
+
+	$moved = 0;
+	$error = 0;
+	$movedentries = array();
+	$entries = scandir(dol_osencode($flatdir));
+	if (!is_array($entries)) {
+		return 0;
+	}
+
+	foreach ($entries as $entry) {
+		if ($entry === '.' || $entry === '..') {
+			continue;
+		}
+
+		$source = rtrim($flatdir, '/\\').'/'.$entry;
+		$target = rtrim($canonicaldir, '/\\').'/'.$entry;
+		if (file_exists(dol_osencode($target))) {
+			dol_syslog(__METHOD__.' keeps flat document because canonical target already exists source='.$source.' target='.$target, LOG_WARNING);
+			continue;
+		}
+		if (!@rename(dol_osencode($source), dol_osencode($target))) {
+			dol_syslog(__METHOD__.' failed to move flat document source='.$source.' target='.$target, LOG_WARNING);
+			$error++;
+			continue;
+		}
+		$moved++;
+		$movedentries[] = $entry;
+	}
+
+	if ($moved > 0) {
+		$oldrelpath = diffusionGetDocumentPathRelativeToDataRoot($flatdir);
+		$newrelpath = diffusionGetDocumentPathRelativeToDataRoot($canonicaldir);
+		$objectentity = !empty($object->entity) ? (int) $object->entity : (int) $conf->entity;
+
+		if ($oldrelpath !== '' && $newrelpath !== '') {
+			$escapedfilenames = array();
+			foreach ($movedentries as $movedentry) {
+				$escapedfilenames[] = "'".$db->escape($movedentry)."'";
+			}
+
+			$sql = 'UPDATE '.MAIN_DB_PREFIX.'ecm_files';
+			$sql .= " SET filepath = '".$db->escape($newrelpath)."'";
+			$sql .= " WHERE filepath = '".$db->escape($oldrelpath)."'";
+			$sql .= ' AND entity = '.$objectentity;
+			if (!empty($escapedfilenames)) {
+				$sql .= ' AND filename IN ('.implode(', ', $escapedfilenames).')';
+			}
+			if (!$db->query($sql)) {
+				dol_syslog(__METHOD__.' failed to update ECM filepath from '.$oldrelpath.' to '.$newrelpath.': '.$db->lasterror(), LOG_WARNING);
+				$error++;
+			}
+
+			if (!empty($object->last_main_doc) && strpos((string) $object->last_main_doc, $oldrelpath.'/') === 0) {
+				$lastmaindocname = basename(str_replace('\\', '/', (string) $object->last_main_doc));
+				if (in_array($lastmaindocname, $movedentries, true)) {
+					$newlastmaindoc = $newrelpath.substr((string) $object->last_main_doc, strlen($oldrelpath));
+					$sql = 'UPDATE '.MAIN_DB_PREFIX.$object->table_element;
+					$sql .= " SET last_main_doc = '".$db->escape($newlastmaindoc)."'";
+					$sql .= ' WHERE rowid = '.((int) $object->id);
+					if ($db->query($sql)) {
+						$object->last_main_doc = $newlastmaindoc;
+					} else {
+						dol_syslog(__METHOD__.' failed to update last_main_doc from '.$object->last_main_doc.' to '.$newlastmaindoc.': '.$db->lasterror(), LOG_WARNING);
+						$error++;
+					}
+				}
+			}
+		}
+	}
+
+	$remaining = scandir(dol_osencode($flatdir));
+	if (is_array($remaining) && count(array_diff($remaining, array('.', '..'))) === 0) {
+		@rmdir(dol_osencode($flatdir));
+	}
+
+	return $error ? -1 : $moved;
 }
 
 /**
@@ -534,7 +723,7 @@ function diffusionIsGeneratedDocumentFile($object, $filename)
  */
 function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 {
-	global $conf;
+	global $conf, $db;
 
 	if (!is_object($object) || empty($object->id) || empty($object->ref) || !empty($object->is_template)) {
 		return '';
@@ -544,6 +733,10 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 	}
 
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	if (is_object($db)) {
+		diffusionMigrateFlatDocumentDirectory($db, $object);
+	}
 
 	if (empty($upload_dir)) {
 		$upload_dir = diffusionGetDocumentUploadDir($object);
@@ -555,7 +748,7 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 	$objectref = dol_sanitizeFileName($object->ref);
 
 	$pdfdir = $upload_dir;
-	$pdfrelativebase = $objectref.'/';
+	$pdfrelativebase = diffusionGetDocumentRelativePath($object);
 	$pdfbasename = $objectref.'.pdf';
 	if (!empty($object->last_main_doc) && preg_match('/\.pdf$/i', (string) $object->last_main_doc)) {
 		$candidate = basename(str_replace('\\', '/', (string) $object->last_main_doc));
@@ -570,29 +763,7 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 		$filepdf = $pdfdir.'/'.$pdfbasename;
 	}
 	if (!is_file($filepdf)) {
-		$legacy_upload_dir = diffusionGetLegacyDocumentUploadDir($object, $upload_dir);
-		if (empty($legacy_upload_dir)) {
-			return '';
-		}
-
-		$pdfdir = $legacy_upload_dir;
-		$pdfrelativebase = diffusionGetLegacyDocumentRelativePath($object);
-		$pdfbasename = $objectref.'.pdf';
-		if (!empty($object->last_main_doc) && preg_match('/\.pdf$/i', (string) $object->last_main_doc)) {
-			$candidate = basename(str_replace('\\', '/', (string) $object->last_main_doc));
-			if (is_file($pdfdir.'/'.$candidate)) {
-				$pdfbasename = $candidate;
-			}
-		}
-
-		$filepdf = $pdfdir.'/'.$pdfbasename;
-		if (!is_file($filepdf)) {
-			$pdfbasename = $objectref.'.pdf';
-			$filepdf = $pdfdir.'/'.$pdfbasename;
-		}
-		if (!is_file($filepdf)) {
-			return '';
-		}
+		return '';
 	}
 
 	$fileimage = $filepdf.'_preview.png';
@@ -782,9 +953,10 @@ function diffusionResolveLinkedFilePath($object, $upload_dir, $filename)
 	}
 
 	$upload_dir = rtrim((string) $upload_dir, '/\\');
-	$modulebasedir = dirname($upload_dir);
+	$modulebasedir = diffusionGetDocumentBaseOutputDir($object);
 	$objectref = dol_sanitizeFileName($object->ref);
-	if (preg_match('/^'.preg_quote($objectref, '/').'\//', $filename) || preg_match('/^'.preg_quote((string) $object->element, '/').'\//', $filename)) {
+	$documentelement = diffusionGetDocumentElement();
+	if (preg_match('/^'.preg_quote($objectref, '/').'\//', $filename) || preg_match('/^'.preg_quote($documentelement, '/').'\//', $filename)) {
 		$fullpath = $modulebasedir.'/'.$filename;
 	} else {
 		$fullpath = $upload_dir.'/'.basename($filename);

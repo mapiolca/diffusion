@@ -142,28 +142,11 @@ if (empty($object->fk_element) && !empty($object->element)) {
 
 if ($id > 0 || !empty($ref)) {
 	$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-	if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-		$conf->diffusion = new stdClass();
+	$upload_dir = diffusionGetDocumentUploadDir($object);
+	if (!empty($upload_dir)) {
+		diffusionMigrateFlatDocumentDirectory($db, $object);
 	}
-	if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-		$conf->diffusion->multidir_output = array();
-	}
-	$defaultdiffusionoutput = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-	$diffusionoutput = !empty($conf->diffusion->multidir_output[$entityfordoc]) ? $conf->diffusion->multidir_output[$entityfordoc] : (!empty($conf->diffusion->dir_output) ? $conf->diffusion->dir_output : $defaultdiffusionoutput);
-	if ($entityfordoc > 1 && preg_match('/\/'.preg_quote((string) $entityfordoc, '/').'\//', (string) $diffusionoutput) === 0) {
-		$diffusionoutput = $defaultdiffusionoutput;
-	}
-	$conf->diffusion->multidir_output[$entityfordoc] = $diffusionoutput;
-	if (!isset($conf->diffusion->enabled)) {
-		$conf->diffusion->enabled = 1;
-	}
-
-	$objref = dol_sanitizeFileName($object->ref);
-	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-	if (empty($upload_dir)) {
-		$upload_dir = $diffusionoutput.'/'.$objref;
-	}
-	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
+	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 }
 
 // Permissions
@@ -204,6 +187,9 @@ $diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']
 $diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
 $diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
 $diffusionrenameto = $diffusionfilerename ? dol_string_nohtmltag(dol_sanitizeFileName(GETPOST('renamefileto', 'alpha'), '_', 0)) : '';
+$object->element = diffusionGetDocumentElement();
+$modulepart = diffusionGetDocumentModulepart();
+$relativepathwithnofile = diffusionGetDocumentRelativePath($object);
 if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissiontoadd) && GETPOST('urlfile', 'alpha')) {
 	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, GETPOST('urlfile', 'alpha', 0, null, null, 1));
 	$tmpurl = !empty($backtopage) ? $backtopage : $_SERVER["PHP_SELF"].'?id='.$object->id;
@@ -240,13 +226,9 @@ print dol_get_fiche_head($head, 'document', $langs->trans("Diffusion"), -1, $obj
 
 
 // Build file list
-$filearray = dol_dir_list($upload_dir, "files", 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1);
-$legacyfilearray = diffusionGetLegacyDocumentFileArray($object, $upload_dir, $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC));
+$filearray = (!empty($upload_dir) && is_dir(dol_osencode($upload_dir))) ? dol_dir_list($upload_dir, "files", 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1) : array();
 $totalsize = 0;
 foreach ($filearray as $key => $file) {
-	$totalsize += $file['size'];
-}
-foreach ($legacyfilearray as $key => $file) {
 	$totalsize += $file['size'];
 }
 
@@ -262,7 +244,7 @@ print '<div class="underbanner clearboth"></div>';
 print '<table class="border centpercent tableforfield">';
 
 // Number of files
-print '<tr><td class="titlefield">'.$langs->trans("NbOfAttachedFiles").'</td><td colspan="3">'.(count($filearray) + count($legacyfilearray)).'</td></tr>';
+print '<tr><td class="titlefield">'.$langs->trans("NbOfAttachedFiles").'</td><td colspan="3">'.count($filearray).'</td></tr>';
 
 // Total size
 print '<tr><td>'.$langs->trans("TotalSizeOfAttachedFiles").'</td><td colspan="3">'.$totalsize.' '.$langs->trans("bytes").'</td></tr>';
@@ -273,19 +255,15 @@ print '</div>';
 
 print dol_get_fiche_end();
 
-$modulepart = 'diffusion';
 $param = '&id='.$object->id.'&entity='.(int) $entityfordoc;
 $permtoedit = $permissiontoadd;
 //$relativepathwithnofile='diffusion/' . dol_sanitizeFileName($object->id).'/';
-$relativepathwithnofile = dol_sanitizeFileName($object->ref).'/';
 dol_syslog(__METHOD__.' document_actions_post_headers entity='.(int) $entityfordoc.' relativepathwithnofile='.$relativepathwithnofile.' modulepart='.$modulepart, LOG_DEBUG);
 
 $tmperrorreporting = error_reporting();
 error_reporting($tmperrorreporting & ~E_WARNING);
 include DOL_DOCUMENT_ROOT.'/core/tpl/document_actions_post_headers.tpl.php';
 error_reporting($tmperrorreporting);
-
-diffusionPrintLegacyDocumentList($formfile, $object, $upload_dir, $modulepart, $param, $permissiontoadd, $sortfield, $sortorder);
 
 // End of page
 llxFooter();

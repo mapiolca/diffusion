@@ -2,8 +2,12 @@
 
 ## 1.3.0 (16/06/2026)
 
-- FR: Ajout d'un fallback d'affichage pour les documents historiques stockés sous `diffusiondoc/<REF>/`, sans migration physique ni retour au stockage historique.
-- EN: Added a display fallback for historical documents stored under `diffusiondoc/<REF>/`, without physical migration or reverting new storage.
+- FR: Correction des permissions d'accès aux PDF et vignettes de diffusion en alignant les URLs et le stockage documentaire sur le chemin natif `diffusion/diffusiondoc/<REF>/`.
+- EN: Fixed access permissions for diffusion PDFs and previews by aligning document URLs and storage on the native `diffusion/diffusiondoc/<REF>/` path.
+- FR: Ajout d'une migration conservatrice des documents créés dans l'ancien chemin plat `diffusion/<REF>/`, avec mise à jour ECM et `last_main_doc` uniquement pour les fichiers déplacés sans conflit.
+- EN: Added a conservative migration for documents created in the former flat `diffusion/<REF>/` path, updating ECM and `last_main_doc` only for files moved without conflict.
+- FR: Remplacement du fallback d'affichage des anciens documents par une migration vers le chemin natif compatible permissions.
+- EN: Replaced the old-document display fallback with a migration to the native permission-compatible path.
 - FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
 - EN: Harmonized the Diffusion, Attached files and Events/Agenda tab headers, added the generated PDF preview to the header and automatically regenerated the PDF after attached-file changes.
 - FR: Alignement du bloc des derniers événements de la fiche Diffusion sur le réglage natif Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT`.

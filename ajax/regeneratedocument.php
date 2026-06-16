@@ -109,6 +109,7 @@ if (!empty($object->entity) && !in_array((int) $object->entity, $allowedentities
 }
 
 $upload_dir = diffusionGetDocumentUploadDir($object);
+diffusionMigrateFlatDocumentDirectory($db, $object);
 $result = diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'ajaxupload', $files);
 if ($result < 0) {
 	$errors = array();

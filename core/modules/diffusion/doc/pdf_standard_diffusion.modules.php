@@ -35,6 +35,7 @@
  */
 
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
+dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
@@ -582,14 +583,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function prepareDocumentPaths($object)
 	{
-		$entity = !empty($object->entity) ? (int) $object->entity : 1;
-		$moduleoutput = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-		if (empty($moduleoutput)) {
-			global $conf;
-			$baseoutput = !empty($conf->diffusion->multidir_output[$entity]) ? $conf->diffusion->multidir_output[$entity] : DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
-			$moduleoutput = $baseoutput.'/'.dol_sanitizeFileName($object->ref);
-		}
-		$multidir = dirname($moduleoutput);
+		$multidir = function_exists('diffusionGetDocumentBaseOutputDir') ? diffusionGetDocumentBaseOutputDir($object) : '';
 		if (empty($multidir)) {
 			return null;
 		}
@@ -607,7 +601,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			return null;
 		}
 
-		$dir = $moduleoutput;
+		if (function_exists('diffusionMigrateFlatDocumentDirectory')) {
+			diffusionMigrateFlatDocumentDirectory($this->db, $object);
+		}
+
+		$dir = function_exists('diffusionGetDocumentUploadDir') ? diffusionGetDocumentUploadDir($object) : $multidir.'/diffusiondoc/'.$objectref;
 
 		return array(
 			'dir' => $dir,

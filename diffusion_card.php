@@ -513,28 +513,11 @@ $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink
 
 
 $entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-	$conf->diffusion = new stdClass();
+$upload_dir = diffusionGetDocumentUploadDir($object);
+if (!empty($upload_dir)) {
+	diffusionMigrateFlatDocumentDirectory($db, $object);
 }
-if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-	$conf->diffusion->multidir_output = array();
-}
-$defaultdiffusionoutput = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-$diffusionoutput = !empty($conf->diffusion->multidir_output[$entityfordoc]) ? $conf->diffusion->multidir_output[$entityfordoc] : (!empty($conf->diffusion->dir_output) ? $conf->diffusion->dir_output : $defaultdiffusionoutput);
-if ($entityfordoc > 1 && preg_match('/\/'.preg_quote((string) $entityfordoc, '/').'\//', (string) $diffusionoutput) === 0) {
-	$diffusionoutput = $defaultdiffusionoutput;
-}
-$conf->diffusion->multidir_output[$entityfordoc] = $diffusionoutput;
-if (!isset($conf->diffusion->enabled)) {
-	$conf->diffusion->enabled = 1;
-}
-
-$objref = dol_sanitizeFileName($object->ref);
-$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-if (empty($upload_dir)) {
-	$upload_dir = $diffusionoutput.'/'.$objref;
-}
-dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
+dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 //include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
 // EN: Manage attachment upload and deletion with Dolibarr helper to keep buttons functional.
@@ -626,7 +609,9 @@ if (empty($reshook)) {
 	include DOL_DOCUMENT_ROOT.'/core/actions_printing.inc.php';
 
 	// Actions on linked files from the native attached files block.
-	$modulepart = 'diffusion';
+	$object->element = diffusionGetDocumentElement();
+	$modulepart = diffusionGetDocumentModulepart();
+	$relativepathwithnofile = diffusionGetDocumentRelativePath($object);
 	$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
 	$diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
 	$diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
@@ -1492,20 +1477,18 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 		$object->element = "diffusiondoc";
 		if ($includedocgeneration) {
-			$objref = dol_sanitizeFileName($object->ref);
-			$relativepath = $objref;
+			$relativepath = rtrim(diffusionGetDocumentRelativePath($object), '/');
 			$filedir = $upload_dir;
 			$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id.'&entity='.(int) $entityfordoc;
 			$genallowed = $permissiontoread; // If you can read, you can build the PDF to read content
 			$delallowed = $permissiontoadd; // If you can create/edit, you can remove a file on card
-			$modulepart = 'diffusion';
+			$modulepart = diffusionGetDocumentModulepart();
 			dol_syslog(__METHOD__.' showdocuments entity='.(int) $entityfordoc.' relativepath='.$relativepath.' filedir='.$filedir.' modulepart='.$modulepart, LOG_DEBUG);
 			$tmperrorreporting = error_reporting();
 			error_reporting($tmperrorreporting & ~E_WARNING);
 			$moreparam = '&entity='.(int) $entityfordoc;
 			print $formfile->showdocuments($modulepart, $relativepath, $filedir, $urlsource, $genallowed, $delallowed, $object->model_pdf, 1, 0, 0, 28, 0, $moreparam, '', '', $langs->defaultlang);
 			error_reporting($tmperrorreporting);
-			diffusionPrintLegacyDocumentList($formfile, $object, $upload_dir, $modulepart, $moreparam, $delallowed);
 		}
 		/*
 		// Show links to link elements

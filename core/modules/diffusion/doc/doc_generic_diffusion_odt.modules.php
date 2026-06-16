@@ -30,6 +30,7 @@
  */
 
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
+dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
@@ -276,11 +277,9 @@ class doc_generic_diffusion_odt extends ModelePDFDiffusion
 
 		$object->fetch_thirdparty();
 		$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-		if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
-			$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-		}
+		$moduleoutput = function_exists('diffusionGetDocumentBaseOutputDir') ? diffusionGetDocumentBaseOutputDir($object) : '';
 
-		if (!empty($conf->diffusion->multidir_output[$entityfordoc])) {
+		if (!empty($moduleoutput)) {
 
 			if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
 				$conf->diffusion = new stdClass();
@@ -292,13 +291,10 @@ class doc_generic_diffusion_odt extends ModelePDFDiffusion
 				$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
 			}
 			$objectref = dol_sanitizeFileName($object->ref);
-			$dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-			if (empty($dir)) {
-				$dir = $conf->diffusion->multidir_output[$entityfordoc];
-				if (!preg_match('/specimen/i', $objectref)) {
-					$dir .= "/".$objectref;
-				}
+			if (function_exists('diffusionMigrateFlatDocumentDirectory')) {
+				diffusionMigrateFlatDocumentDirectory($this->db, $object);
 			}
+			$dir = function_exists('diffusionGetDocumentUploadDir') ? diffusionGetDocumentUploadDir($object) : $moduleoutput.'/diffusiondoc/'.$objectref;
 			$file = $dir."/".$objectref.".odt";
 
 			if (!file_exists($dir)) {
