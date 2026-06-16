@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction de la pagination du PDF Diffusion pour réserver systématiquement la zone de pied de page lors du rendu des descriptions HTML, tableaux, contacts et pièces jointes.
+- EN: Fixed Diffusion PDF pagination to consistently reserve the footer area while rendering HTML descriptions, tables, contacts and attachments.
 - FR: Correction des liens d'ouverture des PDF Diffusion pour référencer les fichiers sous `diffusion/<référence>/` au lieu de `diffusion/diffusiondoc/<référence>/`.
 - EN: Fixed Diffusion PDF opening links so files are referenced under `diffusion/<reference>/` instead of `diffusion/diffusiondoc/<reference>/`.
 - FR: Alignement des switches de modes de contact Diffusion sur le paramètre natif Dolibarr de désactivation JavaScript/Ajax, avec fallback non-Ajax sécurisé et retour fiche.
