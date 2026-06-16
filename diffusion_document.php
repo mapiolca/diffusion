@@ -190,6 +190,8 @@ if (empty($object->id)) {
  * Actions
  */
 
+$error = 0;
+
 if ($action == 'remove_file' && !empty($permissiontoadd) && $object->id > 0) {
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 	$filetodelete = GETPOST('file', 'alpha');
@@ -212,34 +214,11 @@ if ($action == 'remove_file' && !empty($permissiontoadd) && $object->id > 0) {
 	$action = '';
 }
 
+$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
 include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
-
-if (GETPOST('sendit', 'alpha') && !empty($permissiontoadd) && getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD')) {
-	$relUploadDir = preg_replace('/^'.preg_quote(DOL_DATA_ROOT, '/').'/', '', $upload_dir);
-	dol_syslog(__METHOD__.' sendit entity='.(int) $entityfordoc.' upload_dir='.$upload_dir.' relUploadDir='.$relUploadDir, LOG_DEBUG);
-	if (!preg_match('/[\\/]temp[\\/]|[\\/]thumbs|\.meta$/', $relUploadDir)) {
-		$relUploadDir = preg_replace('/[\\/]$/', '', $relUploadDir);
-		$relUploadDir = preg_replace('/^[\\/]/', '', $relUploadDir);
-
-		require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
-
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."ecm_files";
-		$sql .= " WHERE src_object_type = '".$db->escape($object->table_element)."'";
-		$sql .= " AND src_object_id = ".((int) $object->id);
-		$sql .= " AND filepath = '".$db->escape($relUploadDir)."'";
-		$sql .= " AND (share IS NULL OR share = '')";
-		$resql = $db->query($sql);
-		if ($resql) {
-			while ($objFile = $db->fetch_object($resql)) {
-				$ecmfile = new EcmFiles($db);
-				if ($ecmfile->fetch((int) $objFile->rowid) > 0 && empty($ecmfile->share)) {
-					$ecmfile->share = getRandomPassword(true);
-					$ecmfile->update($user);
-				}
-			}
-		}
-	}
+if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionPostProcessUploadedFiles')) {
+	dol_syslog(__METHOD__.' post upload processing entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
+	diffusionPostProcessUploadedFiles($db, $object, $upload_dir, $user, $langs);
 }
 
 /*
@@ -333,6 +312,7 @@ print dol_get_fiche_end();
 
 $modulepart = 'diffusion';
 $param = '&id='.$object->id.'&entity='.(int) $entityfordoc;
+$permtoedit = $permissiontoadd;
 //$relativepathwithnofile='diffusion/' . dol_sanitizeFileName($object->id).'/';
 $relativepathwithnofile = $object->element.'/'.dol_sanitizeFileName($object->ref).'/';
 dol_syslog(__METHOD__.' document_actions_post_headers entity='.(int) $entityfordoc.' relativepathwithnofile='.$relativepathwithnofile.' modulepart='.$modulepart, LOG_DEBUG);

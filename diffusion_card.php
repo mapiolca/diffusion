@@ -555,6 +555,14 @@ if (empty($reshook)) {
 	// Actions when printing a doc from card
 	include DOL_DOCUMENT_ROOT.'/core/actions_printing.inc.php';
 
+	// Actions on linked files from the native attached files block.
+	$modulepart = 'diffusion';
+	$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
+	include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
+	if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionPostProcessUploadedFiles')) {
+		diffusionPostProcessUploadedFiles($db, $object, $upload_dir, $user, $langs);
+	}
+
 // Action to move up and down lines of object
 //include DOL_DOCUMENT_ROOT.'/core/actions_lineupdown.inc.php';
 
@@ -1065,40 +1073,67 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 			$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_help', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('SelectProjectContactsToImport').'</span>');
 
+			$contactrows = array();
 			foreach (array('internal' => (array) $internalcontacts, 'external' => (array) $externalcontacts) as $source => $contacts) {
 				foreach ($contacts as $contactline) {
+					$contactid = (int) ($contactline['id'] ?? 0);
+					$contacttypeid = (int) ($contactline['fk_c_type_contact'] ?? 0);
+					if ($contactid <= 0 || $contacttypeid <= 0) {
+						continue;
+					}
+
 					$contactlabel = '';
 					if ($source === 'internal') {
 						$usercontact = new User($db);
-						if ($usercontact->fetch((int) $contactline['id']) > 0) {
+						if ($usercontact->fetch($contactid) > 0) {
 							$contactlabel = $usercontact->getFullName($langs);
 						}
 					} else {
 						$soccontact = new Contact($db);
-						if ($soccontact->fetch((int) $contactline['id']) > 0) {
+						if ($soccontact->fetch($contactid) > 0) {
 							$contactlabel = $soccontact->getFullName($langs);
 						}
 					}
 
 					if (empty($contactlabel)) {
-						$contactlabel = $langs->trans('Contact').' #'.((int) $contactline['id']);
+						$contactlabel = $langs->trans('Contact').' #'.$contactid;
 					}
 
-					$contacttype = dol_escape_htmltag($contactline['libelle']);
-					$checkboxlabel = dol_escape_htmltag($contactlabel).' <span class="opacitymedium">('.$contacttype.')</span>';
-					$formquestion[] = array(
-						'type' => 'checkbox',
-						'name' => 'projectcontacts_'.$source.'_'.((int) $contactline['id']).'_'.((int) $contactline['fk_c_type_contact']),
-						'label' => $checkboxlabel,
-						'value' => $source.':'.((int) $contactline['id']).':'.((int) $contactline['fk_c_type_contact'])
+					$contactrows[] = array(
+						'source' => $source,
+						'id' => $contactid,
+						'typeid' => $contacttypeid,
+						'label' => $contactlabel,
+						'type' => (string) ($contactline['libelle'] ?? ''),
 					);
 				}
 			}
 
-			if (count($formquestion) === 1) {
+			if (empty($contactrows)) {
 				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_empty', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('NoProjectContactsToImport').'</span>');
+			} else {
+				$tableid = 'diffusion-project-contacts-'.((int) $object->id);
+				$tablehtml = '<table class="noborder centpercent diffusion-project-contacts-table" id="'.$tableid.'">';
+				$tablehtml .= '<tr class="liste_titre">';
+				$tablehtml .= '<th class="center"><a href="#" class="diffusion-select-all-project-contacts" data-target="'.$tableid.'">'.$langs->trans('SelectAllProjectContacts').'</a></th>';
+				$tablehtml .= '<th>'.$langs->trans('Contact').'</th>';
+				$tablehtml .= '<th>'.$langs->trans('Type').'</th>';
+				$tablehtml .= '<th>'.$langs->trans('Source').'</th>';
+				$tablehtml .= '</tr>';
+				foreach ($contactrows as $contactrow) {
+					$value = $contactrow['source'].':'.((int) $contactrow['id']).':'.((int) $contactrow['typeid']);
+					$tablehtml .= '<tr class="oddeven">';
+					$tablehtml .= '<td class="center"><input type="checkbox" class="flat diffusion-project-contact-checkbox" name="projectcontacts[]" value="'.dol_escape_htmltag($value).'"></td>';
+					$tablehtml .= '<td>'.dol_escape_htmltag($contactrow['label']).'</td>';
+					$tablehtml .= '<td>'.dol_escape_htmltag($contactrow['type']).'</td>';
+					$tablehtml .= '<td>'.$langs->trans($contactrow['source'] === 'internal' ? 'Internal' : 'External').'</td>';
+					$tablehtml .= '</tr>';
+				}
+				$tablehtml .= '</table>';
+
+				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_table', 'label' => '', 'value' => $tablehtml);
 			}
-			$contactlinecount = max(0, count($formquestion) - 1);
+			$contactlinecount = count($contactrows);
 			$popupheight = 280 + (35 * $contactlinecount);
 			$popupheight = min(760, max(360, $popupheight));
 			$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('ImportProjectContacts'), $langs->trans('ConfirmImportProjectContacts'), 'importprojectcontacts', $formquestion, 'yes', 1, $popupheight);

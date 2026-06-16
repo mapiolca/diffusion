@@ -120,7 +120,23 @@ class ActionsDiffusion
 	 */
 	public static function getNotificationEventCodes()
 	{
-		return array_keys(self::getBusinessEventsDefinition());
+		$events = array_keys(self::getBusinessEventsDefinition());
+		return array_values(array_diff($events, self::getExcludedNotificationEventCodes()));
+	}
+
+	/**
+	 * Return business event codes intentionally hidden from native notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getExcludedNotificationEventCodes()
+	{
+		return array(
+			'DIFFUSION_CANCEL',
+			'DIFFUSION_REOPEN',
+			'DIFFUSION_DIFFUSION_MODIFY',
+			'DIFFUSIONCONTACT_DELETEALL',
+		);
 	}
 
 	/**
@@ -132,7 +148,7 @@ class ActionsDiffusion
 	public static function repairNotificationActionTriggerElementTypes($db)
 	{
 		$codes = array();
-		foreach (self::getNotificationEventCodes() as $code) {
+		foreach (array_keys(self::getBusinessEventsDefinition()) as $code) {
 			$codes[] = "'".$db->escape($code)."'";
 		}
 		if (empty($codes)) {
@@ -1520,7 +1536,9 @@ class ActionsDiffusion
 			$events = array_merge($hookmanager->resArray['arrayofnotifsupported'], $events);
 		}
 
-		$this->results = array('arrayofnotifsupported' => array_values(array_unique($events)));
+		$events = array_values(array_diff(array_unique($events), self::getExcludedNotificationEventCodes()));
+
+		$this->results = array('arrayofnotifsupported' => $events);
 
 		return 0;
 	}

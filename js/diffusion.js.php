@@ -158,6 +158,17 @@ jQuery(document).ready(function () {
 
 	diffusionEnhanceEmailTemplateSubstitutionTooltips();
 
+	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
+		var target = jQuery(this).data('target');
+
+		event.preventDefault();
+		if (!target) {
+			return;
+		}
+
+		jQuery('#' + target).find('input.diffusion-project-contact-checkbox').prop('checked', true);
+	});
+
 	if (!jQuery('body').hasClass('page-notification')) {
 		return;
 	}

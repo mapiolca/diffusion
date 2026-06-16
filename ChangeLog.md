@@ -30,6 +30,14 @@
 - EN: Declared Diffusion substitution variables in native email template help, with French and English labels.
 - FR: Ajout de l'aide native des variables Diffusion dans les modèles de courriel et les descriptions de modèles, avec substitution de la description à la création depuis modèle.
 - EN: Added native Diffusion variable help in email templates and template descriptions, with description substitution when creating from a template.
+- FR: Nettoyage des événements exposés au module Notifications pour masquer les triggers sans action utilisateur active ou trop bruités.
+- EN: Cleaned up events exposed to the Notifications module by hiding triggers without active user actions or too noisy.
+- FR: Amélioration des listes Diffusion avec tri par défaut métier et meilleure prise en charge des filtres/ordres natifs de `/admin/defaultvalues.php`.
+- EN: Improved Diffusion lists with business default sorting and better support for native `/admin/defaultvalues.php` filters/sort orders.
+- FR: Amélioration de l'import des contacts projet avec une sélection décochée par défaut et un lien de sélection globale.
+- EN: Improved project contact import with unchecked rows by default and a select-all link.
+- FR: Alignement de la fiche principale sur la gestion native des fichiers joints et régénération non bloquante du PDF après upload.
+- EN: Aligned the main card with native attached-file handling and added non-blocking PDF regeneration after upload.
 
 ## 1.2.4 (15/06/2026)
 

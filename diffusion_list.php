@@ -97,6 +97,71 @@ require_once __DIR__.'/class/diffusion.class.php';
  * @var User $user
  */
 
+/**
+ * Normalize scalar or array filter values into an integer array.
+ *
+ * @param mixed $value Submitted or default filter value
+ * @return int[]
+ */
+function diffusionListNormalizeSearchIntArray($value)
+{
+	$values = is_array($value) ? $value : explode(',', (string) $value);
+	$result = array();
+	foreach ($values as $item) {
+		if ($item === '' || $item === null) {
+			continue;
+		}
+		$result[] = (int) $item;
+	}
+
+	return $result;
+}
+
+/**
+ * Complete extrafield search values from native default filters when core helper skipped them.
+ *
+ * @param array<string,mixed> $search_array_options Search values returned by ExtraFields
+ * @param ExtraFields         $extrafields          Extrafields handler
+ * @param string              $table_element        Table element key
+ * @return void
+ */
+function diffusionListCompleteExtrafieldSearchDefaults(&$search_array_options, $extrafields, $table_element)
+{
+	if (empty($extrafields->attributes[$table_element]['label']) || !is_array($extrafields->attributes[$table_element]['label'])) {
+		return;
+	}
+
+	foreach ($extrafields->attributes[$table_element]['label'] as $key => $label) {
+		$optionkey = 'options_'.$key;
+		$hasvalue = isset($search_array_options[$optionkey]) && $search_array_options[$optionkey] !== '' && $search_array_options[$optionkey] !== array();
+		if ($hasvalue) {
+			continue;
+		}
+
+		$fieldname = 'search_'.$optionkey;
+		$arrayvalue = GETPOST($fieldname, 'array');
+		if (is_array($arrayvalue)) {
+			$filteredarrayvalue = array();
+			foreach ($arrayvalue as $arrayitem) {
+				if ($arrayitem === '' || $arrayitem === null) {
+					continue;
+				}
+				$filteredarrayvalue[] = $arrayitem;
+			}
+			$arrayvalue = $filteredarrayvalue;
+			if (!empty($arrayvalue)) {
+				$search_array_options[$optionkey] = $arrayvalue;
+				continue;
+			}
+		}
+
+		$scalarvalue = GETPOST($fieldname, 'restricthtml');
+		if ($scalarvalue !== '') {
+			$search_array_options[$optionkey] = $scalarvalue;
+		}
+	}
+}
+
 // Load translation files required by the page
 $langs->loadLangs(array("diffusion@diffusion", "other"));
 
@@ -113,8 +178,14 @@ $optioncss  = GETPOST('optioncss', 'aZ'); // Option for the css output (always '
 $mode       = GETPOST('mode', 'aZ'); // The display mode ('list', 'kanban', 'hierarchy', 'calendar', 'gantt', ...)
 $groupby = GETPOST('groupby', 'aZ09');	// Example: $groupby = 'p.fk_opp_status' or $groupby = 'p.fk_statut'
 $show_templates = GETPOSTINT('show_templates');
-$search_entity = GETPOST('search_entity', 'array:int');
-$search_fk_user_exped = GETPOST('search_fk_user_exped', 'array:int');
+$search_entity = diffusionListNormalizeSearchIntArray(GETPOST('search_entity', 'array:int'));
+$search_fk_user_exped = diffusionListNormalizeSearchIntArray(GETPOST('search_fk_user_exped', 'array:int'));
+if (empty($search_entity) && GETPOST('search_entity', 'alphanohtml') !== '') {
+	$search_entity = diffusionListNormalizeSearchIntArray(GETPOST('search_entity', 'alphanohtml'));
+}
+if (empty($search_fk_user_exped) && GETPOST('search_fk_user_exped', 'alphanohtml') !== '') {
+	$search_fk_user_exped = diffusionListNormalizeSearchIntArray(GETPOST('search_fk_user_exped', 'alphanohtml'));
+}
 $entityfilteroptions = array();
 $senderfilteroptions = array();
 $showentitycolumn = false;
@@ -165,13 +236,18 @@ $extrafields->fetch_name_optionals_label($object->table_element);
 //$extrafields->fetch_name_optionals_label($object->table_element_line);
 
 $search_array_options = $extrafields->getOptionalsFromPost($object->table_element, '', 'search_');
+diffusionListCompleteExtrafieldSearchDefaults($search_array_options, $extrafields, $object->table_element);
 
 // Default sort order (if not yet defined by previous GETPOST)
 if (!$sortfield) {
-	reset($object->fields);					// Reset is required to avoid key() to return null.
-	$sortfield = "t.".key($object->fields); // Set here default search field. By default 1st field in definition.
-}
-if (!$sortorder) {
+	if ($show_templates) {
+		$sortfield = "t.ref";
+		$sortorder = $sortorder ?: "ASC";
+	} else {
+		$sortfield = "t.date_creation,t.rowid";
+		$sortorder = $sortorder ?: "DESC,DESC";
+	}
+} elseif (!$sortorder) {
 	$sortorder = "ASC";
 }
 
@@ -187,7 +263,13 @@ if (empty($search_fk_user_exped) || !is_array($search_fk_user_exped)) {
 foreach ($object->fields as $key => $val) {
 	if ($key === 'fk_user_exped') {
 		if (!empty($search_fk_user_exped)) {
-			$search[$key] = array_filter($search_fk_user_exped, 'strlen');
+			$search[$key] = array();
+			foreach ($search_fk_user_exped as $searchsenderid) {
+				if ($searchsenderid === '' || $searchsenderid === null) {
+					continue;
+				}
+				$search[$key][] = (int) $searchsenderid;
+			}
 		}
 	} elseif (GETPOST('search_'.$key, 'alpha') !== '') {
 		$search[$key] = GETPOST('search_'.$key, 'alpha');
@@ -318,6 +400,8 @@ if (empty($reshook)) {
 		}
 		$search_all = '';
 		$toselect = array();
+		$search_entity = array();
+		$search_fk_user_exped = array();
 		$search_array_options = array();
 	}
 	if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')
@@ -395,7 +479,13 @@ $sql .= " AND t.is_template = ".$show_templates;
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
 		if ($key === 'fk_user_exped' && is_array($search[$key])) {
-			$searchsenderids = array_map('intval', array_filter($search[$key], 'strlen'));
+			$searchsenderids = array();
+			foreach ($search[$key] as $searchsenderid) {
+				if ($searchsenderid === '' || $searchsenderid === null) {
+					continue;
+				}
+				$searchsenderids[] = (int) $searchsenderid;
+			}
 			if (!empty($searchsenderids)) {
 				$sql .= " AND t.fk_user_exped IN (".implode(', ', $searchsenderids).")";
 			}
@@ -435,7 +525,13 @@ foreach ($search as $key => $val) {
 	}
 }
 if ($showentitycolumn && !empty($search_entity)) {
-	$searchentityids = array_map('intval', array_filter($search_entity, 'strlen'));
+	$searchentityids = array();
+	foreach ($search_entity as $searchentityid) {
+		if ($searchentityid === '' || $searchentityid === null) {
+			continue;
+		}
+		$searchentityids[] = (int) $searchentityid;
+	}
 	if (!empty($searchentityids)) {
 		$sql .= " AND t.entity IN (".implode(', ', $searchentityids).")";
 	}

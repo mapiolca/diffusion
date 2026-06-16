@@ -128,3 +128,94 @@ function diffusionPrepareHead($object)
 
 	return $head;
 }
+
+/**
+ * Complete missing public ECM shares for files attached to a diffusion.
+ *
+ * @param DoliDB       $db         Database handler
+ * @param Diffusion    $object     Diffusion object
+ * @param string       $upload_dir Absolute upload directory
+ * @param User         $user       Current user
+ * @return int                     Number of completed shares, <0 on error
+ */
+function diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user)
+{
+	if (empty($object->id) || empty($upload_dir) || !getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD')) {
+		return 0;
+	}
+
+	$relUploadDir = preg_replace('/^'.preg_quote(DOL_DATA_ROOT, '/').'/', '', (string) $upload_dir);
+	if (preg_match('/[\\/]temp[\\/]|[\\/]thumbs|\.meta$/', $relUploadDir)) {
+		return 0;
+	}
+
+	$relUploadDir = preg_replace('/[\\/]$/', '', $relUploadDir);
+	$relUploadDir = preg_replace('/^[\\/]/', '', $relUploadDir);
+
+	require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
+
+	$sql = "SELECT rowid";
+	$sql .= " FROM ".MAIN_DB_PREFIX."ecm_files";
+	$sql .= " WHERE src_object_type = '".$db->escape($object->table_element)."'";
+	$sql .= " AND src_object_id = ".((int) $object->id);
+	$sql .= " AND filepath = '".$db->escape($relUploadDir)."'";
+	$sql .= " AND (share IS NULL OR share = '')";
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		return -1;
+	}
+
+	$count = 0;
+	while ($objFile = $db->fetch_object($resql)) {
+		$ecmfile = new EcmFiles($db);
+		if ($ecmfile->fetch((int) $objFile->rowid) > 0 && empty($ecmfile->share)) {
+			$ecmfile->share = getRandomPassword(true);
+			$updateresult = $ecmfile->update($user);
+			if ($updateresult < 0) {
+				$db->free($resql);
+				return -1;
+			}
+			$count++;
+		}
+	}
+	$db->free($resql);
+
+	return $count;
+}
+
+/**
+ * Run non-blocking post-upload processing on diffusion files.
+ *
+ * @param DoliDB       $db         Database handler
+ * @param Diffusion    $object     Diffusion object
+ * @param string       $upload_dir Absolute upload directory
+ * @param User         $user       Current user
+ * @param Translate    $langs      Translation handler
+ * @return int<-1,1>               1 if OK, -1 if a warning was raised
+ */
+function diffusionPostProcessUploadedFiles($db, $object, $upload_dir, $user, $langs)
+{
+	if (empty($object->id) || !empty($object->is_template)) {
+		return 1;
+	}
+
+	$error = 0;
+
+	$shareresult = diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user);
+	if ($shareresult < 0) {
+		$error++;
+		setEventMessages($db->lasterror(), null, 'warnings');
+	}
+
+	$object->fetch((int) $object->id);
+	$result = $object->generateDocument('', $langs);
+	if ($result < 0) {
+		$error++;
+		$message = !empty($object->error) ? $object->error : $langs->trans('DiffusionDocumentRegenerationAfterUploadFailed');
+		setEventMessages($message, $object->errors, 'warnings');
+	}
+
+	return $error ? -1 : 1;
+}
