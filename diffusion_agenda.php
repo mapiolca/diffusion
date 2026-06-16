@@ -154,7 +154,7 @@ if ($id > 0 || !empty($ref)) {
 	}
 	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
 	if (empty($upload_dir)) {
-		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element.'/'.dol_sanitizeFileName($object->ref);
+		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.dol_sanitizeFileName($object->ref);
 	}
 }
 

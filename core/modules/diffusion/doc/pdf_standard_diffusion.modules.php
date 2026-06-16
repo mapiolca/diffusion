@@ -571,7 +571,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		if (empty($moduleoutput)) {
 			global $conf;
 			$baseoutput = !empty($conf->diffusion->multidir_output[$entity]) ? $conf->diffusion->multidir_output[$entity] : DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
-			$moduleoutput = $baseoutput.'/'.$object->element.'/'.dol_sanitizeFileName($object->ref);
+			$moduleoutput = $baseoutput.'/'.dol_sanitizeFileName($object->ref);
 		}
 		$multidir = dirname($moduleoutput);
 		if (empty($multidir)) {

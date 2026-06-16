@@ -94,7 +94,7 @@ function diffusionPrepareHead($object)
 		}
 		$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
 		if (empty($upload_dir)) {
-			$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".$object->element."/".dol_sanitizeFileName($object->ref);
+			$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".dol_sanitizeFileName($object->ref);
 		}
 		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta|_preview.*\.png)$'));
 		$nbLinks = Link::count($db, $object->element, $object->id);

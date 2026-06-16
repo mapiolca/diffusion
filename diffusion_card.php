@@ -461,7 +461,7 @@ if (!isset($conf->diffusion->enabled)) {
 $objref = dol_sanitizeFileName($object->ref);
 $upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
 if (empty($upload_dir)) {
-	$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+	$upload_dir = $diffusionoutput.'/'.$objref;
 }
 dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
 //include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
@@ -474,7 +474,6 @@ dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutpu
 			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 			$langs->load("other");
-			//$upload_dir = $conf->diffusion->multidir_output[isset($object->entity) ? $object->entity : 1].'/'.$object->element.'/'.$objref;
 			$filetodelete = GETPOST('file', 'alpha');
 			$filetodelete = ltrim((string) $filetodelete, '/');
 			$fullpathtodelete = '';
@@ -1466,7 +1465,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$object->element = "diffusiondoc";
 		if ($includedocgeneration) {
 			$objref = dol_sanitizeFileName($object->ref);
-			$relativepath = $object->element.'/'.$objref;
+			$relativepath = $objref;
 			$filedir = $upload_dir;
 			$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id.'&entity='.(int) $entityfordoc;
 			$genallowed = $permissiontoread; // If you can read, you can build the PDF to read content

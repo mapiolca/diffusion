@@ -160,7 +160,7 @@ if ($id > 0 || !empty($ref)) {
 	$objref = dol_sanitizeFileName($object->ref);
 	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
 	if (empty($upload_dir)) {
-		$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
+		$upload_dir = $diffusionoutput.'/'.$objref;
 	}
 	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
 }
@@ -314,7 +314,7 @@ $modulepart = 'diffusion';
 $param = '&id='.$object->id.'&entity='.(int) $entityfordoc;
 $permtoedit = $permissiontoadd;
 //$relativepathwithnofile='diffusion/' . dol_sanitizeFileName($object->id).'/';
-$relativepathwithnofile = $object->element.'/'.dol_sanitizeFileName($object->ref).'/';
+$relativepathwithnofile = dol_sanitizeFileName($object->ref).'/';
 dol_syslog(__METHOD__.' document_actions_post_headers entity='.(int) $entityfordoc.' relativepathwithnofile='.$relativepathwithnofile.' modulepart='.$modulepart, LOG_DEBUG);
 
 $tmperrorreporting = error_reporting();

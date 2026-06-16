@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction des liens d'ouverture des PDF Diffusion pour référencer les fichiers sous `diffusion/<référence>/` au lieu de `diffusion/diffusiondoc/<référence>/`.
+- EN: Fixed Diffusion PDF opening links so files are referenced under `diffusion/<reference>/` instead of `diffusion/diffusiondoc/<reference>/`.
 - FR: Alignement des switches de modes de contact Diffusion sur le paramètre natif Dolibarr de désactivation JavaScript/Ajax, avec fallback non-Ajax sécurisé et retour fiche.
 - EN: Aligned Diffusion contact method switches with the native Dolibarr JavaScript/Ajax disable setting, with a secured non-Ajax fallback and card redirect.
 - FR: Correction des contacts de diffusion en laissant l'entité portée par la diffusion parente, sans colonne `entity` sur `diffusion_contact`, pour restaurer l'ajout de contacts et les switches de diffusion.

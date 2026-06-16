@@ -294,7 +294,7 @@ class doc_generic_diffusion_odt extends ModelePDFDiffusion
 			$objectref = dol_sanitizeFileName($object->ref);
 			$dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
 			if (empty($dir)) {
-				$dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.$object->element;
+				$dir = $conf->diffusion->multidir_output[$entityfordoc];
 				if (!preg_match('/specimen/i', $objectref)) {
 					$dir .= "/".$objectref;
 				}
