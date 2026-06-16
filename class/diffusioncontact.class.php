@@ -272,6 +272,10 @@ class DiffusionContact extends CommonObject
 		$source = strtolower((string) $source);
 		$source = preg_replace('/[^a-z0-9_]/', '', $source);
 		$typeContactId = (int) $typeContactId;
+		$this->fk_diffusion = $diffusionId;
+		$this->fk_contact = $contactId;
+		$this->contact_source = $source;
+		$this->fk_type_contact = $typeContactId;
 
 		if ($diffusionId <= 0 || $contactId <= 0 || empty($source)) {
 			$this->error = $langs->trans('DiffusionContactSyncError');
@@ -475,6 +479,7 @@ class DiffusionContact extends CommonObject
 			$sql .= ' sp.fk_soc as contact_fk_soc,';
 			$sql .= ' s.nom as company_name';
 			$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
+			$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'diffusion as d ON d.rowid = dc.fk_diffusion';
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."element_contact as ec ON ec.element = 'diffusion'";
 			$sql .= ' AND ec.fk_element = dc.fk_diffusion';
 			$sql .= " AND ((dc.contact_source = 'internal' AND ec.source = 'internal' AND ec.fk_user = dc.fk_contact)";
@@ -484,6 +489,7 @@ class DiffusionContact extends CommonObject
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."socpeople as sp ON (dc.contact_source = 'external' AND sp.rowid = dc.fk_contact)";
 			$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'societe as s ON sp.fk_soc = s.rowid';
 			$sql .= ' WHERE dc.fk_diffusion = ' . $diffusionId;
+			$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
 			$sql .= ' ORDER BY COALESCE(ec.position, dc.rowid), dc.rowid';
 
 			$resql = $this->db->query($sql);
@@ -539,6 +545,10 @@ class DiffusionContact extends CommonObject
                 $source = strtolower((string) $source);
                 $source = preg_replace('/[^a-z0-9_]/', '', $source);
                 $typeContactId = (int) $typeContactId;
+		$this->fk_diffusion = $diffusionId;
+		$this->fk_contact = $contactId;
+		$this->contact_source = $source;
+		$this->fk_type_contact = $typeContactId;
 
                 if ($diffusionId <= 0 || $contactId <= 0 || empty($source)) {
                         $this->error = $langs->trans('DiffusionContactRemoveError');
@@ -553,6 +563,25 @@ class DiffusionContact extends CommonObject
 			}
 
 			return -1;
+		}
+
+		$sqlselect = 'SELECT rowid FROM '.MAIN_DB_PREFIX."diffusion_contact";
+		$sqlselect .= ' WHERE fk_diffusion = '.$diffusionId;
+		$sqlselect .= ' AND fk_contact = '.$contactId;
+		$sqlselect .= " AND contact_source = '".$this->db->escape($source)."'";
+		if ($typeContactId > 0) {
+			$sqlselect .= ' AND fk_type_contact = '.$typeContactId;
+		} else {
+			$sqlselect .= ' AND fk_type_contact IS NULL';
+		}
+		$sqlselect .= ' LIMIT 1';
+		$resqlselect = $this->db->query($sqlselect);
+		if ($resqlselect) {
+			$objselect = $this->db->fetch_object($resqlselect);
+			if ($objselect) {
+				$this->id = (int) $objselect->rowid;
+			}
+			$this->db->free($resqlselect);
 		}
 
 		$sql = 'DELETE FROM '.MAIN_DB_PREFIX."diffusion_contact";

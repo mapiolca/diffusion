@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Ajout des contacts de diffusion comme participants natifs des événements Agenda générés, via les ressources `user` et `socpeople` de Dolibarr.
+- EN: Added Diffusion contacts as native participants of generated Agenda events, using Dolibarr `user` and `socpeople` resources.
 - FR: Renforcement de l'emprise réservée aux pieds de page PDF Diffusion avec mesure réelle du rendu natif et neutralisation des sauts automatiques pendant l'impression du pied.
 - EN: Strengthened the reserved area for Diffusion PDF footers with real native footer measurement and disabled automatic page breaks while rendering the footer.
 - FR: Recalage des pieds de page PDF Diffusion sur le pattern natif Dolibarr, avec texte libre uniquement sur la dernière page et pied simplifié sur les pages intermédiaires.
