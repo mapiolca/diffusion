@@ -38,6 +38,7 @@ Diffusioncontact@diffusion = Diffusion contact
 # EN: Strings used for the PDF contacts and attachments sections.
 DiffusionAttachmentLine = %s (%s)
 DiffusionAttachmentsTitle = Attached documents
+DiffusionHistoricalDocuments = Historical documents
 DiffusionContact = Diffusion contact
 DiffusionContacts = Diffusion contacts
 DiffusionContactsTitle = Diffusion contacts

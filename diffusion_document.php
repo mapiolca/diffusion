@@ -240,9 +240,13 @@ print dol_get_fiche_head($head, 'document', $langs->trans("Diffusion"), -1, $obj
 
 
 // Build file list
-$filearray = dol_dir_list($upload_dir, "files", 0, '', '(\.meta|_preview.*\.png)$', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1);
+$filearray = dol_dir_list($upload_dir, "files", 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1);
+$legacyfilearray = diffusionGetLegacyDocumentFileArray($object, $upload_dir, $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC));
 $totalsize = 0;
 foreach ($filearray as $key => $file) {
+	$totalsize += $file['size'];
+}
+foreach ($legacyfilearray as $key => $file) {
 	$totalsize += $file['size'];
 }
 
@@ -258,7 +262,7 @@ print '<div class="underbanner clearboth"></div>';
 print '<table class="border centpercent tableforfield">';
 
 // Number of files
-print '<tr><td class="titlefield">'.$langs->trans("NbOfAttachedFiles").'</td><td colspan="3">'.count($filearray).'</td></tr>';
+print '<tr><td class="titlefield">'.$langs->trans("NbOfAttachedFiles").'</td><td colspan="3">'.(count($filearray) + count($legacyfilearray)).'</td></tr>';
 
 // Total size
 print '<tr><td>'.$langs->trans("TotalSizeOfAttachedFiles").'</td><td colspan="3">'.$totalsize.' '.$langs->trans("bytes").'</td></tr>';
@@ -280,6 +284,8 @@ $tmperrorreporting = error_reporting();
 error_reporting($tmperrorreporting & ~E_WARNING);
 include DOL_DOCUMENT_ROOT.'/core/tpl/document_actions_post_headers.tpl.php';
 error_reporting($tmperrorreporting);
+
+diffusionPrintLegacyDocumentList($formfile, $object, $upload_dir, $modulepart, $param, $permissiontoadd, $sortfield, $sortorder);
 
 // End of page
 llxFooter();

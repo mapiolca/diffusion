@@ -96,7 +96,8 @@ function diffusionPrepareHead($object)
 		if (empty($upload_dir)) {
 			$upload_dir = $conf->diffusion->multidir_output[$entityfordoc]."/".dol_sanitizeFileName($object->ref);
 		}
-		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta|_preview.*\.png)$'));
+		$nbFiles = count(dol_dir_list($upload_dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)'));
+		$nbFiles += count(diffusionGetLegacyDocumentFileArray($object, $upload_dir));
 		$nbLinks = Link::count($db, $object->element, $object->id);
 		$head[$h][0] = dol_buildpath("/diffusion/diffusion_document.php", 1).'?id='.$object->id;
 		$head[$h][1] = $langs->trans('AttachedFiles');
@@ -331,6 +332,175 @@ function diffusionGetDocumentUploadDir($object)
 }
 
 /**
+ * Return the legacy Diffusion document directory used before the storage path was aligned on modulepart.
+ *
+ * @param Diffusion $object     Diffusion object
+ * @param string    $upload_dir Current absolute upload directory
+ * @return string               Absolute legacy document directory
+ */
+function diffusionGetLegacyDocumentUploadDir($object, $upload_dir = '')
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return '';
+	}
+
+	if (empty($upload_dir)) {
+		$upload_dir = diffusionGetDocumentUploadDir($object);
+	}
+	if (empty($upload_dir)) {
+		return '';
+	}
+
+	return rtrim(dirname(rtrim((string) $upload_dir, '/\\')).'/diffusiondoc/'.dol_sanitizeFileName($object->ref), '/\\');
+}
+
+/**
+ * Return the relative legacy path for document.php and FormFile links.
+ *
+ * @param Diffusion $object Diffusion object
+ * @return string           Relative path with trailing slash
+ */
+function diffusionGetLegacyDocumentRelativePath($object)
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return '';
+	}
+
+	return 'diffusiondoc/'.dol_sanitizeFileName($object->ref).'/';
+}
+
+/**
+ * Tell if a legacy file must be hidden from attached document lists.
+ *
+ * @param string $filename File name or path
+ * @return bool            True when the file is technical
+ */
+function diffusionIsIgnoredLegacyDocumentFile($filename)
+{
+	$filename = str_replace('\\', '/', (string) $filename);
+	$basename = basename($filename);
+
+	return $basename === ''
+		|| $basename === '.'
+		|| $basename === '..'
+		|| preg_match('/(^|\/)thumbs(\/|$)/i', $filename)
+		|| preg_match('/\.meta$/i', $basename)
+		|| preg_match('/\.tmp$/i', $basename)
+		|| preg_match('/_preview.*\.png$/i', $basename)
+		|| preg_match('/\.preview\.png$/i', $basename);
+}
+
+/**
+ * Return real legacy files that should be shown as a fallback.
+ *
+ * @param Diffusion $object     Diffusion object
+ * @param string    $upload_dir Current absolute upload directory
+ * @param string    $sortfield  Sort field for dol_dir_list
+ * @param int       $sortorder  Sort order for dol_dir_list
+ * @return array<int,array<string,mixed>> File array compatible with FormFile::list_of_documents()
+ */
+function diffusionGetLegacyDocumentFileArray($object, $upload_dir = '', $sortfield = 'name', $sortorder = SORT_ASC)
+{
+	if (!is_object($object) || empty($object->ref)) {
+		return array();
+	}
+
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	if (empty($upload_dir)) {
+		$upload_dir = diffusionGetDocumentUploadDir($object);
+	}
+	if (empty($upload_dir)) {
+		return array();
+	}
+
+	$upload_dir = rtrim((string) $upload_dir, '/\\');
+	$legacy_upload_dir = diffusionGetLegacyDocumentUploadDir($object, $upload_dir);
+	if (empty($legacy_upload_dir) || !is_dir(dol_osencode($legacy_upload_dir))) {
+		return array();
+	}
+
+	$ignoredpattern = '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)';
+	$currentbasenames = array();
+	if (is_dir(dol_osencode($upload_dir))) {
+		$currentfilearray = dol_dir_list($upload_dir, 'files', 0, '', $ignoredpattern, 'name', SORT_ASC, 1);
+		foreach ($currentfilearray as $fileinfo) {
+			if (empty($fileinfo['name']) || diffusionIsIgnoredLegacyDocumentFile($fileinfo['name'])) {
+				continue;
+			}
+			$currentbasenames[strtolower((string) $fileinfo['name'])] = true;
+		}
+	}
+
+	$legacyfilearray = dol_dir_list($legacy_upload_dir, 'files', 0, '', $ignoredpattern, $sortfield, $sortorder, 1);
+	$filtered = array();
+	foreach ($legacyfilearray as $fileinfo) {
+		$name = !empty($fileinfo['name']) ? (string) $fileinfo['name'] : basename((string) $fileinfo['fullname']);
+		if (diffusionIsIgnoredLegacyDocumentFile($name)) {
+			continue;
+		}
+		if (!empty($currentbasenames[strtolower($name)])) {
+			continue;
+		}
+		$filtered[] = $fileinfo;
+	}
+
+	return $filtered;
+}
+
+/**
+ * Print the native fallback list for legacy Diffusion documents.
+ *
+ * @param FormFile  $formfile        FormFile helper
+ * @param Diffusion $object          Diffusion object
+ * @param string    $upload_dir      Current absolute upload directory
+ * @param string    $modulepart      Dolibarr document modulepart
+ * @param string    $param           URL parameters
+ * @param int|bool  $permissiontoadd Write permission
+ * @param string    $sortfield       Sort field
+ * @param string    $sortorder       Sort order
+ * @return int                       Number of shown legacy files
+ */
+function diffusionPrintLegacyDocumentList($formfile, $object, $upload_dir, $modulepart, $param = '', $permissiontoadd = 0, $sortfield = 'name', $sortorder = 'ASC')
+{
+	global $langs;
+
+	if (!is_object($formfile)) {
+		return 0;
+	}
+
+	$legacy_upload_dir = diffusionGetLegacyDocumentUploadDir($object, $upload_dir);
+	$legacy_relativepath = diffusionGetLegacyDocumentRelativePath($object);
+	$legacyfilearray = diffusionGetLegacyDocumentFileArray($object, $upload_dir, $sortfield, (strtolower((string) $sortorder) == 'desc' ? SORT_DESC : SORT_ASC));
+	if (empty($legacyfilearray) || empty($legacy_upload_dir) || empty($legacy_relativepath)) {
+		return 0;
+	}
+
+	$formfile->list_of_documents(
+		$legacyfilearray,
+		$object,
+		$modulepart,
+		$param,
+		0,
+		$legacy_relativepath,
+		$permissiontoadd,
+		0,
+		'',
+		0,
+		$langs->trans('DiffusionHistoricalDocuments'),
+		'',
+		0,
+		0,
+		$legacy_upload_dir,
+		$sortfield,
+		(strtolower((string) $sortorder) == 'desc' ? 'DESC' : 'ASC'),
+		1
+	);
+
+	return count($legacyfilearray);
+}
+
+/**
  * Tell if a changed file is the generated diffusion document or one of its own preview files.
  *
  * @param Diffusion $object   Diffusion object
@@ -372,9 +542,6 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 	if (getDolGlobalString('MAIN_DISABLE_PDF_THUMBS')) {
 		return '';
 	}
-	if (!class_exists('Imagick')) {
-		return '';
-	}
 
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
@@ -387,25 +554,52 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 	$upload_dir = rtrim((string) $upload_dir, '/\\');
 	$objectref = dol_sanitizeFileName($object->ref);
 
+	$pdfdir = $upload_dir;
+	$pdfrelativebase = $objectref.'/';
 	$pdfbasename = $objectref.'.pdf';
 	if (!empty($object->last_main_doc) && preg_match('/\.pdf$/i', (string) $object->last_main_doc)) {
 		$candidate = basename(str_replace('\\', '/', (string) $object->last_main_doc));
-		if (is_file($upload_dir.'/'.$candidate)) {
+		if (is_file($pdfdir.'/'.$candidate)) {
 			$pdfbasename = $candidate;
 		}
 	}
 
-	$filepdf = $upload_dir.'/'.$pdfbasename;
+	$filepdf = $pdfdir.'/'.$pdfbasename;
 	if (!is_file($filepdf)) {
 		$pdfbasename = $objectref.'.pdf';
-		$filepdf = $upload_dir.'/'.$pdfbasename;
+		$filepdf = $pdfdir.'/'.$pdfbasename;
 	}
 	if (!is_file($filepdf)) {
-		return '';
+		$legacy_upload_dir = diffusionGetLegacyDocumentUploadDir($object, $upload_dir);
+		if (empty($legacy_upload_dir)) {
+			return '';
+		}
+
+		$pdfdir = $legacy_upload_dir;
+		$pdfrelativebase = diffusionGetLegacyDocumentRelativePath($object);
+		$pdfbasename = $objectref.'.pdf';
+		if (!empty($object->last_main_doc) && preg_match('/\.pdf$/i', (string) $object->last_main_doc)) {
+			$candidate = basename(str_replace('\\', '/', (string) $object->last_main_doc));
+			if (is_file($pdfdir.'/'.$candidate)) {
+				$pdfbasename = $candidate;
+			}
+		}
+
+		$filepdf = $pdfdir.'/'.$pdfbasename;
+		if (!is_file($filepdf)) {
+			$pdfbasename = $objectref.'.pdf';
+			$filepdf = $pdfdir.'/'.$pdfbasename;
+		}
+		if (!is_file($filepdf)) {
+			return '';
+		}
 	}
 
 	$fileimage = $filepdf.'_preview.png';
 	if (!is_file($fileimage) || filemtime($fileimage) < filemtime($filepdf)) {
+		if (!class_exists('Imagick')) {
+			return '';
+		}
 		$ret = dol_convert_file($filepdf, 'png', $fileimage, '0');
 		if ($ret < 0 || !is_file($fileimage)) {
 			return '';
@@ -413,7 +607,7 @@ function diffusionGetGeneratedDocumentPreviewHtml($object, $upload_dir = '')
 	}
 
 	$heightforphotref = !empty($conf->dol_optimize_smallscreen) ? 60 : 80;
-	$relativepathimage = $objectref.'/'.$pdfbasename.'_preview.png';
+	$relativepathimage = $pdfrelativebase.$pdfbasename.'_preview.png';
 	$entity = !empty($object->entity) ? (int) $object->entity : (int) $conf->entity;
 	$url = DOL_URL_ROOT.'/viewimage.php?modulepart=diffusion&amp;entity='.$entity.'&amp;file='.urlencode($relativepathimage).'&amp;cache='.(int) filemtime($fileimage);
 
@@ -465,7 +659,7 @@ function diffusionPrintObjectBanner($object, $form, $linkback, $permissiontoadd,
 		} elseif (!empty($object->fk_project)) {
 			$proj = new Project($db);
 			$proj->fetch($object->fk_project);
-			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"').$proj->getNomUrl(1);
+			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"').$proj->getNomUrl(0);
 			if (!empty($proj->title)) {
 				$morehtmlref .= '<span class="opacitymedium"> - '.dol_escape_htmltag($proj->title).'</span>';
 			}

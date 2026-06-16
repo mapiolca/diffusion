@@ -592,7 +592,26 @@ if (empty($reshook)) {
 		setEventMessages($langs->trans('ErrorActionNotAllowedOnDiffusionTemplate'), null, 'errors');
 		header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
 		exit;
+	}
+
+	if ($action == 'updatedescription') {
+		if (empty($permissiontoadd) || empty($object->id) || empty($object->is_template)) {
+			accessforbidden();
 		}
+		if ($cancel) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+
+		$result = $object->setValueFrom('description', GETPOST('description', 'none'), '', null, 'text', '', $user, $triggermodname);
+		if ($result < 0) {
+			setEventMessages($object->error, $object->errors, 'errors');
+		} else {
+			setEventMessages($langs->trans('RecordSaved'), null, 'mesgs');
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+	}
 
 		// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
 		if ($action == 'add') {
@@ -1265,24 +1284,34 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '</div>';
 
 	if ($descriptionFieldDef !== null) {
+		$inlineEditable = (!empty($permissiontoadd) && isset($object->status) && $object->status == $object::STATUS_DRAFT && empty($object->is_template));
+		$templateDescriptionEditable = (!empty($permissiontoadd) && !empty($object->is_template));
+		$editDescriptionMode = ($action == 'editdescription' && $templateDescriptionEditable);
+
 		print '<div class="clearboth"></div>';
 		print '<table class="border centpercent tableforfield">';
 		print '<tr class="field_description">';
 		print '<td>'.$descriptionFieldDef['label'];
-		if ($inlineEditable && $diffusionSubstitutionHelp !== '') {
+		if (($inlineEditable || $templateDescriptionEditable) && $diffusionSubstitutionHelp !== '') {
 			print ' '.$form->textwithpicto('', $diffusionSubstitutionHelp, 1, 'help', '', 0, 2, 'diffusiondescriptionvariablesedit');
+		}
+		if ($templateDescriptionEditable && !$editDescriptionMode) {
+			print ' <a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=editdescription&token='.newToken().'">'.img_edit($langs->transnoentitiesnoconv('Modify')).'</a>';
 		}
 		print '</td>';
 		print '<td class="valuefield wordbreak">';
-		if ($inlineEditable) {
+		if ($inlineEditable || $editDescriptionMode) {
 			print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'">';
 			print '<input type="hidden" name="token" value="'.newToken().'">';
-			print '<input type="hidden" name="action" value="update">';
+			print '<input type="hidden" name="action" value="'.($editDescriptionMode ? 'updatedescription' : 'update').'">';
 			print '<input type="hidden" name="id" value="'.$object->id.'">';
 			$doleditor = new DolEditor('description', $object->description, '', 200, 'dolibarr_mailings', 'In', true, true, true, 40, '100%');
 			print $doleditor->Create(1);
 			print '<div class="center">';
 			print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
+			if ($editDescriptionMode) {
+				print ' <input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'">';
+			}
 			print '</div>';
 			print '</form>';
 		} else {
@@ -1476,6 +1505,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$moreparam = '&entity='.(int) $entityfordoc;
 			print $formfile->showdocuments($modulepart, $relativepath, $filedir, $urlsource, $genallowed, $delallowed, $object->model_pdf, 1, 0, 0, 28, 0, $moreparam, '', '', $langs->defaultlang);
 			error_reporting($tmperrorreporting);
+			diffusionPrintLegacyDocumentList($formfile, $object, $upload_dir, $modulepart, $moreparam, $delallowed);
 		}
 		/*
 		// Show links to link elements
