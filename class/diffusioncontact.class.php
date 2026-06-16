@@ -128,7 +128,6 @@ class DiffusionContact extends CommonObject
 	 */
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
-		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "isModEnabled('multicompany')", 'position' => 1, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => "1"),
 		"fk_contact" => array("type" => "integer", "label" => "fk_contact", "enabled" => "1", 'position' => 2, 'notnull' => 0, "visible" => "0",),
                 "fk_diffusion" => array("type" => "integer", "label" => "fk_diffusion", "enabled" => "1", 'position' => 1, 'notnull' => 0, "visible" => "0",),
                 "fk_type_contact" => array("type" => "integer", "label" => "fk_type_contact", "enabled" => "1", 'position' => 2, 'notnull' => 0, "visible" => "0",),
@@ -139,7 +138,6 @@ class DiffusionContact extends CommonObject
 		"fk_user_modif" => array("type" => "integer:user:user/class/user.class.php", "label" => "UserModif", "enabled" => "1", 'position' => 511, 'notnull' => 0, "visible" => "0",),
 	);
 	public $rowid;
-	public $entity;
         public $fk_contact;
         public $fk_diffusion;
         public $fk_type_contact;
@@ -197,7 +195,7 @@ class DiffusionContact extends CommonObject
                 global $conf, $langs;
 
                 $this->db = $db;
-                $this->ismultientitymanaged = 1;
+                $this->ismultientitymanaged = 0;
                 $this->isextrafieldmanaged = 1;
 
                 $entity = !empty($conf->entity) ? (int) $conf->entity : 1;
@@ -218,10 +216,6 @@ class DiffusionContact extends CommonObject
                 if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
                         $this->fields['rowid']['visible'] = 0;
 		}
-		if (!isModEnabled('multicompany') && isset($this->fields['entity'])) {
-			$this->fields['entity']['enabled'] = 0;
-		}
-
 		// Example to show how to set values of fields definition dynamically
 		/*if ($user->hasRight('diffusion', 'diffusioncontact', 'read')) {
 			$this->fields['myfield']['visible'] = 1;
@@ -287,6 +281,16 @@ class DiffusionContact extends CommonObject
 
 		$this->db->begin();
 
+		$resultaccess = $this->checkDiffusionAccess($diffusionId);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
+			}
+			$this->db->rollback();
+
+			return -1;
+		}
+
 		$sql = 'SELECT rowid FROM '.MAIN_DB_PREFIX.'diffusion_contact';
 		$sql .= ' WHERE fk_diffusion = '.$diffusionId;
 		$sql .= ' AND fk_contact = '.$contactId;
@@ -330,21 +334,9 @@ class DiffusionContact extends CommonObject
 			return 1;
 		}
 
-		$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
-		$sqlentity = 'SELECT entity FROM '.MAIN_DB_PREFIX.'diffusion WHERE rowid = '.$diffusionId;
-		$resqlentity = $this->db->query($sqlentity);
-		if ($resqlentity) {
-			$objentity = $this->db->fetch_object($resqlentity);
-			if (!empty($objentity->entity)) {
-				$entity = (int) $objentity->entity;
-			}
-			$this->db->free($resqlentity);
-		}
-
 		$insertSql = 'INSERT INTO '.MAIN_DB_PREFIX.'diffusion_contact';
-		$insertSql .= ' (entity, fk_diffusion, fk_contact, contact_source, fk_type_contact, mail_status, letter_status, hand_status, fk_user_modif)';
+		$insertSql .= ' (fk_diffusion, fk_contact, contact_source, fk_type_contact, mail_status, letter_status, hand_status, fk_user_modif)';
 		$insertSql .= ' VALUES (';
-		$insertSql .= $entity.',';
 		$insertSql .= $diffusionId.',';
 		$insertSql .= $contactId.", '".$this->db->escape($source)."',";
 		$insertSql .= ($typeContactId > 0 ? $typeContactId : 'NULL').',';
@@ -377,6 +369,66 @@ class DiffusionContact extends CommonObject
 		$this->db->commit();
 
 		return 1;
+	}
+
+	/**
+	 * Check access to a parent Diffusion through its entity.
+	 *
+	 * @param int $diffusionId Diffusion identifier
+	 * @return int<-1,1> 1 if accessible, 0 if not found/not accessible, <0 on SQL error
+	 */
+	private function checkDiffusionAccess($diffusionId)
+	{
+		$diffusionId = (int) $diffusionId;
+		if ($diffusionId <= 0) {
+			return 0;
+		}
+
+		$sql = 'SELECT d.rowid FROM '.MAIN_DB_PREFIX.'diffusion as d';
+		$sql .= ' WHERE d.rowid = '.$diffusionId;
+		$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$found = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		return $found ? 1 : 0;
+	}
+
+	/**
+	 * Check access to a DiffusionContact line through its parent Diffusion entity.
+	 *
+	 * @param int $id DiffusionContact line identifier
+	 * @return int<-1,1> 1 if accessible, 0 if not found/not accessible, <0 on SQL error
+	 */
+	private function checkDiffusionContactLineAccess($id)
+	{
+		$id = (int) $id;
+		if ($id <= 0) {
+			return 0;
+		}
+
+		$sql = 'SELECT dc.rowid';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
+		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'diffusion as d ON d.rowid = dc.fk_diffusion';
+		$sql .= ' WHERE dc.rowid = '.$id;
+		$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$found = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		return $found ? 1 : 0;
 	}
 
 		/**
@@ -494,7 +546,16 @@ class DiffusionContact extends CommonObject
                         return -1;
                 }
 
-                $sql = 'DELETE FROM '.MAIN_DB_PREFIX."diffusion_contact";
+		$resultaccess = $this->checkDiffusionAccess($diffusionId);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
+			}
+
+			return -1;
+		}
+
+		$sql = 'DELETE FROM '.MAIN_DB_PREFIX."diffusion_contact";
                 $sql .= ' WHERE fk_diffusion = '.$diffusionId;
                 $sql .= ' AND fk_contact = '.$contactId;
                 $sql .= " AND contact_source = '".$this->db->escape($source)."'";
@@ -676,14 +737,11 @@ class DiffusionContact extends CommonObject
 		$sql = "SELECT ";
 		$sql.= $this->getFieldList('t');
 		$sql.= " FROM ".$this->db->prefix().$this->table_element." as t";
+		$sql.= " INNER JOIN ".$this->db->prefix()."diffusion as d ON d.rowid = t.fk_diffusion";
 		if (isset($this->isextrafieldmanaged) && $this->isextrafieldmanaged == 1) {
 			$sql.= " LEFT JOIN ".$this->db->prefix().$this->table_element."_extrafields as te ON te.fk_object = t.rowid";
 		}
-		if (isset($this->ismultientitymanaged) && $this->ismultientitymanaged == 1) {
-			$sql.= " WHERE t.entity IN (".getEntity('diffusion').")";
-		} else {
-			$sql.= " WHERE 1 = 1";
-		}
+		$sql.= " WHERE d.entity IN (".getEntity('diffusion').")";
 
 		// Manage filter
 		$errormessage = '';
@@ -767,11 +825,22 @@ class DiffusionContact extends CommonObject
 
 		$this->db->begin();
 
-		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
-		$sql .= " SET ".$field." = ".$value;
-		$sql .= ", fk_user_modif = ".((int) $user->id);
-		$sql .= " WHERE rowid = ".$id;
-		$sql .= " AND entity IN (".getEntity('diffusion').")";
+		$resultaccess = $this->checkDiffusionContactLineAccess($id);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
+			}
+			$this->db->rollback();
+
+			return -1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." as dc";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."diffusion as d ON d.rowid = dc.fk_diffusion";
+		$sql .= " SET dc.".$field." = ".$value;
+		$sql .= ", dc.fk_user_modif = ".((int) $user->id);
+		$sql .= " WHERE dc.rowid = ".$id;
+		$sql .= " AND d.entity IN (".getEntity('diffusion').")";
 
 		dol_syslog(__METHOD__." sql=".$sql, LOG_DEBUG);
 		$resql = $this->db->query($sql);

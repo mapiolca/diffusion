@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction des contacts de diffusion en laissant l'entité portée par la diffusion parente, sans colonne `entity` sur `diffusion_contact`, pour restaurer l'ajout de contacts et les switches de diffusion.
+- EN: Fixed Diffusion contacts by keeping the entity on the parent Diffusion, without an `entity` column on `diffusion_contact`, restoring contact additions and contact switches.
 - FR: Migration des variables de descriptions et modèles de courriel vers les substitutions standards Dolibarr (`__REF__`, `__LABEL__`, `__PROJECT_REF__`, `__PROJECT_NAME__`) et ajout des variables `__AUTHOR_*__` basées sur le créateur de la diffusion.
 - EN: Migrated description and email template variables to standard Dolibarr substitutions (`__REF__`, `__LABEL__`, `__PROJECT_REF__`, `__PROJECT_NAME__`) and added `__AUTHOR_*__` variables based on the Diffusion creator.
 - FR: Correction de la métadonnée native d'activation Dolibarr en laissant `_init()` / `_remove()` gérer `MAIN_MODULE_DIFFUSION`, ce qui restaure l'affichage de la dernière version d'activation.

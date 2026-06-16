@@ -587,14 +587,12 @@ class modDiffusion extends DolibarrModules
 		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
 			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN model_source integer");
 		}
-		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion_contact LIKE 'entity'");
+		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion_contact LIKE 'fk_type_contact'");
 		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
-			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion_contact ADD COLUMN entity integer DEFAULT 1 NOT NULL");
-			$this->db->query("UPDATE ".MAIN_DB_PREFIX."diffusion_contact as dc INNER JOIN ".MAIN_DB_PREFIX."diffusion as d ON d.rowid = dc.fk_diffusion SET dc.entity = d.entity");
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion_contact ADD COLUMN fk_type_contact integer");
 		}
 		$this->ensureDiffusionRefEntityUniqueIndex();
 		$this->ensureDiffusionIndex('diffusion', 'idx_diffusion_date_creation', 'date_creation');
-		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_entity', 'entity');
 		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_diffusion', 'fk_diffusion');
 		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_contact', 'fk_contact');
 		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_type_contact', 'fk_type_contact');

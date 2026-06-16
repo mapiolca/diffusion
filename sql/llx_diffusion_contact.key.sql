@@ -16,11 +16,10 @@
 
 -- BEGIN MODULEBUILDER INDEXES
 ALTER TABLE llx_diffusion_contact ADD INDEX idx_diffusion_contact_rowid (rowid);
-ALTER TABLE llx_diffusion_contact ADD INDEX idx_diffusion_contact_entity (entity);
 ALTER TABLE llx_diffusion_contact ADD INDEX idx_diffusion_contact_fk_diffusion (fk_diffusion);
 ALTER TABLE llx_diffusion_contact ADD INDEX idx_diffusion_contact_fk_contact (fk_contact);
 ALTER TABLE llx_diffusion_contact ADD INDEX idx_diffusion_contact_fk_type_contact (fk_type_contact);
-ALTER TABLE llx_diffusion_contact ADD UNIQUE INDEX uk_diffusion_contact_link (entity, fk_diffusion, fk_contact, contact_source, fk_type_contact);
+ALTER TABLE llx_diffusion_contact ADD UNIQUE INDEX uk_diffusion_contact_link (fk_diffusion, fk_contact, contact_source, fk_type_contact);
 -- END MODULEBUILDER INDEXES
 
 --ALTER TABLE llx_diffusion_contact ADD UNIQUE INDEX uk_diffusion_contact_fieldxy(fieldx, fieldy);

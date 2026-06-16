@@ -17,7 +17,6 @@
 CREATE TABLE llx_diffusion_contact(
 	-- BEGIN MODULEBUILDER FIELDS
 	rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL, 
-	entity integer DEFAULT 1 NOT NULL,
 	fk_contact integer, 
 	fk_diffusion integer, 
 	fk_type_contact integer,
