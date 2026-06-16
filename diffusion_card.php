@@ -359,6 +359,77 @@ function diffusionHasStoredContactLinkForNativeType(DoliDB $db, $diffusionid, $c
 }
 
 /**
+ * Normalize selected project contacts from classic POST arrays or Ajax formconfirm hidden field.
+ *
+ * @param array<int|string,mixed>|string $rawvalues Raw selected values
+ * @return array<int,string> Normalized selected tuples source:contactid:typeid
+ */
+function diffusionNormalizeProjectContactSelections($rawvalues)
+{
+	if (!is_array($rawvalues)) {
+		$rawvalues = array($rawvalues);
+	}
+
+	$selected = array();
+	$seen = array();
+	foreach ($rawvalues as $rawvalue) {
+		if (is_array($rawvalue)) {
+			$subselected = diffusionNormalizeProjectContactSelections($rawvalue);
+			foreach ($subselected as $subvalue) {
+				if (empty($seen[$subvalue])) {
+					$selected[] = $subvalue;
+					$seen[$subvalue] = true;
+				}
+			}
+			continue;
+		}
+
+		$chunks = explode(',', str_replace(array("\r", "\n", "\t", ';'), ',', (string) $rawvalue));
+		foreach ($chunks as $chunk) {
+			$value = trim((string) $chunk);
+			if ($value === '') {
+				continue;
+			}
+			if (!preg_match('/^(internal|external):([1-9][0-9]*):([1-9][0-9]*)$/', $value)) {
+				continue;
+			}
+			if (empty($seen[$value])) {
+				$selected[] = $value;
+				$seen[$value] = true;
+			}
+		}
+	}
+
+	return $selected;
+}
+
+/**
+ * Return project contacts selected in the import confirmation popup.
+ *
+ * @return array<int,string> Normalized selected tuples source:contactid:typeid
+ */
+function diffusionGetSelectedProjectContactsFromRequest()
+{
+	$rawvalues = array();
+	$projectcontacts = GETPOST('projectcontacts', 'array');
+	if (!empty($projectcontacts)) {
+		$rawvalues[] = $projectcontacts;
+	}
+
+	$projectcontactsbrackets = GETPOST('projectcontacts[]', 'array');
+	if (!empty($projectcontactsbrackets)) {
+		$rawvalues[] = $projectcontactsbrackets;
+	}
+
+	$projectcontactsselected = GETPOST('projectcontacts_selected', 'restricthtml');
+	if (!empty($projectcontactsselected)) {
+		$rawvalues[] = $projectcontactsselected;
+	}
+
+	return diffusionNormalizeProjectContactSelections($rawvalues);
+}
+
+/**
  * @var Conf $conf
  * @var DoliDB $db
  * @var HookManager $hookmanager
@@ -393,8 +464,8 @@ if (!empty($backtopagejsfields)) {
 }
 
 // Handle confirmation popup submit for project contacts import.
-$projectcontactsrequest = GETPOST('projectcontacts', 'array');
-$hasprojectcontactsrequest = is_array($projectcontactsrequest) && count($projectcontactsrequest) > 0;
+$projectcontactsrequest = diffusionGetSelectedProjectContactsFromRequest();
+$hasprojectcontactsrequest = count($projectcontactsrequest) > 0;
 if (($action === 'confirm_importprojectcontacts' || $action === 'ask_import_project_contacts') && ($confirm === 'yes' || $hasprojectcontactsrequest)) {
 	dol_syslog(__METHOD__.' remap action '.$action.' to importprojectcontacts (confirm='.$confirm.', hasprojectcontactsrequest='.(int) $hasprojectcontactsrequest.')', LOG_DEBUG);
 	$action = 'importprojectcontacts';
@@ -765,12 +836,8 @@ if ($action == 'addcontact' && $permissiontoadd) {
 				dol_syslog(__METHOD__.' importprojectcontacts aborted: failed to load project id='.(int) $object->fk_project, LOG_ERR);
 				setEventMessages($langs->trans('ErrorFailedToLoadProject'), null, 'errors');
 			} else {
-				$selectedcontacts = GETPOST('projectcontacts', 'array');
-				dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from projectcontacts='.count((array) $selectedcontacts), LOG_DEBUG);
-				if (empty($selectedcontacts)) {
-					$selectedcontacts = GETPOST('projectcontacts[]', 'array');
-					dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from projectcontacts[]='.count((array) $selectedcontacts), LOG_DEBUG);
-				}
+				$selectedcontacts = diffusionGetSelectedProjectContactsFromRequest();
+				dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts='.count((array) $selectedcontacts), LOG_DEBUG);
 				if (empty($selectedcontacts)) {
 					dol_syslog(__METHOD__.' importprojectcontacts aborted: no selected contacts after parsing request', LOG_WARNING);
 					setEventMessages($langs->trans('ErrorNoContactSelectedForImport'), null, 'warnings');
@@ -1070,6 +1137,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$internalcontacts = $project->liste_contact(-1, 'internal');
 			$externalcontacts = $project->liste_contact(-1, 'external');
 
+			$formquestion[] = array('type' => 'hidden', 'name' => 'projectcontacts_selected', 'value' => '');
 			$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_help', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('SelectProjectContactsToImport').'</span>');
 
 			$contactrows = array();
@@ -1108,34 +1176,45 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 				}
 			}
 
+			$contactlinecount = count($contactrows);
+			$maxcontactchars = dol_strlen($langs->trans('Contact'));
+			$maxtypechars = dol_strlen($langs->trans('Type'));
+			foreach ($contactrows as $contactrow) {
+				$maxcontactchars = max($maxcontactchars, dol_strlen((string) $contactrow['label']));
+				$maxtypechars = max($maxtypechars, dol_strlen((string) $contactrow['type']));
+			}
+			$popupwidth = 380 + min(520, ($maxcontactchars * 6)) + min(360, ($maxtypechars * 6));
+			$popupwidth = min(1180, max(760, $popupwidth));
+			$popupheight = 280 + min(420, (35 * max(1, $contactlinecount)));
+			$popupheight = min(760, max(380, $popupheight));
+
 			if (empty($contactrows)) {
 				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_empty', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('NoProjectContactsToImport').'</span>');
 			} else {
 				$tableid = 'diffusion-project-contacts-'.((int) $object->id);
-				$tablehtml = '<table class="noborder centpercent diffusion-project-contacts-table" id="'.$tableid.'">';
+				$tablehtml = '<div class="diffusion-project-contacts-wrapper" data-dialog-min-width="'.((int) $popupwidth).'">';
+				$tablehtml .= '<table class="noborder centpercent diffusion-project-contacts-table" id="'.$tableid.'" style="table-layout:auto; min-width:720px;">';
 				$tablehtml .= '<tr class="liste_titre">';
-				$tablehtml .= '<th class="center"><a href="#" class="diffusion-select-all-project-contacts" data-target="'.$tableid.'">'.$langs->trans('SelectAllProjectContacts').'</a></th>';
-				$tablehtml .= '<th>'.$langs->trans('Contact').'</th>';
-				$tablehtml .= '<th>'.$langs->trans('Type').'</th>';
-				$tablehtml .= '<th>'.$langs->trans('Source').'</th>';
+				$tablehtml .= '<th class="center nowraponall" style="width:130px; white-space:nowrap;"><a href="#" class="diffusion-select-all-project-contacts" data-target="'.$tableid.'">'.$langs->trans('SelectAllProjectContacts').'</a></th>';
+				$tablehtml .= '<th class="nowraponall" style="white-space:nowrap;">'.$langs->trans('Contact').'</th>';
+				$tablehtml .= '<th class="nowraponall" style="white-space:nowrap;">'.$langs->trans('Type').'</th>';
+				$tablehtml .= '<th class="nowraponall" style="width:95px; white-space:nowrap;">'.$langs->trans('Source').'</th>';
 				$tablehtml .= '</tr>';
 				foreach ($contactrows as $contactrow) {
 					$value = $contactrow['source'].':'.((int) $contactrow['id']).':'.((int) $contactrow['typeid']);
 					$tablehtml .= '<tr class="oddeven">';
-					$tablehtml .= '<td class="center"><input type="checkbox" class="flat diffusion-project-contact-checkbox" name="projectcontacts[]" value="'.dol_escape_htmltag($value).'"></td>';
-					$tablehtml .= '<td>'.dol_escape_htmltag($contactrow['label']).'</td>';
-					$tablehtml .= '<td>'.dol_escape_htmltag($contactrow['type']).'</td>';
-					$tablehtml .= '<td>'.$langs->trans($contactrow['source'] === 'internal' ? 'Internal' : 'External').'</td>';
+					$tablehtml .= '<td class="center nowraponall" style="white-space:nowrap;"><input type="checkbox" class="flat diffusion-project-contact-checkbox" name="projectcontacts[]" value="'.dol_escape_htmltag($value).'"></td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.dol_escape_htmltag($contactrow['label']).'</td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.dol_escape_htmltag($contactrow['type']).'</td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.$langs->trans($contactrow['source'] === 'internal' ? 'Internal' : 'External').'</td>';
 					$tablehtml .= '</tr>';
 				}
 				$tablehtml .= '</table>';
+				$tablehtml .= '</div>';
 
 				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_table', 'label' => '', 'value' => $tablehtml);
 			}
-			$contactlinecount = count($contactrows);
-			$popupheight = 280 + (35 * $contactlinecount);
-			$popupheight = min(760, max(360, $popupheight));
-			$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('ImportProjectContacts'), $langs->trans('ConfirmImportProjectContacts'), 'importprojectcontacts', $formquestion, 'yes', 1, $popupheight);
+			$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('ImportProjectContacts'), $langs->trans('ConfirmImportProjectContacts'), 'importprojectcontacts', $formquestion, 'yes', 1, $popupheight, $popupwidth);
 		} else {
 			setEventMessages($langs->trans('ErrorFailedToLoadProject'), null, 'errors');
 		}
@@ -1494,7 +1573,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		*/
 		print '</div><div class="fichehalfright">';
 
-		$MAXEVENT = 10;
+		$MAXEVENT = getDolUserInt('MAIN_SIZE_SHORTLIST_LIMIT', getDolGlobalInt('MAIN_SIZE_SHORTLIST_LIMIT', 5));
+		if ($MAXEVENT <= 0) {
+			$MAXEVENT = 5;
+		}
 
 		$morehtmlcenter = dolGetButtonTitle($langs->trans('SeeAll'), '', 'fa fa-bars imgforviewmode', dol_buildpath('/diffusion/diffusion_agenda.php', 1).'?id='.$object->id);
 

@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction de l'import des contacts projet depuis la modale Ajax, avec transmission fiable des contacts cochés et ajustement de la taille de la modale au contenu.
+- EN: Fixed project contact import from the Ajax modal, with reliable submission of checked contacts and modal sizing adjusted to its content.
 - FR: Correction de la pagination du PDF Diffusion pour réserver systématiquement la zone de pied de page lors du rendu des descriptions HTML, tableaux, contacts et pièces jointes.
 - EN: Fixed Diffusion PDF pagination to consistently reserve the footer area while rendering HTML descriptions, tables, contacts and attachments.
 - FR: Correction des liens d'ouverture des PDF Diffusion pour référencer les fichiers sous `diffusion/<référence>/` au lieu de `diffusion/diffusiondoc/<référence>/`.

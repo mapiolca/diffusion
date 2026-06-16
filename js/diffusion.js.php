@@ -153,21 +153,102 @@ function diffusionEnhanceEmailTemplateSubstitutionTooltips() {
 	});
 }
 
+function diffusionUpdateProjectContactsSelection($context) {
+	'use strict';
+
+	var values = [];
+	var $container = $context && $context.length ? $context.closest('.ui-dialog-content') : jQuery();
+	if (!$container.length) {
+		$container = jQuery('.diffusion-project-contacts-wrapper').closest('.ui-dialog-content');
+	}
+	if (!$container.length) {
+		$container = jQuery(document);
+	}
+
+	$container.find('input.diffusion-project-contact-checkbox:checked').each(function () {
+		var value = jQuery(this).val();
+		if (value) {
+			values.push(value);
+		}
+	});
+
+	$container.find('input[name="projectcontacts_selected"]').val(values.join(','));
+}
+
+function diffusionResizeProjectContactsDialog() {
+	'use strict';
+
+	var $wrapper = jQuery('.diffusion-project-contacts-wrapper:visible').first();
+	if (!$wrapper.length) {
+		return;
+	}
+
+	var $dialogContent = $wrapper.closest('.ui-dialog-content');
+	if (!$dialogContent.length || typeof $dialogContent.dialog !== 'function') {
+		return;
+	}
+
+	var $table = $wrapper.find('table.diffusion-project-contacts-table').first();
+	var minWidth = parseInt($wrapper.data('dialog-min-width'), 10) || 760;
+	var viewportWidth = jQuery(window).width() || minWidth;
+	var viewportHeight = jQuery(window).height() || 600;
+	var contentWidth = $table.length ? Math.ceil($table.outerWidth(true)) + 90 : minWidth;
+	var dialogWidth = Math.min(Math.max(minWidth, contentWidth), Math.max(320, viewportWidth - 40));
+	var maxContentHeight = Math.max(220, viewportHeight - 190);
+
+	$wrapper.css({
+		'max-height': maxContentHeight + 'px',
+		'overflow-x': 'auto',
+		'overflow-y': 'auto'
+	});
+	$table.find('th,td').css('white-space', 'nowrap');
+
+	$dialogContent.dialog('option', 'width', dialogWidth);
+	$dialogContent.dialog('option', 'height', 'auto');
+	$dialogContent.dialog('option', 'position', { my: 'center', at: 'center', of: window });
+}
+
+function diffusionScheduleProjectContactsDialogResize() {
+	'use strict';
+
+	window.setTimeout(function () {
+		diffusionUpdateProjectContactsSelection(jQuery('.diffusion-project-contacts-wrapper:visible').first());
+		diffusionResizeProjectContactsDialog();
+	}, 50);
+}
+
 jQuery(document).ready(function () {
 	'use strict';
 
 	diffusionEnhanceEmailTemplateSubstitutionTooltips();
+	diffusionScheduleProjectContactsDialogResize();
 
 	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
 		var target = jQuery(this).data('target');
+		var $table;
 
 		event.preventDefault();
 		if (!target) {
 			return;
 		}
 
-		jQuery('#' + target).find('input.diffusion-project-contact-checkbox').prop('checked', true);
+		$table = jQuery('#' + target);
+		$table.find('input.diffusion-project-contact-checkbox').prop('checked', true);
+		diffusionUpdateProjectContactsSelection($table);
+		diffusionResizeProjectContactsDialog();
 	});
+
+	jQuery(document).on('change', 'input.diffusion-project-contact-checkbox', function () {
+		diffusionUpdateProjectContactsSelection(jQuery(this));
+	});
+
+	jQuery(document).on('dialogopen', '.ui-dialog-content', function () {
+		if (jQuery(this).find('.diffusion-project-contacts-wrapper').length) {
+			diffusionScheduleProjectContactsDialogResize();
+		}
+	});
+
+	jQuery(window).on('resize', diffusionScheduleProjectContactsDialogResize);
 
 	if (!jQuery('body').hasClass('page-notification')) {
 		return;
