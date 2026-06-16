@@ -4,10 +4,6 @@
 
 - FR: Ajout d'un fallback d'affichage pour les documents historiques stockés sous `diffusiondoc/<REF>/`, sans migration physique ni retour au stockage historique.
 - EN: Added a display fallback for historical documents stored under `diffusiondoc/<REF>/`, without physical migration or reverting new storage.
-
-- FR: Correction du double picto projet dans les entêtes Diffusion et ajout d'une édition dédiée de la description des modèles.
-- EN: Fixed the duplicated project icon in Diffusion headers and added dedicated editing for template descriptions.
-
 - FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
 - EN: Harmonized the Diffusion, Attached files and Events/Agenda tab headers, added the generated PDF preview to the header and automatically regenerated the PDF after attached-file changes.
 - FR: Alignement du bloc des derniers événements de la fiche Diffusion sur le réglage natif Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT`.
