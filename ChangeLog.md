@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Alignement des switches de modes de contact Diffusion sur le paramètre natif Dolibarr de désactivation JavaScript/Ajax, avec fallback non-Ajax sécurisé et retour fiche.
+- EN: Aligned Diffusion contact method switches with the native Dolibarr JavaScript/Ajax disable setting, with a secured non-Ajax fallback and card redirect.
 - FR: Correction des contacts de diffusion en laissant l'entité portée par la diffusion parente, sans colonne `entity` sur `diffusion_contact`, pour restaurer l'ajout de contacts et les switches de diffusion.
 - EN: Fixed Diffusion contacts by keeping the entity on the parent Diffusion, without an `entity` column on `diffusion_contact`, restoring contact additions and contact switches.
 - FR: Migration des variables de descriptions et modèles de courriel vers les substitutions standards Dolibarr (`__REF__`, `__LABEL__`, `__PROJECT_REF__`, `__PROJECT_NAME__`) et ajout des variables `__AUTHOR_*__` basées sur le créateur de la diffusion.

@@ -368,13 +368,7 @@ foreach ($list as $entry) {
 	$diffusioncontactstatic->mail_status = (int) $entry->mail_status;
 	$diffusioncontactstatic->letter_status = (int) $entry->letter_status;
 	$diffusioncontactstatic->hand_status = (int) $entry->hand_status;
-	$line_diffusioncontact = array('element' => 'diffusioncontact', 'module' => 'diffusion');
-
-	$forcenoajax=1;
-
-	if ($forcenoajax==1) {
-		$diffusioncontactstatic->element = $line_diffusioncontact['element'].'@'.$line_diffusioncontact['module'];
-	}
+	$forcenoajax = empty($conf->use_javascript_ajax) ? 1 : 0;
 
 	print '<tr class="oddeven" data-rowid="' . $entry->id . '">';
 	print '<td class="tdoverflowmax200" data-thirdparty_id="' . ((int) $entry->thirdparty_id) . '" data-thirdparty_name="' . dol_escape_htmltag($entry->thirdparty_name) . '">'.$entry->thirdparty_html.'</td>';
