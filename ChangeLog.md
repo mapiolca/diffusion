@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Renforcement de l'emprise réservée aux pieds de page PDF Diffusion avec mesure réelle du rendu natif et neutralisation des sauts automatiques pendant l'impression du pied.
+- EN: Strengthened the reserved area for Diffusion PDF footers with real native footer measurement and disabled automatic page breaks while rendering the footer.
 - FR: Recalage des pieds de page PDF Diffusion sur le pattern natif Dolibarr, avec texte libre uniquement sur la dernière page et pied simplifié sur les pages intermédiaires.
 - EN: Realigned Diffusion PDF footers with the native Dolibarr pattern, with free text only on the last page and simplified footers on intermediate pages.
 - FR: Reprise de la pagination du PDF Diffusion avec marge basse réservée avant rendu, fermeture contrôlée des pages et meilleure prise en compte du texte libre de pied de page.

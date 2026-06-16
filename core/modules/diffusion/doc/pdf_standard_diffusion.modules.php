@@ -108,6 +108,16 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	public $recipient_override = array();
 
+	/**
+	 * @var float Reserved footer area for intermediate pages, measured from the native footer renderer
+	 */
+	protected $pdfIntermediateFooterReservedHeight = 0.0;
+
+	/**
+	 * @var float Reserved footer area for the last page, measured from the native footer renderer
+	 */
+	protected $pdfLastFooterReservedHeight = 0.0;
+
 
 	/**
 	 *	Constructor
@@ -319,9 +329,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
 
 			    $heightforinfotot = $this->estimateSummaryHeight($contactSummaries, $attachmentSummaries);
-				$heightforfreetext = getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Height reserved to output the free text on last page
-				$heightforfooter = $this->getNativeFooterReservedHeight(); // Height reserved to output the footer (value includes bottom margin)
-				$heightforlastpagefooter = $heightforfooter + $heightforfreetext; // Last page also reserves the free text area
+				$heightforfooter = $this->getNativeFooterReservedHeight() + $this->getPdfFooterSafetyMargin(); // Initial fallback, replaced by measured native footer height after first page creation.
+				$heightforlastpagefooter = $heightforfooter + getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Initial fallback for the last page free text area.
 				$pdf->setAutoPageBreak(true, 0);
 
 				if (class_exists('TCPDF')) {
@@ -360,6 +369,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 				// New page
 				$pdf->AddPage();
+				$this->initPdfFooterReservedHeights($pdf, $object, $outputlangs);
+				$heightforlastpagefooter = $this->getPdfLastFooterReservedHeight();
 				$this->applyPdfPageBottomMargin($pdf, $heightforlastpagefooter);
 				if (!empty($tplidx)) {
 					$pdf->useTemplate($tplidx);
@@ -419,7 +430,10 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$afterContactsY = $this->renderContactsSection($pdf, $object, $contactSummaries, $outputlangs, $summaryStartY, $availableWidth, $heightforlastpagefooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
 				$this->renderAttachmentsSection($pdf, $object, $attachmentSummaries, $outputlangs, $afterContactsY + 4, $availableWidth, $heightforlastpagefooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
 
-				$this->_pagefoot($pdf, $object, $outputlangs);
+				if ($pdf->GetY() > $this->getPageBottomLimit($heightforlastpagefooter)) {
+					$this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null), null, true);
+				}
+				$this->renderPdfPageFooter($pdf, $object, $outputlangs, 0, $heightforlastpagefooter);
 				if (method_exists($pdf, 'AliasNbPages')) {
 					$pdf->AliasNbPages();  // @phan-suppress-current-line PhanUndeclaredMethod
 				}
@@ -1098,6 +1112,131 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	}
 
 	/**
+	 * Return a small safety margin added to the native footer measurement.
+	 *
+	 * @return float
+	 */
+	protected function getPdfFooterSafetyMargin()
+	{
+		return 8.0;
+	}
+
+	/**
+	 * Return a fallback footer height before the native footer can be measured on an existing page.
+	 *
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @return float
+	 */
+	protected function getPdfFooterFallbackReservedHeight($hidefreetext = 0)
+	{
+		$reservedHeight = $this->getNativeFooterReservedHeight();
+		if (empty($hidefreetext)) {
+			$reservedHeight += getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5);
+		}
+
+		return (float) ($reservedHeight + $this->getPdfFooterSafetyMargin());
+	}
+
+	/**
+	 * Measure the native Dolibarr footer inside a PDF transaction and keep a safety margin above it.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @return float
+	 */
+	protected function measurePdfFooterReservedHeight(&$pdf, $object, $outputlangs, $hidefreetext = 0)
+	{
+		$fallbackHeight = $this->getPdfFooterFallbackReservedHeight($hidefreetext);
+		if (!is_object($pdf) || (int) $pdf->getPage() <= 0 || !method_exists($pdf, 'startTransaction') || !method_exists($pdf, 'rollbackTransaction')) {
+			return $fallbackHeight;
+		}
+
+		$currentPage = (int) $pdf->getPage();
+		$currentX = (float) $pdf->GetX();
+		$currentY = (float) $pdf->GetY();
+
+		$pdf->startTransaction();
+		$pdf->SetAutoPageBreak(false, 0);
+		$measuredHeight = (float) $this->_pagefoot($pdf, $object, $outputlangs, $hidefreetext);
+		$pdf = $pdf->rollbackTransaction(true);
+
+		if ($currentPage > 0) {
+			$pdf->setPage($currentPage);
+			$pdf->SetXY($currentX, $currentY);
+		}
+
+		return max($fallbackHeight, $measuredHeight + $this->getPdfFooterSafetyMargin());
+	}
+
+	/**
+	 * Initialize measured footer heights for this PDF generation.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @return void
+	 */
+	protected function initPdfFooterReservedHeights(&$pdf, $object, $outputlangs)
+	{
+		$this->pdfIntermediateFooterReservedHeight = $this->measurePdfFooterReservedHeight($pdf, $object, $outputlangs, 1);
+		$this->pdfLastFooterReservedHeight = $this->measurePdfFooterReservedHeight($pdf, $object, $outputlangs, 0);
+		$this->applyPdfPageBottomMargin($pdf, $this->pdfLastFooterReservedHeight);
+	}
+
+	/**
+	 * Return the measured intermediate footer height.
+	 *
+	 * @return float
+	 */
+	protected function getPdfIntermediateFooterReservedHeight()
+	{
+		if ($this->pdfIntermediateFooterReservedHeight > 0) {
+			return (float) $this->pdfIntermediateFooterReservedHeight;
+		}
+
+		return $this->getPdfFooterFallbackReservedHeight(1);
+	}
+
+	/**
+	 * Return the measured last-page footer height.
+	 *
+	 * @return float
+	 */
+	protected function getPdfLastFooterReservedHeight()
+	{
+		if ($this->pdfLastFooterReservedHeight > 0) {
+			return (float) $this->pdfLastFooterReservedHeight;
+		}
+
+		return $this->getPdfFooterFallbackReservedHeight(0);
+	}
+
+	/**
+	 * Render the native footer without letting TCPDF split it as regular page content.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @param ?float $reservedFooterHeight Reserved height to restore after footer rendering
+	 * @return float
+	 */
+	protected function renderPdfPageFooter(&$pdf, $object, $outputlangs, $hidefreetext = 0, $reservedFooterHeight = null)
+	{
+		$pdf->SetAutoPageBreak(false, 0);
+		$height = (float) $this->_pagefoot($pdf, $object, $outputlangs, $hidefreetext);
+
+		if ($reservedFooterHeight === null) {
+			$reservedFooterHeight = empty($hidefreetext) ? $this->getPdfLastFooterReservedHeight() : $this->getPdfIntermediateFooterReservedHeight();
+		}
+		$this->applyPdfPageBottomMargin($pdf, (float) $reservedFooterHeight);
+
+		return $height;
+	}
+
+	/**
 	 * Apply the generated document bottom margin to the current page.
 	 *
 	 * @param TCPDF|TCPDI $pdf PDF handler
@@ -1135,8 +1274,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$pdf->setPage($pageid);
 		}
 
-		$this->applyPdfPageBottomMargin($pdf, $this->getNativeFooterReservedHeight());
-		$this->_pagefoot($pdf, $object, $outputlangs, 1);
+		$this->renderPdfPageFooter($pdf, $object, $outputlangs, 1, $this->getPdfIntermediateFooterReservedHeight());
 
 		if ($pageid !== null && $currentPage > 0) {
 			$pdf->setPage($currentPage);
@@ -1185,7 +1323,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function addPdfContentPage(&$pdf, $object, $outputlangs, $tplidx, &$pagenb, $outputlangsbis = null, $startY = null, $repeatPageHeadOnExtraPages = true)
 	{
-		$heightforlastpagefooter = $this->getNativeFooterReservedHeight() + getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5);
+		$heightforlastpagefooter = $this->getPdfLastFooterReservedHeight();
 		$this->renderIntermediatePdfFooter($pdf, $object, $outputlangs);
 		$pdf->AddPage();
 		$this->applyPdfPageBottomMargin($pdf, $heightforlastpagefooter);
