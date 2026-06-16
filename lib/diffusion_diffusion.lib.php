@@ -130,17 +130,68 @@ function diffusionPrepareHead($object)
 }
 
 /**
- * Complete missing public ECM shares for files attached to a diffusion.
+ * Normalize submitted linked file names.
  *
- * @param DoliDB       $db         Database handler
- * @param Diffusion    $object     Diffusion object
- * @param string       $upload_dir Absolute upload directory
- * @param User         $user       Current user
- * @return int                     Number of completed shares, <0 on error
+ * @param array<int,string>|string $filenames File names or paths
+ * @return array<int,string>                  Normalized base file names
  */
-function diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user)
+function diffusionNormalizeLinkedFileNames($filenames)
 {
-	if (empty($object->id) || empty($upload_dir) || !getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD')) {
+	if (!is_array($filenames)) {
+		$filenames = array($filenames);
+	}
+
+	$normalized = array();
+	foreach ($filenames as $filename) {
+		$basename = basename(str_replace('\\', '/', (string) $filename));
+		$basename = dol_string_nohtmltag($basename);
+		if ($basename === '') {
+			continue;
+		}
+		$normalized[$basename] = $basename;
+	}
+
+	return array_values($normalized);
+}
+
+/**
+ * Tell if an attached file is a technical file that must not be indexed/shared.
+ *
+ * @param Diffusion $object   Diffusion object
+ * @param string    $filename File name or path
+ * @return bool               True if the file is technical
+ */
+function diffusionIsTechnicalAttachedFile($object, $filename)
+{
+	$filename = str_replace('\\', '/', (string) $filename);
+	$basename = basename($filename);
+
+	return $basename === ''
+		|| $basename === '.'
+		|| $basename === '..'
+		|| preg_match('/(^|\/)thumbs(\/|$)/i', $filename)
+		|| preg_match('/\.meta$/i', $basename)
+		|| preg_match('/\.tmp$/i', $basename)
+		|| preg_match('/_preview.*\.png$/i', $basename)
+		|| preg_match('/\.preview\.png$/i', $basename)
+		|| diffusionIsGeneratedDocumentFile($object, $basename);
+}
+
+/**
+ * Ensure ECM index and public shares for files attached to a diffusion.
+ *
+ * @param DoliDB                  $db         Database handler
+ * @param Diffusion               $object     Diffusion object
+ * @param string                  $upload_dir Absolute upload directory
+ * @param User                    $user       Current user
+ * @param array<int,string>|string $filenames Optional list of uploaded file names
+ * @return int                                Number of indexed/updated files, <0 on error
+ */
+function diffusionEnsureAttachedFilesIndexedAndShared($db, $object, $upload_dir, $user, $filenames = array())
+{
+	global $conf;
+
+	if (empty($object->id) || empty($upload_dir)) {
 		return 0;
 	}
 
@@ -151,38 +202,97 @@ function diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user)
 
 	$relUploadDir = preg_replace('/[\\/]$/', '', $relUploadDir);
 	$relUploadDir = preg_replace('/^[\\/]/', '', $relUploadDir);
+	$upload_dir = rtrim((string) $upload_dir, '/\\');
+	$objectentity = !empty($object->entity) ? (int) $object->entity : (int) $conf->entity;
+	$setsharekey = getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD') ? 1 : 0;
 
-	require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
-	require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+	if ($setsharekey) {
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
+	}
 
-	$sql = "SELECT rowid";
-	$sql .= " FROM ".MAIN_DB_PREFIX."ecm_files";
-	$sql .= " WHERE src_object_type = '".$db->escape($object->table_element)."'";
-	$sql .= " AND src_object_id = ".((int) $object->id);
-	$sql .= " AND filepath = '".$db->escape($relUploadDir)."'";
-	$sql .= " AND (share IS NULL OR share = '')";
-
-	$resql = $db->query($sql);
-	if (!$resql) {
-		return -1;
+	$candidates = diffusionNormalizeLinkedFileNames($filenames);
+	if (empty($candidates)) {
+		$fileList = dol_dir_list($upload_dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', 'name', SORT_ASC, 1);
+		foreach ($fileList as $fileinfo) {
+			if (!empty($fileinfo['name'])) {
+				$candidates[] = $fileinfo['name'];
+			}
+		}
+		$candidates = diffusionNormalizeLinkedFileNames($candidates);
 	}
 
 	$count = 0;
-	while ($objFile = $db->fetch_object($resql)) {
-		$ecmfile = new EcmFiles($db);
-		if ($ecmfile->fetch((int) $objFile->rowid) > 0 && empty($ecmfile->share)) {
-			$ecmfile->share = getRandomPassword(true);
-			$updateresult = $ecmfile->update($user);
-			if ($updateresult < 0) {
-				$db->free($resql);
+	foreach ($candidates as $filename) {
+		if (diffusionIsTechnicalAttachedFile($object, $filename)) {
+			continue;
+		}
+
+		$fullpath = $upload_dir.'/'.$filename;
+		if (!is_file(dol_osencode($fullpath))) {
+			continue;
+		}
+
+		$sql = 'SELECT rowid, share, src_object_type, src_object_id, entity';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'ecm_files';
+		$sql .= " WHERE filepath = '".$db->escape($relUploadDir)."'";
+		$sql .= " AND filename = '".$db->escape($filename)."'";
+		$sql .= ' AND entity = '.$objectentity;
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+		$objFile = $db->fetch_object($resql);
+		$db->free($resql);
+		if (empty($objFile)) {
+			$result = addFileIntoDatabaseIndex($upload_dir, $filename, $filename, 'uploaded', $setsharekey, $object);
+			if ($result < 0) {
+				return -1;
+			}
+			if ($result > 0) {
+				$count++;
+			}
+			continue;
+		}
+
+		$updates = array();
+		if ((string) $objFile->src_object_type !== (string) $object->table_element) {
+			$updates[] = "src_object_type = '".$db->escape((string) $object->table_element)."'";
+		}
+		if ((int) $objFile->src_object_id !== (int) $object->id) {
+			$updates[] = 'src_object_id = '.((int) $object->id);
+		}
+		if ((int) $objFile->entity !== $objectentity) {
+			$updates[] = 'entity = '.$objectentity;
+		}
+		if ($setsharekey && empty($objFile->share)) {
+			$updates[] = "share = '".$db->escape(getRandomPassword(true))."'";
+		}
+		if (!empty($updates)) {
+			$sql = 'UPDATE '.MAIN_DB_PREFIX.'ecm_files SET '.implode(', ', $updates);
+			$sql .= ' WHERE rowid = '.((int) $objFile->rowid);
+			if (!$db->query($sql)) {
 				return -1;
 			}
 			$count++;
 		}
 	}
-	$db->free($resql);
 
 	return $count;
+}
+
+/**
+ * Complete missing public ECM shares for files attached to a diffusion.
+ *
+ * @param DoliDB       $db         Database handler
+ * @param Diffusion    $object     Diffusion object
+ * @param string       $upload_dir Absolute upload directory
+ * @param User         $user       Current user
+ * @return int                     Number of indexed/updated files, <0 on error
+ */
+function diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user)
+{
+	return diffusionEnsureAttachedFilesIndexedAndShared($db, $object, $upload_dir, $user);
 }
 
 /**
@@ -412,9 +522,10 @@ function diffusionPrintObjectBanner($object, $form, $linkback, $permissiontoadd,
  * @param User         $user       Current user
  * @param Translate    $langs      Translation handler
  * @param string       $reason     Reason for logs
+ * @param array<int,string>|string $filenames Optional list of uploaded file names
  * @return int<-1,1>               1 if OK, -1 if a warning was raised
  */
-function diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, $reason = '')
+function diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, $reason = '', $filenames = array())
 {
 	if (empty($object->id) || !empty($object->is_template)) {
 		return 1;
@@ -422,10 +533,12 @@ function diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_
 
 	$error = 0;
 
-	$shareresult = diffusionCompleteAttachedFileShares($db, $object, $upload_dir, $user);
+	$shareresult = diffusionEnsureAttachedFilesIndexedAndShared($db, $object, $upload_dir, $user, $filenames);
 	if ($shareresult < 0) {
 		$error++;
-		setEventMessages($db->lasterror(), null, 'warnings');
+		$message = $db->lasterror() ?: $langs->trans('DiffusionDocumentRegenerationAfterFileChangeFailed');
+		$object->errors[] = $message;
+		setEventMessages($message, null, 'warnings');
 	}
 
 	$object->fetch((int) $object->id);

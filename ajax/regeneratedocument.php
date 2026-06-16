@@ -82,6 +82,10 @@ function diffusionAjaxRegenerateDocumentResponse($status, $payload)
 
 $action = GETPOST('action', 'aZ09');
 $id = GETPOSTINT('id');
+$files = GETPOST('files', 'array');
+if (!is_array($files)) {
+	$files = array();
+}
 
 if ($action !== 'regenerate' || $id <= 0) {
 	diffusionAjaxRegenerateDocumentResponse(400, array('status' => 'error', 'errors' => array('Bad parameters')));
@@ -105,7 +109,7 @@ if (!empty($object->entity) && !in_array((int) $object->entity, $allowedentities
 }
 
 $upload_dir = diffusionGetDocumentUploadDir($object);
-$result = diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'ajaxupload');
+$result = diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'ajaxupload', $files);
 if ($result < 0) {
 	$errors = array();
 	if (!empty($object->error)) {

@@ -219,26 +219,36 @@ function diffusionScheduleProjectContactsDialogResize() {
 	}, 50);
 }
 
-function diffusionAjaxUploadResponseHasErrors(responseData) {
+function diffusionGetAjaxUploadResponseInfo(responseData) {
 	'use strict';
 
 	var files;
+	var info = {
+		hasErrors: true,
+		names: []
+	};
+
 	try {
 		files = (typeof responseData === 'string') ? JSON.parse(responseData) : responseData;
 	} catch (e) {
-		return true;
+		return info;
 	}
 	if (!jQuery.isArray(files)) {
-		return true;
+		return info;
 	}
 
+	info.hasErrors = false;
 	for (var i = 0; i < files.length; i++) {
 		if (files[i] && files[i].error) {
-			return true;
+			info.hasErrors = true;
+			continue;
+		}
+		if (files[i] && files[i].name) {
+			info.names.push(files[i].name);
 		}
 	}
 
-	return false;
+	return info;
 }
 
 function diffusionGetCurrentPageDiffusionId() {
@@ -317,7 +327,9 @@ function diffusionHandleDragDropUpload(event) {
 		contentType: false,
 		data: formData
 	}).done(function (responseData) {
-		if (diffusionAjaxUploadResponseHasErrors(responseData)) {
+		var uploadInfo = diffusionGetAjaxUploadResponseInfo(responseData);
+
+		if (uploadInfo.hasErrors) {
 			diffusionRedirectAfterDragDrop(id, 'ErrorOnAtLeastOneFileUpload:warnings');
 			return;
 		}
@@ -328,7 +340,8 @@ function diffusionHandleDragDropUpload(event) {
 			data: {
 				action: 'regenerate',
 				id: id,
-				token: token
+				token: token,
+				files: uploadInfo.names
 			}
 		}).done(function () {
 			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs');

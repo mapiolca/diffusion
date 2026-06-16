@@ -2,6 +2,9 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Indexation ECM et génération des liens publics natifs pour les pièces jointes ajoutées par drag-and-drop Diffusion.
+- EN: Added ECM indexing and native public link generation for attachments added through Diffusion drag-and-drop.
+
 - FR: Correction de la liste des pièces jointes PDF pour masquer les fichiers techniques de preview et reprise du drag-and-drop Diffusion pour régénérer le PDF avant la redirection.
 - EN: Fixed the PDF attachments list to hide technical preview files and reworked Diffusion drag-and-drop so the PDF is regenerated before redirecting.
 
