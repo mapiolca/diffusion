@@ -2,6 +2,10 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Reprise de la pagination du PDF Diffusion avec marge basse réservée avant rendu, fermeture contrôlée des pages et meilleure prise en compte du texte libre de pied de page.
+- EN: Reworked Diffusion PDF pagination with bottom margin reserved before rendering, controlled page finalization and better handling of footer free text.
+- FR: Alignement du bloc des derniers événements de la fiche Diffusion sur le réglage natif Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT`.
+- EN: Aligned the latest events block on the Diffusion card with the native Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT` setting.
 - FR: Correction de l'import des contacts projet depuis la modale Ajax, avec transmission fiable des contacts cochés et ajustement de la taille de la modale au contenu.
 - EN: Fixed project contact import from the Ajax modal, with reliable submission of checked contacts and modal sizing adjusted to its content.
 - FR: Correction de la pagination du PDF Diffusion pour réserver systématiquement la zone de pied de page lors du rendu des descriptions HTML, tableaux, contacts et pièces jointes.
