@@ -22,6 +22,45 @@ SET type_template = 'diffusion@diffusion'
 WHERE module = 'diffusion'
 AND type_template IN ('diffusion', 'diffusiondoc@diffusion', 'diffusioncontact@diffusion');
 
+UPDATE llx_c_email_templates
+SET topic = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(topic, '__DIFFUSION_REF__', '__REF__'), '__DIFFUSION_LABEL__', '__LABEL__'), '__DIFFUSION_PROJECT_REF__', '__PROJECT_REF__'), '__DIFFUSION_PROJECT_LABEL__', '__PROJECT_NAME__'), '__DIFFUSION_AUTHOR_FULLNAME__', '__AUTHOR_FULLNAME__'), '__DIFFUSION_AUTHOR_EMAIL__', '__AUTHOR_EMAIL__')
+WHERE module = 'diffusion'
+AND topic IS NOT NULL
+AND (
+	INSTR(topic, '__DIFFUSION_REF__') > 0
+	OR INSTR(topic, '__DIFFUSION_LABEL__') > 0
+	OR INSTR(topic, '__DIFFUSION_PROJECT_REF__') > 0
+	OR INSTR(topic, '__DIFFUSION_PROJECT_LABEL__') > 0
+	OR INSTR(topic, '__DIFFUSION_AUTHOR_FULLNAME__') > 0
+	OR INSTR(topic, '__DIFFUSION_AUTHOR_EMAIL__') > 0
+);
+
+UPDATE llx_c_email_templates
+SET content = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(content, '__DIFFUSION_REF__', '__REF__'), '__DIFFUSION_LABEL__', '__LABEL__'), '__DIFFUSION_PROJECT_REF__', '__PROJECT_REF__'), '__DIFFUSION_PROJECT_LABEL__', '__PROJECT_NAME__'), '__DIFFUSION_AUTHOR_FULLNAME__', '__AUTHOR_FULLNAME__'), '__DIFFUSION_AUTHOR_EMAIL__', '__AUTHOR_EMAIL__')
+WHERE module = 'diffusion'
+AND content IS NOT NULL
+AND (
+	INSTR(content, '__DIFFUSION_REF__') > 0
+	OR INSTR(content, '__DIFFUSION_LABEL__') > 0
+	OR INSTR(content, '__DIFFUSION_PROJECT_REF__') > 0
+	OR INSTR(content, '__DIFFUSION_PROJECT_LABEL__') > 0
+	OR INSTR(content, '__DIFFUSION_AUTHOR_FULLNAME__') > 0
+	OR INSTR(content, '__DIFFUSION_AUTHOR_EMAIL__') > 0
+);
+
+UPDATE llx_c_email_templates
+SET content_lines = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(content_lines, '__DIFFUSION_REF__', '__REF__'), '__DIFFUSION_LABEL__', '__LABEL__'), '__DIFFUSION_PROJECT_REF__', '__PROJECT_REF__'), '__DIFFUSION_PROJECT_LABEL__', '__PROJECT_NAME__'), '__DIFFUSION_AUTHOR_FULLNAME__', '__AUTHOR_FULLNAME__'), '__DIFFUSION_AUTHOR_EMAIL__', '__AUTHOR_EMAIL__')
+WHERE module = 'diffusion'
+AND content_lines IS NOT NULL
+AND (
+	INSTR(content_lines, '__DIFFUSION_REF__') > 0
+	OR INSTR(content_lines, '__DIFFUSION_LABEL__') > 0
+	OR INSTR(content_lines, '__DIFFUSION_PROJECT_REF__') > 0
+	OR INSTR(content_lines, '__DIFFUSION_PROJECT_LABEL__') > 0
+	OR INSTR(content_lines, '__DIFFUSION_AUTHOR_FULLNAME__') > 0
+	OR INSTR(content_lines, '__DIFFUSION_AUTHOR_EMAIL__') > 0
+);
+
 UPDATE llx_actioncomm
 SET elementtype = 'diffusiondoc@diffusion'
 WHERE elementtype = 'diffusion@diffusion'

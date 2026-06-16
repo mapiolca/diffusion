@@ -327,6 +327,46 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Replace legacy Diffusion-specific substitution keys in module email templates.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function migrateLegacyEmailTemplateSubstitutionKeys($db)
+	{
+		$replacements = array(
+			'__DIFFUSION_REF__' => '__REF__',
+			'__DIFFUSION_LABEL__' => '__LABEL__',
+			'__DIFFUSION_PROJECT_REF__' => '__PROJECT_REF__',
+			'__DIFFUSION_PROJECT_LABEL__' => '__PROJECT_NAME__',
+			'__DIFFUSION_AUTHOR_FULLNAME__' => '__AUTHOR_FULLNAME__',
+			'__DIFFUSION_AUTHOR_EMAIL__' => '__AUTHOR_EMAIL__',
+		);
+		$columns = array('topic', 'content', 'content_lines');
+
+		foreach ($columns as $column) {
+			$expression = $column;
+			$conditions = array();
+			foreach ($replacements as $oldkey => $newkey) {
+				$expression = "REPLACE(".$expression.", '".$db->escape($oldkey)."', '".$db->escape($newkey)."')";
+				$conditions[] = "INSTR(".$column.", '".$db->escape($oldkey)."') > 0";
+			}
+
+			$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+			$sql .= " SET ".$column." = ".$expression;
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND ".$column." IS NOT NULL";
+			$sql .= " AND (".implode(' OR ', $conditions).")";
+
+			if (!$db->query($sql)) {
+				return -1;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
 	 * Normalize old hidden notification mirrors created without a technical label suffix.
 	 *
 	 * @param DoliDB $db Database handler
@@ -401,6 +441,11 @@ class ActionsDiffusion
 		$resultmigrate = self::migrateLegacyVisibleEmailTemplateTypes($db);
 		if ($resultmigrate < 0) {
 			return $resultmigrate;
+		}
+
+		$resultsubstitutionmigrate = self::migrateLegacyEmailTemplateSubstitutionKeys($db);
+		if ($resultsubstitutionmigrate < 0) {
+			return $resultsubstitutionmigrate;
 		}
 
 		$targettype = self::getNotificationMirrorEmailTemplateTypeForContext($notifcode, $object);
@@ -912,7 +957,130 @@ class ActionsDiffusion
 	public function __construct($db)
 	{
 		$this->db = $db;
+		self::getDiffusionOutputDirForEntity();
 		dol_syslog(__METHOD__ . " hook class initialized from class/actions_diffusion.class.php", LOG_DEBUG);
+	}
+
+	/**
+	 * Return and initialize the Diffusion document output directory for an entity.
+	 *
+	 * @param int $entity Entity id. Current entity is used when empty.
+	 * @return string
+	 */
+	private static function getDiffusionOutputDirForEntity($entity = 0)
+	{
+		global $conf;
+
+		$entity = (int) $entity;
+		if ($entity <= 0) {
+			$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+		}
+
+		if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
+			$conf->diffusion = new stdClass();
+		}
+		if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
+			$conf->diffusion->multidir_output = array();
+		}
+
+		$defaultoutput = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
+		if (empty($conf->diffusion->multidir_output[$entity])) {
+			$conf->diffusion->multidir_output[$entity] = $defaultoutput;
+		}
+		if (empty($conf->diffusion->dir_output)) {
+			$conf->diffusion->dir_output = $conf->diffusion->multidir_output[$entity];
+		}
+		if (empty($conf->diffusion->dir_temp)) {
+			$conf->diffusion->dir_temp = $conf->diffusion->multidir_output[$entity].'/temp';
+		}
+
+		if (!isset($conf->diffusiondoc) || !is_object($conf->diffusiondoc)) {
+			$conf->diffusiondoc = new stdClass();
+		}
+		$conf->diffusiondoc->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
+		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
+		$conf->diffusiondoc->multidir_output = $conf->diffusion->multidir_output;
+		$conf->diffusiondoc->dir_temp = $conf->diffusion->dir_temp;
+
+		return $conf->diffusion->multidir_output[$entity];
+	}
+
+	/**
+	 * Describe Diffusion object aliases to Dolibarr generic object APIs.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function getElementProperties($parameters, &$object, &$action, $hookmanager)
+	{
+		global $conf;
+
+		$elementtype = !empty($parameters['elementType']) ? (string) $parameters['elementType'] : '';
+		if (!in_array($elementtype, array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+
+		$diroutput = self::getDiffusionOutputDirForEntity();
+
+		$this->results = array(
+			'module' => 'diffusion',
+			'element' => 'diffusiondoc',
+			'table_element' => 'diffusion',
+			'subelement' => 'diffusiondoc',
+			'classpath' => 'diffusion/class',
+			'classfile' => 'diffusiondoc',
+			'classname' => 'Diffusiondoc',
+			'dir_output' => $diroutput,
+			'dir_temp' => !empty($conf->diffusion->dir_temp) ? $conf->diffusion->dir_temp : $diroutput.'/temp',
+			'parent_element' => '',
+		);
+		$hookmanager->resArray = $this->results;
+
+		return 1;
+	}
+
+	/**
+	 * Keep native AJAX drag-and-drop uploads in the Diffusion document directory.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function overrideUploadOptions($parameters, &$object, &$action, $hookmanager)
+	{
+		if (empty($parameters['element']) || !in_array((string) $parameters['element'], array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+		if (!is_object($object) || empty($object->id) || empty($object->ref)) {
+			return 0;
+		}
+
+		$entity = !empty($object->entity) ? (int) $object->entity : 0;
+		$baseoutput = self::getDiffusionOutputDirForEntity($entity);
+		$objectref = dol_sanitizeFileName($object->ref);
+		$uploadDir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
+		if (empty($uploadDir) || strpos((string) $uploadDir, 'error-diroutput-not-defined') === 0) {
+			$uploadDir = $baseoutput.'/'.$objectref;
+		}
+		$uploadDir = rtrim((string) $uploadDir, '/\\').'/';
+		$fileUrl = DOL_URL_ROOT.'/document.php?modulepart=diffusion&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$objectref.'/');
+
+		if (empty($parameters['options']) || !is_array($parameters['options'])) {
+			$parameters['options'] = array();
+		}
+		$parameters['options']['upload_dir'] = $uploadDir;
+		$parameters['options']['upload_url'] = $fileUrl;
+		$parameters['options']['image_versions']['thumbnail']['upload_dir'] = $uploadDir.'thumbs/';
+		$parameters['options']['image_versions']['thumbnail']['upload_url'] = DOL_URL_ROOT.'/document.php?modulepart=diffusion&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$objectref.'/thumbs/');
+
+		$this->results = array('options' => $parameters['options']);
+
+		return 0;
 	}
 
 	/**

@@ -155,7 +155,7 @@ class modDiffusion extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
-				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'toprightmenu', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
+				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'toprightmenu', 'elementproperties', 'fileupload', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
 				'entity' => '0',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
@@ -777,6 +777,12 @@ class modDiffusion extends DolibarrModules
 			return -3;
 		}
 
+		$resultsubstitutionmigrate = ActionsDiffusion::migrateLegacyEmailTemplateSubstitutionKeys($this->db);
+		if ($resultsubstitutionmigrate < 0) {
+			$this->error = $this->db->lasterror();
+			return -4;
+		}
+
 		$templates = ActionsDiffusion::getDefaultEmailTemplatesDefinition();
 		$langcodes = array('fr_FR', 'en_US');
 		$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
@@ -809,7 +815,7 @@ class modDiffusion extends DolibarrModules
 				$resql = $this->db->query($sql);
 				if (!$resql) {
 					$this->error = $this->db->lasterror();
-					return -4;
+					return -5;
 				}
 			}
 		}

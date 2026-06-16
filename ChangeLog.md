@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Migration des variables de descriptions et modèles de courriel vers les substitutions standards Dolibarr (`__REF__`, `__LABEL__`, `__PROJECT_REF__`, `__PROJECT_NAME__`) et ajout des variables `__AUTHOR_*__` basées sur le créateur de la diffusion.
+- EN: Migrated description and email template variables to standard Dolibarr substitutions (`__REF__`, `__LABEL__`, `__PROJECT_REF__`, `__PROJECT_NAME__`) and added `__AUTHOR_*__` variables based on the Diffusion creator.
 - FR: Correction de la métadonnée native d'activation Dolibarr en laissant `_init()` / `_remove()` gérer `MAIN_MODULE_DIFFUSION`, ce qui restaure l'affichage de la dernière version d'activation.
 - EN: Fixed native Dolibarr activation metadata by letting `_init()` / `_remove()` manage `MAIN_MODULE_DIFFUSION`, restoring the last activation version display.
 - FR: Alignement du socle de compatibilité sur Dolibarr v20 et PHP 8.0, avec ajout d'une page de réglages Compatibilité centralisée.
@@ -40,6 +42,8 @@
 - EN: Aligned the main card with native attached-file handling and added non-blocking PDF regeneration after upload.
 - FR: Ajout de l'alias natif `Diffusiondoc` pour résoudre correctement les objets liés des événements Agenda `diffusiondoc@diffusion`.
 - EN: Added the native `Diffusiondoc` alias so Agenda events linked with `diffusiondoc@diffusion` resolve to the Diffusion object instead of showing as deleted.
+- FR: Correction de l'upload natif par glisser-déposer des pièces jointes Diffusion en exposant l'élément `diffusiondoc` aux propriétés documentaires Dolibarr.
+- EN: Fixed native drag-and-drop upload for Diffusion attachments by exposing the `diffusiondoc` element to Dolibarr document properties.
 
 ## 1.2.4 (15/06/2026)
 

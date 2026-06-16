@@ -124,7 +124,7 @@ function diffusionAppendSubstitutionHelp(existingHtml) {
 	'use strict';
 
 	existingHtml = existingHtml || '';
-	if (!diffusionSubstitutionHelpHtml || existingHtml.indexOf('__DIFFUSION_REF__') !== -1) {
+	if (!diffusionSubstitutionHelpHtml || existingHtml.indexOf('__DIFFUSIONCONTACT_ID__') !== -1) {
 		return existingHtml;
 	}
 

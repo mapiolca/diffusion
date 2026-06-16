@@ -9,8 +9,8 @@ AND type_template IN ('diffusion', 'diffusiondoc@diffusion', 'diffusioncontact@d
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'fr_FR', 0, NULL, NOW(), 'Envoi d''une diffusion', 100, 1, 'isModEnabled("diffusion")', '1',
-	'Diffusion __DIFFUSION_REF__',
-	'Bonjour,<br><br>Veuillez trouver ci-joint la diffusion __DIFFUSION_REF__.<br><br>__DIFFUSION_LABEL__<br>__DIFFUSION_URL__<br><br>Cordialement,<br>__SENDEREMAIL_SIGNATURE__'
+	'Diffusion __REF__',
+	'Bonjour,<br><br>Veuillez trouver ci-joint la diffusion __REF__.<br><br>__LABEL__<br>__DIFFUSION_URL__<br><br>Cordialement,<br>__SENDEREMAIL_SIGNATURE__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
@@ -19,8 +19,8 @@ WHERE NOT EXISTS (
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'en_US', 0, NULL, NOW(), 'Send a diffusion', 100, 1, 'isModEnabled("diffusion")', '1',
-	'Diffusion __DIFFUSION_REF__',
-	'Hello,<br><br>Please find attached diffusion __DIFFUSION_REF__.<br><br>__DIFFUSION_LABEL__<br>__DIFFUSION_URL__<br><br>Regards,<br>__SENDEREMAIL_SIGNATURE__'
+	'Diffusion __REF__',
+	'Hello,<br><br>Please find attached diffusion __REF__.<br><br>__LABEL__<br>__DIFFUSION_URL__<br><br>Regards,<br>__SENDEREMAIL_SIGNATURE__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
@@ -29,8 +29,8 @@ WHERE NOT EXISTS (
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'fr_FR', 0, NULL, NOW(), 'Notification diffusion', 110, 1, 'isModEnabled("diffusion")', '0',
-	'Notification diffusion __DIFFUSION_REF__',
-	'Bonjour,<br><br>Un événement a été enregistré pour la diffusion __DIFFUSION_REF__.<br><br>Statut : __DIFFUSION_STATUS__<br>Projet : __DIFFUSION_PROJECT_REF__<br>Tiers : __DIFFUSION_THIRDPARTY_NAME__<br><br>Voir la diffusion : __DIFFUSION_URL__'
+	'Notification diffusion __REF__',
+	'Bonjour,<br><br>Un événement a été enregistré pour la diffusion __REF__.<br><br>Statut : __DIFFUSION_STATUS__<br>Projet : __PROJECT_REF__<br>Tiers : __DIFFUSION_THIRDPARTY_NAME__<br><br>Voir la diffusion : __DIFFUSION_URL__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
@@ -39,8 +39,8 @@ WHERE NOT EXISTS (
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'en_US', 0, NULL, NOW(), 'Diffusion notification', 110, 1, 'isModEnabled("diffusion")', '0',
-	'Diffusion notification __DIFFUSION_REF__',
-	'Hello,<br><br>An event has been recorded for diffusion __DIFFUSION_REF__.<br><br>Status: __DIFFUSION_STATUS__<br>Project: __DIFFUSION_PROJECT_REF__<br>Third party: __DIFFUSION_THIRDPARTY_NAME__<br><br>Open diffusion: __DIFFUSION_URL__'
+	'Diffusion notification __REF__',
+	'Hello,<br><br>An event has been recorded for diffusion __REF__.<br><br>Status: __DIFFUSION_STATUS__<br>Project: __PROJECT_REF__<br>Third party: __DIFFUSION_THIRDPARTY_NAME__<br><br>Open diffusion: __DIFFUSION_URL__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
@@ -49,8 +49,8 @@ WHERE NOT EXISTS (
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'fr_FR', 0, NULL, NOW(), 'Notification contact de diffusion', 120, 1, 'isModEnabled("diffusion")', '0',
-	'Notification contact diffusion __DIFFUSION_REF__',
-	'Bonjour,<br><br>Un événement a été enregistré sur un contact de la diffusion __DIFFUSION_REF__.<br><br>Contact : __DIFFUSIONCONTACT_NAME__<br>E-mail : __DIFFUSIONCONTACT_EMAIL__<br>Source : __DIFFUSIONCONTACT_SOURCE__<br><br>Voir la diffusion : __DIFFUSIONCONTACT_URL__'
+	'Notification contact diffusion __REF__',
+	'Bonjour,<br><br>Un événement a été enregistré sur un contact de la diffusion __REF__.<br><br>Contact : __DIFFUSIONCONTACT_NAME__<br>E-mail : __DIFFUSIONCONTACT_EMAIL__<br>Source : __DIFFUSIONCONTACT_SOURCE__<br><br>Voir la diffusion : __DIFFUSIONCONTACT_URL__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates
@@ -59,8 +59,8 @@ WHERE NOT EXISTS (
 
 INSERT INTO llx_c_email_templates (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)
 SELECT 1, 'diffusion', 'diffusion@diffusion', 'en_US', 0, NULL, NOW(), 'Diffusion contact notification', 120, 1, 'isModEnabled("diffusion")', '0',
-	'Diffusion contact notification __DIFFUSION_REF__',
-	'Hello,<br><br>An event has been recorded on a contact of diffusion __DIFFUSION_REF__.<br><br>Contact: __DIFFUSIONCONTACT_NAME__<br>Email: __DIFFUSIONCONTACT_EMAIL__<br>Source: __DIFFUSIONCONTACT_SOURCE__<br><br>Open diffusion: __DIFFUSIONCONTACT_URL__'
+	'Diffusion contact notification __REF__',
+	'Hello,<br><br>An event has been recorded on a contact of diffusion __REF__.<br><br>Contact: __DIFFUSIONCONTACT_NAME__<br>Email: __DIFFUSIONCONTACT_EMAIL__<br>Source: __DIFFUSIONCONTACT_SOURCE__<br><br>Open diffusion: __DIFFUSIONCONTACT_URL__'
 FROM DUAL
 WHERE NOT EXISTS (
 	SELECT 1 FROM llx_c_email_templates

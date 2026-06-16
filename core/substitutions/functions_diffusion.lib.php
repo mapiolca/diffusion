@@ -51,16 +51,12 @@ function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $objec
 			$url = dol_buildpath('/diffusion/diffusion_card.php', 2).'?id='.(int) $diffusion->id;
 		}
 
-		$substitutionarray['__DIFFUSION_REF__'] = !empty($diffusion->ref) ? (string) $diffusion->ref : '';
-		$substitutionarray['__DIFFUSION_LABEL__'] = !empty($diffusion->label) ? (string) $diffusion->label : '';
+		diffusion_fill_standard_diffusion_substitutions($substitutionarray, $diffusion);
 		$substitutionarray['__DIFFUSION_DESCRIPTION__'] = !empty($diffusion->description) ? dol_string_nohtmltag((string) $diffusion->description) : '';
 		$substitutionarray['__DIFFUSION_STATUS__'] = isset($diffusion->status) ? diffusion_get_status_label_for_substitution($diffusion->status, $langs) : '';
 		$substitutionarray['__DIFFUSION_URL__'] = $url;
-		$substitutionarray['__DIFFUSION_PROJECT_REF__'] = '';
-		$substitutionarray['__DIFFUSION_PROJECT_LABEL__'] = '';
 		$substitutionarray['__DIFFUSION_THIRDPARTY_NAME__'] = '';
-		$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = '';
-		$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = '';
+		diffusion_init_author_substitution_keys($substitutionarray);
 
 		$thirdpartyid = 0;
 		if (!empty($diffusion->socid)) {
@@ -73,8 +69,9 @@ function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $objec
 			require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
 			$project = new Project($diffusion->db);
 			if ($project->fetch((int) $diffusion->fk_project) > 0) {
-				$substitutionarray['__DIFFUSION_PROJECT_REF__'] = (string) $project->ref;
-				$substitutionarray['__DIFFUSION_PROJECT_LABEL__'] = (string) $project->title;
+				$substitutionarray['__PROJECT_ID__'] = !empty($project->id) ? (string) $project->id : '';
+				$substitutionarray['__PROJECT_REF__'] = (string) $project->ref;
+				$substitutionarray['__PROJECT_NAME__'] = (string) $project->title;
 				if (empty($thirdpartyid) && !empty($project->socid)) {
 					$thirdpartyid = (int) $project->socid;
 				}
@@ -93,8 +90,7 @@ function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $objec
 			require_once DOL_DOCUMENT_ROOT.'/user/class/user.class.php';
 			$author = new User($diffusion->db);
 			if ($author->fetch((int) $diffusion->fk_user_creat) > 0) {
-				$substitutionarray['__DIFFUSION_AUTHOR_FULLNAME__'] = $author->getFullName($langs);
-				$substitutionarray['__DIFFUSION_AUTHOR_EMAIL__'] = (string) $author->email;
+				diffusion_fill_author_substitution_keys($substitutionarray, $langs, $author);
 			}
 		}
 	};
@@ -146,6 +142,97 @@ function diffusion_completesubstitutionarray(&$substitutionarray, $langs, $objec
 }
 
 /**
+ * Fill standard object substitution keys for a Diffusion object.
+ *
+ * DiffusionContact notifications load their parent Diffusion after the core
+ * common substitutions have been built from the contact line object.
+ *
+ * @param array<string,string> $substitutionarray Substitution array
+ * @param CommonObject $diffusion Diffusion object
+ * @return void
+ */
+function diffusion_fill_standard_diffusion_substitutions(&$substitutionarray, $diffusion)
+{
+	$diffusionid = !empty($diffusion->id) ? (int) $diffusion->id : (!empty($diffusion->rowid) ? (int) $diffusion->rowid : 0);
+
+	$substitutionarray['__ID__'] = $diffusionid > 0 ? (string) $diffusionid : '';
+	$substitutionarray['__REF__'] = !empty($diffusion->ref) ? (string) $diffusion->ref : '';
+	$substitutionarray['__NEWREF__'] = isset($diffusion->newref) ? (string) $diffusion->newref : '';
+	$substitutionarray['__LABEL__'] = !empty($diffusion->label) ? (string) $diffusion->label : '';
+	$substitutionarray['__PROJECT_ID__'] = '';
+	$substitutionarray['__PROJECT_REF__'] = '';
+	$substitutionarray['__PROJECT_NAME__'] = '';
+}
+
+/**
+ * Initialize author substitution keys with empty values.
+ *
+ * @param array<string,string> $substitutionarray Substitution array
+ * @return void
+ */
+function diffusion_init_author_substitution_keys(&$substitutionarray)
+{
+	foreach (diffusion_get_author_substitution_default_values() as $key => $value) {
+		$substitutionarray[$key] = $value;
+	}
+}
+
+/**
+ * Return default values for author substitution keys.
+ *
+ * @return array<string,string>
+ */
+function diffusion_get_author_substitution_default_values()
+{
+	return array(
+		'__AUTHOR_SIGNATURE__' => '',
+		'__AUTHOR_ID__' => '',
+		'__AUTHOR_LOGIN__' => '',
+		'__AUTHOR_EMAIL__' => '',
+		'__AUTHOR_PHONE__' => '',
+		'__AUTHOR_PHONEPRO__' => '',
+		'__AUTHOR_PHONEMOBILE__' => '',
+		'__AUTHOR_FAX__' => '',
+		'__AUTHOR_LASTNAME__' => '',
+		'__AUTHOR_FIRSTNAME__' => '',
+		'__AUTHOR_FULLNAME__' => '',
+		'__AUTHOR_SUPERVISOR_ID__' => '0',
+		'__AUTHOR_JOB__' => '',
+		'__AUTHOR_REMOTE_IP__' => '',
+		'__AUTHOR_VCARD_URL__' => '',
+	);
+}
+
+/**
+ * Fill author substitution keys from the Diffusion creator.
+ *
+ * @param array<string,string> $substitutionarray Substitution array
+ * @param Translate|null $langs Output language
+ * @param User $author Author user
+ * @return void
+ */
+function diffusion_fill_author_substitution_keys(&$substitutionarray, $langs, $author)
+{
+	$useSignature = !function_exists('getDolGlobalString') || !getDolGlobalString('MAIN_MAIL_DO_NOT_USE_SIGN');
+
+	$substitutionarray['__AUTHOR_SIGNATURE__'] = ($useSignature && !empty($author->signature)) ? (string) $author->signature : '';
+	$substitutionarray['__AUTHOR_ID__'] = !empty($author->id) ? (string) $author->id : '';
+	$substitutionarray['__AUTHOR_LOGIN__'] = isset($author->login) ? (string) $author->login : '';
+	$substitutionarray['__AUTHOR_EMAIL__'] = isset($author->email) ? (string) $author->email : '';
+	$substitutionarray['__AUTHOR_PHONE__'] = function_exists('dol_print_phone') ? (string) dol_print_phone((isset($author->office_phone) ? $author->office_phone : ''), '', 0, 0, '', ' ', '', '', -1) : (isset($author->office_phone) ? (string) $author->office_phone : '');
+	$substitutionarray['__AUTHOR_PHONEPRO__'] = function_exists('dol_print_phone') ? (string) dol_print_phone((isset($author->user_mobile) ? $author->user_mobile : ''), '', 0, 0, '', ' ', '', '', -1) : (isset($author->user_mobile) ? (string) $author->user_mobile : '');
+	$substitutionarray['__AUTHOR_PHONEMOBILE__'] = function_exists('dol_print_phone') ? (string) dol_print_phone((isset($author->personal_mobile) ? $author->personal_mobile : ''), '', 0, 0, '', ' ', '', '', -1) : (isset($author->personal_mobile) ? (string) $author->personal_mobile : '');
+	$substitutionarray['__AUTHOR_FAX__'] = isset($author->office_fax) ? (string) $author->office_fax : '';
+	$substitutionarray['__AUTHOR_LASTNAME__'] = isset($author->lastname) ? (string) $author->lastname : '';
+	$substitutionarray['__AUTHOR_FIRSTNAME__'] = isset($author->firstname) ? (string) $author->firstname : '';
+	$substitutionarray['__AUTHOR_FULLNAME__'] = method_exists($author, 'getFullName') ? (string) $author->getFullName($langs) : trim($substitutionarray['__AUTHOR_FIRSTNAME__'].' '.$substitutionarray['__AUTHOR_LASTNAME__']);
+	$substitutionarray['__AUTHOR_SUPERVISOR_ID__'] = !empty($author->fk_user) ? (string) $author->fk_user : '0';
+	$substitutionarray['__AUTHOR_JOB__'] = isset($author->job) ? (string) $author->job : '';
+	$substitutionarray['__AUTHOR_REMOTE_IP__'] = function_exists('getUserRemoteIP') ? (string) getUserRemoteIP() : '';
+	$substitutionarray['__AUTHOR_VCARD_URL__'] = method_exists($author, 'getOnlineVirtualCardUrl') ? (string) $author->getOnlineVirtualCardUrl('', 'external') : '';
+}
+
+/**
  * Check whether Dolibarr is building the help/catalog of available email variables.
  *
  * @param mixed $parameters Extra parameters
@@ -187,16 +274,105 @@ function diffusion_get_available_substitution_keys($langs = null)
 	}
 
 	$translationkeys = array(
-		'__DIFFUSION_REF__' => 'DiffusionSubstitutionDiffusionRef',
-		'__DIFFUSION_LABEL__' => 'DiffusionSubstitutionDiffusionLabel',
+		'__SENDEREMAIL_SIGNATURE__' => 'DiffusionSubstitutionSenderEmailSignature',
+		'__USER_SIGNATURE__' => 'DiffusionSubstitutionUserSignature',
+		'__USER_ID__' => 'DiffusionSubstitutionUser',
+		'__USER_LOGIN__' => 'DiffusionSubstitutionUser',
+		'__USER_EMAIL__' => 'DiffusionSubstitutionUser',
+		'__USER_PHONE__' => 'DiffusionSubstitutionUser',
+		'__USER_PHONEPRO__' => 'DiffusionSubstitutionUser',
+		'__USER_PHONEMOBILE__' => 'DiffusionSubstitutionUser',
+		'__USER_FAX__' => 'DiffusionSubstitutionUser',
+		'__USER_LASTNAME__' => 'DiffusionSubstitutionUser',
+		'__USER_FIRSTNAME__' => 'DiffusionSubstitutionUser',
+		'__USER_FULLNAME__' => 'DiffusionSubstitutionUser',
+		'__USER_SUPERVISOR_ID__' => 'DiffusionSubstitutionUser',
+		'__USER_JOB__' => 'DiffusionSubstitutionUser',
+		'__USER_REMOTE_IP__' => 'DiffusionSubstitutionUser',
+		'__USER_VCARD_URL__' => 'DiffusionSubstitutionUser',
+		'__AUTHOR_SIGNATURE__' => 'DiffusionSubstitutionAuthorSignature',
+		'__AUTHOR_ID__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_LOGIN__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_EMAIL__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_PHONE__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_PHONEPRO__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_PHONEMOBILE__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_FAX__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_LASTNAME__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_FIRSTNAME__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_FULLNAME__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_SUPERVISOR_ID__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_JOB__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_REMOTE_IP__' => 'DiffusionSubstitutionAuthor',
+		'__AUTHOR_VCARD_URL__' => 'DiffusionSubstitutionAuthor',
+		'__MYCOMPANY_NAME__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_EMAIL__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_URL__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PHONE__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PHONEMOBILE__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_FAX__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID1__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID2__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID3__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID4__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID5__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID6__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID7__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID8__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID9__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_PROFID10__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_CAPITAL__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_FULLADDRESS__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_ADDRESS__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_VATNUMBER__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_ZIP__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_TOWN__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_STATE__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_COUNTRY__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_COUNTRY_ID__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_COUNTRY_CODE__' => 'DiffusionSubstitutionMyCompany',
+		'__MYCOMPANY_CURRENCY_CODE__' => 'DiffusionSubstitutionMyCompany',
+		'__ID__' => 'DiffusionSubstitutionObjectId',
+		'__REF__' => 'DiffusionSubstitutionObjectRef',
+		'__NEWREF__' => 'DiffusionSubstitutionObjectNewRef',
+		'__LABEL__' => 'DiffusionSubstitutionObjectLabel',
+		'__PROJECT_ID__' => 'DiffusionSubstitutionProject',
+		'__PROJECT_REF__' => 'DiffusionSubstitutionProject',
+		'__PROJECT_NAME__' => 'DiffusionSubstitutionProject',
+		'__NOW_TMS__' => 'DiffusionSubstitutionDate',
+		'__NOW_TMS_YMD__' => 'DiffusionSubstitutionDate',
+		'__DAY__' => 'DiffusionSubstitutionDate',
+		'__DAY_TEXT__' => 'DiffusionSubstitutionDate',
+		'__DAY_TEXT_SHORT__' => 'DiffusionSubstitutionDate',
+		'__DAY_TEXT_MIN__' => 'DiffusionSubstitutionDate',
+		'__MONTH__' => 'DiffusionSubstitutionDate',
+		'__MONTH_TEXT__' => 'DiffusionSubstitutionDate',
+		'__MONTH_TEXT_SHORT__' => 'DiffusionSubstitutionDate',
+		'__MONTH_TEXT_MIN__' => 'DiffusionSubstitutionDate',
+		'__YEAR__' => 'DiffusionSubstitutionDate',
+		'__YEAR_PREVIOUS_MONTH__' => 'DiffusionSubstitutionDate',
+		'__YEAR_NEXT_MONTH__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_DAY__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_MONTH__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_MONTH_TEXT__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_MONTH_TEXT_SHORT__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_MONTH_TEXT_MIN__' => 'DiffusionSubstitutionDate',
+		'__PREVIOUS_YEAR__' => 'DiffusionSubstitutionDate',
+		'__NEXT_DAY__' => 'DiffusionSubstitutionDate',
+		'__NEXT_MONTH__' => 'DiffusionSubstitutionDate',
+		'__NEXT_MONTH_TEXT__' => 'DiffusionSubstitutionDate',
+		'__NEXT_MONTH_TEXT_SHORT__' => 'DiffusionSubstitutionDate',
+		'__NEXT_MONTH_TEXT_MIN__' => 'DiffusionSubstitutionDate',
+		'__NEXT_YEAR__' => 'DiffusionSubstitutionDate',
+		'__ENTITY_ID__' => 'DiffusionSubstitutionSystem',
+		'__DOL_MAIN_URL_ROOT__' => 'DiffusionSubstitutionSystem',
+		'__(AnyTranslationKey)__' => 'DiffusionSubstitutionTranslationKey',
+		'__(AnyTranslationKey|langfile)__' => 'DiffusionSubstitutionTranslationLangfileKey',
+		'__[AnyConstantKey]__' => 'DiffusionSubstitutionConstantKey',
 		'__DIFFUSION_DESCRIPTION__' => 'DiffusionSubstitutionDiffusionDescription',
 		'__DIFFUSION_STATUS__' => 'DiffusionSubstitutionDiffusionStatus',
 		'__DIFFUSION_URL__' => 'DiffusionSubstitutionDiffusionUrl',
-		'__DIFFUSION_PROJECT_REF__' => 'DiffusionSubstitutionDiffusionProjectRef',
-		'__DIFFUSION_PROJECT_LABEL__' => 'DiffusionSubstitutionDiffusionProjectLabel',
 		'__DIFFUSION_THIRDPARTY_NAME__' => 'DiffusionSubstitutionDiffusionThirdpartyName',
-		'__DIFFUSION_AUTHOR_FULLNAME__' => 'DiffusionSubstitutionDiffusionAuthorFullname',
-		'__DIFFUSION_AUTHOR_EMAIL__' => 'DiffusionSubstitutionDiffusionAuthorEmail',
 		'__DIFFUSIONCONTACT_ID__' => 'DiffusionSubstitutionDiffusionContactId',
 		'__DIFFUSIONCONTACT_FK_DIFFUSION__' => 'DiffusionSubstitutionDiffusionContactFkDiffusion',
 		'__DIFFUSIONCONTACT_CONTACT_ID__' => 'DiffusionSubstitutionDiffusionContactContactId',
