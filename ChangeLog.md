@@ -38,6 +38,8 @@
 - EN: Improved project contact import with unchecked rows by default and a select-all link.
 - FR: Alignement de la fiche principale sur la gestion native des fichiers joints et régénération non bloquante du PDF après upload.
 - EN: Aligned the main card with native attached-file handling and added non-blocking PDF regeneration after upload.
+- FR: Ajout de l'alias natif `Diffusiondoc` pour résoudre correctement les objets liés des événements Agenda `diffusiondoc@diffusion`.
+- EN: Added the native `Diffusiondoc` alias so Agenda events linked with `diffusiondoc@diffusion` resolve to the Diffusion object instead of showing as deleted.
 
 ## 1.2.4 (15/06/2026)
 
