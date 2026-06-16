@@ -2,6 +2,8 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Recalage des pieds de page PDF Diffusion sur le pattern natif Dolibarr, avec texte libre uniquement sur la dernière page et pied simplifié sur les pages intermédiaires.
+- EN: Realigned Diffusion PDF footers with the native Dolibarr pattern, with free text only on the last page and simplified footers on intermediate pages.
 - FR: Reprise de la pagination du PDF Diffusion avec marge basse réservée avant rendu, fermeture contrôlée des pages et meilleure prise en compte du texte libre de pied de page.
 - EN: Reworked Diffusion PDF pagination with bottom margin reserved before rendering, controlled page finalization and better handling of footer free text.
 - FR: Alignement du bloc des derniers événements de la fiche Diffusion sur le réglage natif Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT`.
