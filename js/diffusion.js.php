@@ -120,6 +120,7 @@ if (function_exists('diffusion_get_available_substitution_help_html')) {
 
 var diffusionSubstitutionHelpHtml = <?php echo json_encode($diffusionSubstitutionHelpHtml, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 var diffusionRegenerateDocumentUrl = <?php echo json_encode(dol_buildpath('/diffusion/ajax/regeneratedocument.php', 1), JSON_UNESCAPED_SLASHES); ?>;
+var diffusionFileUploadUrl = <?php echo json_encode(DOL_URL_ROOT.'/core/ajax/fileupload.php', JSON_UNESCAPED_SLASHES); ?>;
 
 function diffusionAppendSubstitutionHelp(existingHtml) {
 	'use strict';
@@ -240,49 +241,106 @@ function diffusionAjaxUploadResponseHasErrors(responseData) {
 	return false;
 }
 
-function diffusionRegenerateDocumentAfterAjaxUpload(responseData, settings) {
+function diffusionGetCurrentPageDiffusionId() {
 	'use strict';
 
-	var data;
-	var element;
+	var urlParams = new URLSearchParams(window.location.search || '');
+	var id = urlParams.get('id') || '';
+
+	if (!id) {
+		id = jQuery('input[name="id"]').first().val() || '';
+	}
+
+	return id;
+}
+
+function diffusionRedirectAfterDragDrop(id, eventMessages) {
+	'use strict';
+
+	var redirectUrl = new URL(window.location.href);
+	redirectUrl.searchParams.set('id', id);
+	redirectUrl.searchParams.set('seteventmessages', eventMessages);
+	window.location.href = redirectUrl.pathname + redirectUrl.search;
+}
+
+function diffusionHandleDragDropUpload(event) {
+	'use strict';
+
+	var dropArea;
+	var dataTransfer;
+	var droppedFiles;
+	var formData;
 	var id;
 	var token;
 
-	if (!settings || !settings.url || settings.url.indexOf('/core/ajax/fileupload.php') === -1) {
-		return;
-	}
-	data = settings.data;
-	if (!data || typeof data.get !== 'function') {
+	if (!document.body || (!document.body.classList.contains('page-card') && !document.body.classList.contains('page-card_document'))) {
 		return;
 	}
 
-	element = data.get('element');
-	if (element !== 'diffusiondoc' && element !== 'diffusiondoc@diffusion') {
+	dropArea = event.target && event.target.closest ? event.target.closest('.cssDragDropArea') : null;
+	if (!dropArea) {
 		return;
 	}
-	if (diffusionAjaxUploadResponseHasErrors(responseData)) {
+	dataTransfer = event.dataTransfer;
+	if (!dataTransfer || !dataTransfer.files || !dataTransfer.files.length) {
 		return;
 	}
 
-	id = data.get('fk_element');
-	token = data.get('token') || jQuery('meta[name="anti-csrf-currenttoken"]').attr('content') || '';
-	if (!id || !token || !diffusionRegenerateDocumentUrl) {
+	id = diffusionGetCurrentPageDiffusionId();
+	token = jQuery('meta[name="anti-csrf-currenttoken"]').attr('content') || '';
+	if (!id || !token || !diffusionFileUploadUrl) {
 		return;
 	}
+
+	event.preventDefault();
+	event.stopPropagation();
+	event.stopImmediatePropagation();
+
+	formData = new FormData();
+	formData.append('fk_element', id);
+	formData.append('element', 'diffusiondoc');
+	formData.append('token', token);
+	formData.append('action', 'linkit');
+
+	droppedFiles = dataTransfer.files;
+	jQuery.each(droppedFiles, function (index, file) {
+		formData.append('files[]', file, file.name);
+	});
+
+	jQuery('.cssDragDropArea').removeClass('highlightDragDropArea');
+	jQuery('.dragDropAreaMessage').addClass('hidden');
 
 	jQuery.ajax({
-		url: diffusionRegenerateDocumentUrl,
+		url: diffusionFileUploadUrl,
 		type: 'POST',
-		async: false,
-		data: {
-			action: 'regenerate',
-			id: id,
-			token: token
+		processData: false,
+		contentType: false,
+		data: formData
+	}).done(function (responseData) {
+		if (diffusionAjaxUploadResponseHasErrors(responseData)) {
+			diffusionRedirectAfterDragDrop(id, 'ErrorOnAtLeastOneFileUpload:warnings');
+			return;
 		}
+
+		jQuery.ajax({
+			url: diffusionRegenerateDocumentUrl,
+			type: 'POST',
+			data: {
+				action: 'regenerate',
+				id: id,
+				token: token
+			}
+		}).done(function () {
+			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs');
+		}).fail(function () {
+			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs,DiffusionDocumentRegenerationAfterFileChangeFailed:warnings');
+		});
 	}).fail(function (jqXHR) {
-		if (window.console && window.console.warn) {
-			window.console.warn('Diffusion PDF regeneration after Ajax upload failed', jqXHR.responseText || jqXHR.statusText);
+		if (jqXHR && jqXHR.status === 403) {
+			diffusionRedirectAfterDragDrop(id, 'ErrorUploadPermissionDenied:errors');
+			return;
 		}
+		diffusionRedirectAfterDragDrop(id, 'ErrorUploadFileDragDropPermissionDenied:errors');
 	});
 }
 
@@ -292,9 +350,7 @@ jQuery(document).ready(function () {
 	diffusionEnhanceEmailTemplateSubstitutionTooltips();
 	diffusionScheduleProjectContactsDialogResize();
 
-	jQuery(document).ajaxSuccess(function (event, xhr, settings) {
-		diffusionRegenerateDocumentAfterAjaxUpload(xhr.responseText, settings);
-	});
+	document.addEventListener('drop', diffusionHandleDragDropUpload, true);
 
 	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
 		var target = jQuery(this).data('target');

@@ -991,7 +991,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$shareByFilename = $this->getSharedLinksByFilename($object, $dir);
 		}
 
-		$fileList = dol_dir_list($dir, 'files', 0, '', '(\.meta$|\.tmp$|\.preview\.png$)', 'name', SORT_ASC, 1);
+		$fileList = dol_dir_list($dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', 'name', SORT_ASC, 1);
 		foreach ($fileList as $fileinfo) {
 			if (!empty($currentPdfName) && dol_strtolower($fileinfo['name']) == dol_strtolower($currentPdfName)) {
 				continue;

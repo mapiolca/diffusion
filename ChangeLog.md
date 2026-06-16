@@ -2,6 +2,9 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction de la liste des pièces jointes PDF pour masquer les fichiers techniques de preview et reprise du drag-and-drop Diffusion pour régénérer le PDF avant la redirection.
+- EN: Fixed the PDF attachments list to hide technical preview files and reworked Diffusion drag-and-drop so the PDF is regenerated before redirecting.
+
 - FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
 - EN: Harmonized the Diffusion, Attached files and Events/Agenda tab headers, added the generated PDF preview to the header and automatically regenerated the PDF after attached-file changes.
 
