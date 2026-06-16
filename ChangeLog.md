@@ -2,6 +2,11 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
+- EN: Harmonized the Diffusion, Attached files and Events/Agenda tab headers, added the generated PDF preview to the header and automatically regenerated the PDF after attached-file changes.
+
+- FR: Correction de la traduction française de la colonne Environnement en liste Diffusion et ajout d'une pagination native sur l'onglet Événements/Agenda.
+- EN: Fixed the French translation of the Environment column on the Diffusion list and added native pagination to the Events/Agenda tab.
 - FR: Ajout des contacts de diffusion comme participants natifs des événements Agenda générés, via les ressources `user` et `socpeople` de Dolibarr.
 - EN: Added Diffusion contacts as native participants of generated Agenda events, using Dolibarr `user` and `socpeople` resources.
 - FR: Renforcement de l'emprise réservée aux pieds de page PDF Diffusion avec mesure réelle du rendu natif et neutralisation des sauts automatiques pendant l'impression du pied.

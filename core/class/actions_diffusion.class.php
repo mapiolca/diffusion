@@ -1043,6 +1043,34 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Replace the default Diffusion banner pictogram with the generated PDF preview when available.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function formDolBanner($parameters, &$object, &$action, $hookmanager)
+	{
+		if (!is_object($object) || !in_array((string) $object->element, array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+
+		dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
+		if (!function_exists('diffusionGetGeneratedDocumentPreviewHtml')) {
+			return 0;
+		}
+
+		$previewhtml = diffusionGetGeneratedDocumentPreviewHtml($object);
+		if ($previewhtml !== '') {
+			$parameters['morehtmlleft'] = $previewhtml;
+		}
+
+		return 0;
+	}
+
+	/**
 	 * Keep native AJAX drag-and-drop uploads in the Diffusion document directory.
 	 *
 	 * @param array<string,mixed> $parameters Hook parameters

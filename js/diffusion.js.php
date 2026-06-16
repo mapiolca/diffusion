@@ -119,6 +119,7 @@ if (function_exists('diffusion_get_available_substitution_help_html')) {
 /* Javascript library of module Diffusion */
 
 var diffusionSubstitutionHelpHtml = <?php echo json_encode($diffusionSubstitutionHelpHtml, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+var diffusionRegenerateDocumentUrl = <?php echo json_encode(dol_buildpath('/diffusion/ajax/regeneratedocument.php', 1), JSON_UNESCAPED_SLASHES); ?>;
 
 function diffusionAppendSubstitutionHelp(existingHtml) {
 	'use strict';
@@ -217,11 +218,83 @@ function diffusionScheduleProjectContactsDialogResize() {
 	}, 50);
 }
 
+function diffusionAjaxUploadResponseHasErrors(responseData) {
+	'use strict';
+
+	var files;
+	try {
+		files = (typeof responseData === 'string') ? JSON.parse(responseData) : responseData;
+	} catch (e) {
+		return true;
+	}
+	if (!jQuery.isArray(files)) {
+		return true;
+	}
+
+	for (var i = 0; i < files.length; i++) {
+		if (files[i] && files[i].error) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function diffusionRegenerateDocumentAfterAjaxUpload(responseData, settings) {
+	'use strict';
+
+	var data;
+	var element;
+	var id;
+	var token;
+
+	if (!settings || !settings.url || settings.url.indexOf('/core/ajax/fileupload.php') === -1) {
+		return;
+	}
+	data = settings.data;
+	if (!data || typeof data.get !== 'function') {
+		return;
+	}
+
+	element = data.get('element');
+	if (element !== 'diffusiondoc' && element !== 'diffusiondoc@diffusion') {
+		return;
+	}
+	if (diffusionAjaxUploadResponseHasErrors(responseData)) {
+		return;
+	}
+
+	id = data.get('fk_element');
+	token = data.get('token') || jQuery('meta[name="anti-csrf-currenttoken"]').attr('content') || '';
+	if (!id || !token || !diffusionRegenerateDocumentUrl) {
+		return;
+	}
+
+	jQuery.ajax({
+		url: diffusionRegenerateDocumentUrl,
+		type: 'POST',
+		async: false,
+		data: {
+			action: 'regenerate',
+			id: id,
+			token: token
+		}
+	}).fail(function (jqXHR) {
+		if (window.console && window.console.warn) {
+			window.console.warn('Diffusion PDF regeneration after Ajax upload failed', jqXHR.responseText || jqXHR.statusText);
+		}
+	});
+}
+
 jQuery(document).ready(function () {
 	'use strict';
 
 	diffusionEnhanceEmailTemplateSubstitutionTooltips();
 	diffusionScheduleProjectContactsDialogResize();
+
+	jQuery(document).ajaxSuccess(function (event, xhr, settings) {
+		diffusionRegenerateDocumentAfterAjaxUpload(xhr.responseText, settings);
+	});
 
 	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
 		var target = jQuery(this).data('target');

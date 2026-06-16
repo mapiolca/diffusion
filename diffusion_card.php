@@ -540,31 +540,12 @@ dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutpu
 // EN: Manage attachment upload and deletion with Dolibarr helper to keep buttons functional.
 // FR: Gère l'envoi et la suppression des pièces jointes avec l'aide Dolibarr pour garder les boutons fonctionnels.
 // Delete file in doc form
-	if ($action == 'remove_file' && $permissiontoadd) {
-		if ($object->id > 0) {
-			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
-			$langs->load("other");
-			$filetodelete = GETPOST('file', 'alpha');
-			$filetodelete = ltrim((string) $filetodelete, '/');
-			$fullpathtodelete = '';
-			if ($filetodelete !== '' && preg_match('/\.\./', $filetodelete)) {
-				$fullpathtodelete = '';
-			} elseif (preg_match('/^'.preg_quote($object->element, '/').'\//', $filetodelete)) {
-				$fullpathtodelete = $diffusionoutput.'/'.$filetodelete;
-			} else {
-				$fullpathtodelete = $upload_dir.'/'.basename($filetodelete);
-			}
-			dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete.' fullpath='.$fullpathtodelete, LOG_DEBUG);
-			$ret = (!empty($fullpathtodelete) ? dol_delete_file($fullpathtodelete, 0, 0, 0, $object) : 0);
-			if ($ret) {
-				setEventMessages($langs->trans("FileWasRemoved", $filetodelete), null, 'mesgs');
-			} else {
-				setEventMessages($langs->trans("ErrorFailToDeleteFile", $filetodelete), null, 'errors');
-			}
-			$action = '';
-		}
-	}
+if ($action == 'remove_file' && $permissiontoadd && $object->id > 0) {
+	$filetodelete = GETPOST('file', 'alpha');
+	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete, LOG_DEBUG);
+	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, $filetodelete);
+	$action = '';
+}
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
@@ -628,9 +609,21 @@ if (empty($reshook)) {
 	// Actions on linked files from the native attached files block.
 	$modulepart = 'diffusion';
 	$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
+	$diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
+	$diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
+	$diffusionrenameto = $diffusionfilerename ? dol_string_nohtmltag(dol_sanitizeFileName(GETPOST('renamefileto', 'alpha'), '_', 0)) : '';
+	if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissiontoadd) && GETPOST('urlfile', 'alpha')) {
+		diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, GETPOST('urlfile', 'alpha', 0, null, null, 1));
+		$tmpurl = !empty($backtopage) ? $backtopage : $_SERVER["PHP_SELF"].'?id='.$object->id;
+		header('Location: '.$tmpurl);
+		exit;
+	}
 	include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
-	if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionPostProcessUploadedFiles')) {
-		diffusionPostProcessUploadedFiles($db, $object, $upload_dir, $user, $langs);
+	if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionRegenerateDocumentAfterLinkedFileChange')) {
+		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload');
+	}
+	if ($diffusionfilerename && !empty($permissiontoadd) && empty($error) && $diffusionrenamefrom !== $diffusionrenameto && is_file(diffusionResolveLinkedFilePath($object, $upload_dir, $diffusionrenameto)) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenamefrom) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenameto)) {
+		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'rename');
 	}
 
 // Action to move up and down lines of object
@@ -1237,80 +1230,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// ------------------------------------------------------------
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
-	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
-	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
-
-	$morehtmlref = '<div class="refidno">';
-	if (!empty($object->is_template)) {
-		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
-		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
-	}
-	if (isset($object->fields['label'])) {
-		if (!empty($object->is_template)) {
-			$morehtmlref .= '<br>';
-		}
-		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
-		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
-	}
-	if (isModEnabled('project')) {
-		$langs->load("projects");
-		$morehtmlref .= '<br>';
-		if ($permissiontoadd) {
-			$socidforproject = GETPOSTINT('socid');
-			$socidforproject = ($socidforproject > 0 ? $socidforproject : -1);
-			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"');
-			if ($action != 'classify') {
-				$morehtmlref .= '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=classify&token='.newToken().'&id='.$object->id.'">'.img_edit($langs->transnoentitiesnoconv('SetProject')).'</a> ';
-			}
-			$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $socidforproject, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
-		} elseif (!empty($object->fk_project)) {
-			$proj = new Project($db);
-			$proj->fetch($object->fk_project);
-			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"').$proj->getNomUrl(1);
-			if (!empty($proj->title)) {
-				$morehtmlref .= '<span class="opacitymedium"> - '.dol_escape_htmltag($proj->title).'</span>';
-			}
-		}
-	}
-	if (empty($object->is_template)) {
-		$morehtmlref .= '<br>';
-		$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
-		$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
-
-		$morehtmlref .= '<br>';
-		$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
-		if (!empty($object->fk_user_exped)) {
-			$userexped = new User($db);
-			if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
-				$morehtmlref .= $userexped->getNomUrl(-1);
-			} else {
-				$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
-			}
-		} else {
-			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
-		}
-	}
-
-	if (isModEnabled('multicompany') && !empty($object->entity) && (int) $object->entity !== (int) $conf->entity) {
-		$entitylabel = (string) $object->entity;
-		$sqlentity = 'SELECT label FROM '.MAIN_DB_PREFIX.'entity WHERE rowid = '.((int) $object->entity);
-		$resqlentity = $db->query($sqlentity);
-		if ($resqlentity) {
-			$objentity = $db->fetch_object($resqlentity);
-			if ($objentity && isset($objentity->label) && $objentity->label !== '') {
-				$entitylabel = $objentity->label;
-			}
-		}
-
-		$morehtmlref .= '<br>';
-		$morehtmlref .= '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entitylabel).'</span></div>';
-	}
-	$morehtmlref .= '</div>';
-
-
-	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
-	$fieldrefbanner = (!empty($object->is_template) ? '' : 'ref');
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', $fieldrefbanner, $morehtmlref, '', 0, '', $morehtmlstatus);
+	diffusionPrintObjectBanner($object, $form, $linkback, $permissiontoadd, $action);
 
 
 	print '<div class="fichecenter">';
