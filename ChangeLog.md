@@ -2,6 +2,9 @@
 
 ## 1.3.0 (15/06/2026)
 
+- FR: Correction du retour à brouillon Diffusion lorsque le trigger Agenda cherchait à tort un champ tiers inexistant sur la table `diffusion`.
+- EN: Fixed Diffusion back-to-draft when the Agenda trigger wrongly looked for a missing third-party field on the `diffusion` table.
+
 - FR: Indexation ECM et génération des liens publics natifs pour les pièces jointes ajoutées par drag-and-drop Diffusion.
 - EN: Added ECM indexing and native public link generation for attachments added through Diffusion drag-and-drop.
 

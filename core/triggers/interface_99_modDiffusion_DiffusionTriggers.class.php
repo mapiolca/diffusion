@@ -292,8 +292,9 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 			return array('fk_soc' => 0, 'fk_project' => 0, 'fk_user_creat' => 0);
 		}
 
-		$sql = 'SELECT d.fk_soc, d.fk_project, d.fk_user_creat';
+		$sql = 'SELECT p.fk_soc, d.fk_project, d.fk_user_creat';
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion as d';
+		$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'projet as p ON p.rowid = d.fk_project AND p.entity IN ('.getEntity('project').')';
 		$sql .= ' WHERE d.rowid = '.$diffusionid;
 		$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
 
