@@ -89,19 +89,28 @@ class OtherOverviewHook
 	}
 }
 
-// A Git ref selects only the native HookManager version, not a full ERP instance.
-if (!empty($argv[3])) {
-	$process = proc_open(array('git', '-C', dirname($coreRoot), 'show', $argv[3].':htdocs/core/class/hookmanager.class.php'), array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
-	if (!is_resource($process)) { throw new RuntimeException('Cannot read the native HookManager'); }
+// Select native hook dispatch and tab integration, not a full ERP instance.
+function nativeOverviewSource($path) {
+	global $argv, $coreRoot;
+	if (empty($argv[3])) {
+		return file_get_contents($coreRoot.'/'.$path);
+	}
+	$process = proc_open(array('git', '-C', dirname($coreRoot), 'show', $argv[3].':htdocs/'.$path), array(1 => array('pipe', 'w'), 2 => array('pipe', 'w')), $pipes);
+	if (!is_resource($process)) { throw new RuntimeException('Cannot read native core source'); }
 	$source = stream_get_contents($pipes[1]);
 	$error = stream_get_contents($pipes[2]);
 	fclose($pipes[1]);
 	fclose($pipes[2]);
 	if (proc_close($process) !== 0) { throw new RuntimeException($error); }
-	eval('?>'.$source);
-} else {
-	require DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+	return $source;
 }
+eval('?>'.nativeOverviewSource('core/class/hookmanager.class.php'));
+// Extract the unmodified top-level function to avoid loading unrelated globals
+// and core helpers already replaced by controlled doubles in this CLI test.
+if (!preg_match('/^function complete_head_from_modules\(.*?^\}/ms', nativeOverviewSource('core/lib/functions.lib.php'), $nativeTabFunction)) {
+	throw new RuntimeException('Native tab integration function not found');
+}
+eval($nativeTabFunction[0]);
 require $advancedRoot.'/class/actions_lmdbadvancedproject.class.php';
 require __DIR__.'/../core/class/actions_diffusion.class.php';
 
@@ -192,15 +201,65 @@ foreach (array(false, true) as $admin) {
 }
 $user->admin = 0;
 $user->permissions = array('diffusion.diffusiondoc.read' => true, 'projet.lire' => true);
-$diffusionHook = (new ReflectionClass('ActionsDiffusion'))->newInstanceWithoutConstructor();
-$diffusionHook->db = $db;
-$tabs = array('type' => 'project', 'head' => array(array('/projet/element.php?id=42', 'Overview', 'element')));
-$diffusionHook->completeTabsHead($tabs, $project, $action, $manager);
-check(strpos($tabs['head'][0][1], '>2</span>') !== false, true, 'Authorized badge');
-$user->permissions = array();
-$tabs['head'][0][1] = 'Overview';
-$diffusionHook->completeTabsHead($tabs, $project, $action, $manager);
-check($tabs['head'][0][1], 'Overview', 'Unauthorized badge hidden');
+// Reproduce the screenshot through the native tab pipeline: three core objects
+// plus five readable diffusions, across all three passes used by project tabs.
+$db->pdo->beginTransaction();
+$db->pdo->exec("INSERT INTO test_diffusion VALUES (5,1,42,2,'E','Extra E',NULL,NULL,0),(6,1,42,2,'F','Extra F',NULL,NULL,0),(7,1,42,3,'G','Extra G',NULL,NULL,0)");
+$coreTabs = array(
+	array('/projet/element.php?id=42', 'Overview<span class="badge marginleftonlyshort">3</span>', 'element'),
+	array('/projet/note.php?id=42', 'Notes<span class="badge marginleftonlyshort">1</span>', 'notes'),
+);
+foreach ($orders as $order) {
+	$hookmanager = newManager($order);
+	$head = $coreTabs;
+	$h = count($head);
+	$before = count($db->queries);
+	foreach (array(array('add', 'core'), array('add', 'external'), array('remove', '')) as $pass) {
+		complete_head_from_modules($conf, $langs, $project, $head, $h, 'project', $pass[0], $pass[1]);
+		check(strip_tags($head[0][1]), 'Overview8', 'Native tab badge adds five diffusions exactly once');
+		check(substr_count($head[0][1], '<span '), 1, 'One merged badge');
+		check($head[1], $coreTabs[1], 'Other tab preserved');
+		check($h, 2, 'No duplicated tabs');
+	}
+	check(count($db->queries) - $before, 1, 'One count query across repeated tab passes');
+}
+$head = array(array('/projet/element.php?id=42', 'Overview', 'element'));
+$h = count($head);
+complete_head_from_modules($conf, $langs, $project, $head, $h, 'project');
+check(strip_tags($head[0][1]), 'Overview5', 'Badge created when core has no linked elements');
+foreach (array(0, 1) as $admin) {
+	$user->admin = $admin;
+	$user->permissions = array('projet.lire' => true);
+	$head = $coreTabs;
+	$before = count($db->queries);
+	complete_head_from_modules($conf, $langs, $project, $head, $h, 'project');
+	check($head, $coreTabs, 'Unauthorized badge hidden, including administrators');
+	check(count($db->queries), $before, 'No count query without read rights');
+}
+$user->admin = 0;
+$user->permissions = array('diffusion.diffusiondoc.read' => true, 'projet.lire' => true);
+$visibleEntities = array(1, 2);
+$head = $coreTabs;
+complete_head_from_modules($conf, $langs, $project, $head, $h, 'project');
+check(strip_tags($head[0][1]), 'Overview9', 'Badge includes shared entity only when authorized');
+$visibleEntities = array(1);
+$emptyProject = clone $project;
+$emptyProject->id = 99;
+$head = $coreTabs;
+complete_head_from_modules($conf, $langs, $emptyProject, $head, $h, 'project');
+check($head, $coreTabs, 'Project without diffusions retains its native badge');
+$head = array($coreTabs[1]);
+$before = count($db->queries);
+complete_head_from_modules($conf, $langs, $project, $head, $h, 'project');
+check($head, array($coreTabs[1]), 'Absent overview tab is not recreated');
+check(count($db->queries), $before, 'No count query without overview tab');
+$otherObject = new stdClass();
+$otherObject->id = 42;
+$head = $coreTabs;
+complete_head_from_modules($conf, $langs, $otherObject, $head, $h, 'thirdparty');
+check($head, $coreTabs, 'Other object tabs are untouched');
+check(count($db->queries), $before, 'No count query for another object');
+$db->pdo->rollBack();
 
 // Simulate the denial returned by the native project restriction. This does not
 // validate real project assignments or external-user access on an ERP instance.
@@ -218,6 +277,10 @@ foreach (array('completeListOfReferent', 'printOverviewDetail', 'printOverviewPr
 	check($manager->resPrint, '', 'Project denial: '.$method);
 }
 check(count($db->queries), $before, 'No diffusion query for an inaccessible project');
+$head = $coreTabs;
+complete_head_from_modules($conf, $langs, $private, $head, $h, 'project');
+check($head, $coreTabs, 'Inaccessible project: no badge contribution');
+check(count($db->queries), $before, 'Inaccessible project: no count query');
 
 $visibleEntities = array(1, 2);
 $manager->executeHooks('printOverviewDetail', $params, $project, $action);
@@ -235,6 +298,10 @@ foreach (array('completeListOfReferent', 'printOverviewDetail', 'printOverviewPr
 	check($manager->resPrint, '', 'Disabled module: no output');
 }
 check(count($db->queries), $before, 'Disabled module: no query');
+$head = $coreTabs;
+complete_head_from_modules($conf, $langs, $project, $head, $h, 'project');
+check($head, $coreTabs, 'Disabled module: no badge contribution');
+check(count($db->queries), $before, 'Disabled module: no count query');
 $enabledModules['diffusion'] = true;
 $manager = newManager(array('diffusion', 'other'));
 $manager->executeHooks('completeListOfReferent', array(), $project, $action);
@@ -247,4 +314,4 @@ $user->permissions['fournisseur.facture.lire'] = true;
 $manager = newManager(array('diffusion', 'advanced', 'other'));
 $manager->executeHooks('completeListOfReferent', array(), $project, $action);
 check(array_keys($manager->resArray), array('diffusion', 'other_module'), 'Disabled split options do not remove Diffusion');
-echo $checks.' assertions passed; native HookManager '.($argv[3] ?? 'working tree').'; PHP '.PHP_VERSION."; simulated permissions and in-memory SQLite.\n";
+echo $checks.' assertions passed; native HookManager and complete_head_from_modules '.($argv[3] ?? 'working tree').'; PHP '.PHP_VERSION."; simulated permissions and in-memory SQLite.\n";

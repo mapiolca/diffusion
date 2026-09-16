@@ -1319,8 +1319,9 @@ class ActionsDiffusion
 	{
 		global $user;
 
-		$objectType = !empty($parameters['type']) ? (string) $parameters['type'] : '';
-		if ($objectType !== 'project') {
+		// complete_head_from_modules() only supplies type from Dolibarr 24.
+		// Earlier versions identify the tab owner through the Project object.
+		if (isset($parameters['type']) && $parameters['type'] !== 'project') {
 			return 0;
 		}
 		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
@@ -1336,12 +1337,6 @@ class ActionsDiffusion
 			return 0;
 		}
 
-		$nbdiffusions = $this->getDiffusionCountByProject((int) $object->id);
-		if ($nbdiffusions <= 0) {
-			return 0;
-		}
-
-		$updated = false;
 		foreach ($parameters['head'] as $tabKey => $tab) {
 			if (!is_array($tab) || empty($tab[2]) || $tab[2] !== 'element') {
 				continue;
@@ -1350,6 +1345,10 @@ class ActionsDiffusion
 			$tabLabel = isset($tab[1]) ? (string) $tab[1] : '';
 			if (strpos($tabLabel, 'badge-diffusion-merged') !== false || strpos($tabLabel, 'badge-diffusion-added') !== false) {
 				continue;
+			}
+			$nbdiffusions = $this->getDiffusionCountByProject((int) $object->id);
+			if ($nbdiffusions <= 0) {
+				return 0;
 			}
 			if (preg_match('/(<span class=")([^"]*badge[^"]*)(">)([0-9]+)(<\/span>)/', $tabLabel, $matches)) {
 				$newValue = ((int) $matches[4]) + $nbdiffusions;
@@ -1360,12 +1359,7 @@ class ActionsDiffusion
 			}
 
 			$parameters['head'][$tabKey] = $tab;
-			$updated = true;
 			break;
-		}
-
-		if (!$updated) {
-			return 0;
 		}
 
 		return 0;
