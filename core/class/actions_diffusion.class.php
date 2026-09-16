@@ -29,6 +29,27 @@ class ActionsDiffusion
 	/** @var string Identifier used by Multicompany external sharing payload */
 	public const MULTICOMPANY_SHARING_ROOT_KEY = 'diffusion';
 
+	/** @var string Legacy visible email template type used before module picto alignment */
+	public const EMAIL_TEMPLATE_TYPE_LEGACY_DIFFUSION = 'diffusion';
+
+	/** @var string Email template type for manual sending from diffusion cards and lists */
+	public const EMAIL_TEMPLATE_TYPE_MANUAL = 'diffusion@diffusion';
+
+	/** @var string Single visible email template type for all Diffusion module emails */
+	public const EMAIL_TEMPLATE_TYPE_NOTIFICATION = 'diffusion@diffusion';
+
+	/** @var string Hidden Dolibarr notification template type for Diffusion objects */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND = 'diffusiondoc_send';
+
+	/** @var string Hidden Dolibarr notification template type for DiffusionContact objects */
+	public const EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND = 'diffusioncontact_send';
+
+	/** @var string Agenda link element type for Diffusion objects */
+	public const AGENDA_ELEMENTTYPE_DIFFUSION = 'diffusiondoc@diffusion';
+
+	/** @var string Agenda link element type for DiffusionContact objects */
+	public const AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT = 'diffusioncontact@diffusion';
+
 	/** @var DoliDB Database handler */
 	public $db;
 
@@ -38,11 +59,895 @@ class ActionsDiffusion
 	/** @var array<string> Errors */
 	public $errors = array();
 
+	/** @var array<string> Warnings */
+	public $warnings = array();
+
 	/** @var string Output */
 	public $resprints;
 
 	/** @var array<string,mixed> Hook results */
 	public $results = array();
+
+	/**
+	 * Return the centralized list of business events exposed by the module.
+	 *
+	 * @return array<string,array<string,int|string>>
+	 */
+	public static function getBusinessEventsDefinition()
+	{
+		$diffusion = array(
+			'notification_elementtype' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+			'agenda_elementtype' => self::AGENDA_ELEMENTTYPE_DIFFUSION,
+		);
+		$diffusioncontact = array(
+			'notification_elementtype' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+			'agenda_elementtype' => self::AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT,
+		);
+
+		return array(
+			'DIFFUSION_CREATE' => array_merge(array('label' => 'DiffusionTriggerLabelCreate', 'description' => 'DiffusionTriggerDescCreate', 'rang' => 2000), $diffusion),
+			'DIFFUSION_VALIDATE' => array_merge(array('label' => 'DiffusionTriggerLabelValidate', 'description' => 'DiffusionTriggerDescValidate', 'rang' => 2001), $diffusion),
+			'DIFFUSION_SENDMAIL' => array_merge(array('label' => 'DiffusionTriggerLabelSendMail', 'description' => 'DiffusionTriggerDescSendMail', 'rang' => 2002), $diffusion),
+			'DIFFUSION_SETDIFFUSED' => array_merge(array('label' => 'DiffusionTriggerLabelSetDiffused', 'description' => 'DiffusionTriggerDescSetDiffused', 'rang' => 2003), $diffusion),
+			'DIFFUSION_BACKTODRAFT' => array_merge(array('label' => 'DiffusionTriggerLabelBackToDraft', 'description' => 'DiffusionTriggerDescBackToDraft', 'rang' => 2004), $diffusion),
+			'DIFFUSION_DELETE' => array_merge(array('label' => 'DiffusionTriggerLabelDelete', 'description' => 'DiffusionTriggerDescDelete', 'rang' => 2005), $diffusion),
+			'DIFFUSION_CANCEL' => array_merge(array('label' => 'DiffusionTriggerLabelCancel', 'description' => 'DiffusionTriggerDescCancel', 'rang' => 2006), $diffusion),
+			'DIFFUSION_REOPEN' => array_merge(array('label' => 'DiffusionTriggerLabelReopen', 'description' => 'DiffusionTriggerDescReopen', 'rang' => 2007), $diffusion),
+			'DIFFUSION_DIFFUSION_MODIFY' => array_merge(array('label' => 'DiffusionTriggerLabelModify', 'description' => 'DiffusionTriggerDescModify', 'rang' => 2008), $diffusion),
+			'DIFFUSIONCONTACT_INSERT' => array_merge(array('label' => 'DiffusionContactTriggerLabelInsert', 'description' => 'DiffusionContactTriggerDescInsert', 'rang' => 2010), $diffusioncontact),
+			'DIFFUSIONCONTACT_DELETELINE' => array_merge(array('label' => 'DiffusionContactTriggerLabelDeleteLine', 'description' => 'DiffusionContactTriggerDescDeleteLine', 'rang' => 2011), $diffusioncontact),
+			'DIFFUSIONCONTACT_UPDATELINE' => array_merge(array('label' => 'DiffusionContactTriggerLabelUpdateLine', 'description' => 'DiffusionContactTriggerDescUpdateLine', 'rang' => 2012), $diffusioncontact),
+			'DIFFUSIONCONTACT_DELETEALL' => array_merge(array('label' => 'DiffusionContactTriggerLabelDeleteAll', 'description' => 'DiffusionContactTriggerDescDeleteAll', 'rang' => 2013), $diffusioncontact),
+		);
+	}
+
+	/**
+	 * Return one business event definition.
+	 *
+	 * @param string $code Business trigger code
+	 * @return array<string,int|string>
+	 */
+	public static function getBusinessEventDefinition($code)
+	{
+		$events = self::getBusinessEventsDefinition();
+		return !empty($events[$code]) ? $events[$code] : array();
+	}
+
+	/**
+	 * Return business event codes supported by native notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getNotificationEventCodes()
+	{
+		$events = array_keys(self::getBusinessEventsDefinition());
+		return array_values(array_diff($events, self::getExcludedNotificationEventCodes()));
+	}
+
+	/**
+	 * Return business event codes intentionally hidden from native notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getExcludedNotificationEventCodes()
+	{
+		return array(
+			'DIFFUSION_CANCEL',
+			'DIFFUSION_REOPEN',
+			'DIFFUSION_DIFFUSION_MODIFY',
+			'DIFFUSIONCONTACT_DELETEALL',
+		);
+	}
+
+	/**
+	 * Force native notification trigger rows to use the single visible Diffusion element type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function repairNotificationActionTriggerElementTypes($db)
+	{
+		$codes = array();
+		foreach (array_keys(self::getBusinessEventsDefinition()) as $code) {
+			$codes[] = "'".$db->escape($code)."'";
+		}
+		if (empty($codes)) {
+			return 1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."c_action_trigger";
+		$sql .= " SET elementtype = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		$sql .= " WHERE code IN (".implode(',', $codes).")";
+
+		return $db->query($sql) ? 1 : -1;
+	}
+
+	/**
+	 * Return email template types exposed by the module.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	public static function getEmailTemplateTypes()
+	{
+		return array(
+			self::EMAIL_TEMPLATE_TYPE_MANUAL => array('label' => 'MailToSendDiffusion', 'picto' => 'diffusion@diffusion'),
+		);
+	}
+
+	/**
+	 * Return default email templates to create at module activation.
+	 *
+	 * @return array<string,array<string,int|string>>
+	 */
+	public static function getDefaultEmailTemplatesDefinition()
+	{
+		return array(
+			'DIFFUSION_MANUAL_SEND' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_MANUAL,
+				'label' => 'DiffusionEmailTemplateManualLabel',
+				'topic' => 'DiffusionEmailTemplateManualTopic',
+				'content' => 'DiffusionEmailTemplateManualContent',
+				'position' => 100,
+				'joinfiles' => 1,
+			),
+			'DIFFUSION_NOTIFICATION' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+				'label' => 'DiffusionEmailTemplateNotificationLabel',
+				'topic' => 'DiffusionEmailTemplateNotificationTopic',
+				'content' => 'DiffusionEmailTemplateNotificationContent',
+				'position' => 110,
+				'joinfiles' => 0,
+			),
+			'DIFFUSIONCONTACT_NOTIFICATION' => array(
+				'type_template' => self::EMAIL_TEMPLATE_TYPE_NOTIFICATION,
+				'label' => 'DiffusionContactEmailTemplateNotificationLabel',
+				'topic' => 'DiffusionContactEmailTemplateNotificationTopic',
+				'content' => 'DiffusionContactEmailTemplateNotificationContent',
+				'position' => 120,
+				'joinfiles' => 0,
+			),
+		);
+	}
+
+	/**
+	 * Return legacy visible email template types that must be folded into the single Diffusion type.
+	 *
+	 * @return string[]
+	 */
+	public static function getLegacyVisibleEmailTemplateTypes()
+	{
+		return array(
+			self::EMAIL_TEMPLATE_TYPE_LEGACY_DIFFUSION,
+			self::AGENDA_ELEMENTTYPE_DIFFUSION,
+			self::AGENDA_ELEMENTTYPE_DIFFUSIONCONTACT,
+		);
+	}
+
+	/**
+	 * Return hidden email template types expected by Dolibarr notifications.
+	 *
+	 * @return string[]
+	 */
+	public static function getNotificationMirrorEmailTemplateTypes()
+	{
+		return array(
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND,
+			self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND,
+		);
+	}
+
+	/**
+	 * Migrate legacy visible notification template types into the single visible Diffusion type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function migrateLegacyVisibleEmailTemplateTypes($db)
+	{
+		$visibletypes = array_merge(array(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION), self::getLegacyVisibleEmailTemplateTypes());
+		$visibletypes = array_values(array_unique($visibletypes));
+
+		$quotedtypes = array();
+		foreach ($visibletypes as $type) {
+			$quotedtypes[] = "'".$db->escape($type)."'";
+		}
+		if (empty($quotedtypes)) {
+			return 1;
+		}
+
+		$sql = "SELECT rowid, entity, label, lang, type_template, active, position";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template IN (".implode(',', $quotedtypes).")";
+		$sql .= " ORDER BY entity, label, lang, rowid";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+
+		$groups = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$row = array(
+				'rowid' => (int) $obj->rowid,
+				'entity' => (int) $obj->entity,
+				'label' => $obj->label,
+				'lang' => $obj->lang,
+				'type_template' => (string) $obj->type_template,
+				'active' => (int) $obj->active,
+				'position' => ($obj->position === null ? null : (int) $obj->position),
+			);
+
+			$key = self::getEmailTemplateUniqueRuntimeKey((int) $obj->entity, $obj->label, $obj->lang);
+			if (empty($groups[$key])) {
+				$groups[$key] = array();
+			}
+			$groups[$key][] = $row;
+		}
+		$db->free($resql);
+
+		foreach ($groups as $rows) {
+			$keeperindex = self::getVisibleEmailTemplateKeeperIndex($rows);
+
+			foreach ($rows as $index => $row) {
+				if ($index === $keeperindex) {
+					if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION) {
+						continue;
+					}
+
+					$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+					$sqlupdate .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+					$sqlupdate .= " WHERE rowid = ".((int) $row['rowid']);
+
+					if (!$db->query($sqlupdate)) {
+						return -1;
+					}
+
+					continue;
+				}
+
+				$archivedlabel = self::getLegacyVisibleEmailTemplateArchiveLabel($row['label'], $row['type_template'], (int) $row['rowid']);
+				if (self::emailTemplateLabelExists($db, (int) $row['entity'], $archivedlabel, $row['lang'], (int) $row['rowid'])) {
+					$archivedlabel = self::getLegacyVisibleEmailTemplateArchiveLabel($row['label'], $row['type_template'].'-'.((int) $row['rowid']), (int) $row['rowid']);
+				}
+
+				$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+				$sqlupdate .= " SET type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+				$sqlupdate .= ", label = ".self::sqlNullableString($db, $archivedlabel);
+				$sqlupdate .= ", active = 0";
+				$sqlupdate .= " WHERE rowid = ".((int) $row['rowid']);
+
+				if (!$db->query($sqlupdate)) {
+					return -1;
+				}
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Replace legacy Diffusion-specific substitution keys in module email templates.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function migrateLegacyEmailTemplateSubstitutionKeys($db)
+	{
+		$replacements = array(
+			'__DIFFUSION_REF__' => '__REF__',
+			'__DIFFUSION_LABEL__' => '__LABEL__',
+			'__DIFFUSION_PROJECT_REF__' => '__PROJECT_REF__',
+			'__DIFFUSION_PROJECT_LABEL__' => '__PROJECT_NAME__',
+			'__DIFFUSION_AUTHOR_FULLNAME__' => '__AUTHOR_FULLNAME__',
+			'__DIFFUSION_AUTHOR_EMAIL__' => '__AUTHOR_EMAIL__',
+		);
+		$columns = array('topic', 'content', 'content_lines');
+
+		foreach ($columns as $column) {
+			$expression = $column;
+			$conditions = array();
+			foreach ($replacements as $oldkey => $newkey) {
+				$expression = "REPLACE(".$expression.", '".$db->escape($oldkey)."', '".$db->escape($newkey)."')";
+				$conditions[] = "INSTR(".$column.", '".$db->escape($oldkey)."') > 0";
+			}
+
+			$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+			$sql .= " SET ".$column." = ".$expression;
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND ".$column." IS NOT NULL";
+			$sql .= " AND (".implode(' OR ', $conditions).")";
+
+			if (!$db->query($sql)) {
+				return -1;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Normalize old hidden notification mirrors created without a technical label suffix.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @return int<-1,1>
+	 */
+	public static function normalizeNotificationEmailTemplateMirrorLabels($db)
+	{
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$sql = "SELECT rowid, entity, label, lang";
+			$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+			$sql .= " WHERE module = 'diffusion'";
+			$sql .= " AND type_template = '".$db->escape($targettype)."'";
+
+			$resql = $db->query($sql);
+			if (!$resql) {
+				return -1;
+			}
+
+			while ($obj = $db->fetch_object($resql)) {
+				$label = (string) $obj->label;
+				$mirrorlabel = self::getNotificationMirrorLabel($label, $targettype);
+				if ($label === $mirrorlabel) {
+					continue;
+				}
+
+				$targetlabel = $mirrorlabel;
+				if (self::emailTemplateLabelExists($db, (int) $obj->entity, $targetlabel, $obj->lang, (int) $obj->rowid)) {
+					$targetlabel = self::getNotificationMirrorLabel($label, $targettype.'-'.$obj->rowid);
+				}
+
+				$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+				$sqlupdate .= " SET label = ".self::sqlNullableString($db, $targetlabel);
+				$sqlupdate .= " WHERE rowid = ".((int) $obj->rowid);
+
+				if (!$db->query($sqlupdate)) {
+					$db->free($resql);
+					return -1;
+				}
+			}
+
+			$db->free($resql);
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Sync the selected visible template for a notification event into hidden Dolibarr notification template types.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $notifcode Notification trigger code
+	 * @param CommonObject|null $object Notification object
+	 * @return int<-1,1>
+	 */
+	public static function syncSelectedNotificationEmailTemplateMirrors($db, $notifcode, $object = null)
+	{
+		if (empty($notifcode) || !in_array($notifcode, self::getNotificationEventCodes(), true)) {
+			return 1;
+		}
+
+		$label = getDolGlobalString($notifcode.'_TEMPLATE');
+		if ($label === '') {
+			return 1;
+		}
+		$visiblelabel = self::getVisibleLabelFromNotificationMirrorLabel($label);
+
+		$resultnormalize = self::normalizeNotificationEmailTemplateMirrorLabels($db);
+		if ($resultnormalize < 0) {
+			return $resultnormalize;
+		}
+
+		$resultmigrate = self::migrateLegacyVisibleEmailTemplateTypes($db);
+		if ($resultmigrate < 0) {
+			return $resultmigrate;
+		}
+
+		$resultsubstitutionmigrate = self::migrateLegacyEmailTemplateSubstitutionKeys($db);
+		if ($resultsubstitutionmigrate < 0) {
+			return $resultsubstitutionmigrate;
+		}
+
+		$targettype = self::getNotificationMirrorEmailTemplateTypeForContext($notifcode, $object);
+		$result = self::syncEmailTemplateMirror($db, $targettype, $visiblelabel);
+		if ($result < 0) {
+			return $result;
+		}
+		if ($result === 0) {
+			return self::disableNotificationEmailTemplateMirrors($db, $visiblelabel);
+		}
+
+		global $conf;
+		if (is_object($conf) && !empty($conf->global) && is_object($conf->global)) {
+			$conf->global->{$notifcode.'_TEMPLATE'} = self::getNotificationMirrorLabel($visiblelabel, $targettype);
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Return hidden template type expected by Dolibarr for a notification context.
+	 *
+	 * @param string $notifcode Notification trigger code
+	 * @param CommonObject|null $object Notification object
+	 * @return string
+	 */
+	private static function getNotificationMirrorEmailTemplateTypeForContext($notifcode, $object = null)
+	{
+		if (is_object($object) && !empty($object->element)) {
+			$typefromobject = (string) $object->element.'_send';
+			if (in_array($typefromobject, self::getNotificationMirrorEmailTemplateTypes(), true)) {
+				return $typefromobject;
+			}
+		}
+
+		if (strpos($notifcode, 'DIFFUSIONCONTACT_') === 0) {
+			return self::EMAIL_TEMPLATE_TYPE_DIFFUSIONCONTACT_SEND;
+		}
+
+		return self::EMAIL_TEMPLATE_TYPE_DIFFUSION_SEND;
+	}
+
+	/**
+	 * Return the hidden mirror label used to avoid Dolibarr unique key conflicts.
+	 *
+	 * @param string $label Visible email template label
+	 * @param string $targettype Hidden target template type
+	 * @return string
+	 */
+	private static function getNotificationMirrorLabel($label, $targettype)
+	{
+		$suffix = ' ['.$targettype.']';
+		if (substr($label, -strlen($suffix)) === $suffix) {
+			return $label;
+		}
+
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr((string) $label, 0, $maxlabelsize).$suffix;
+	}
+
+	/**
+	 * Return visible template label when the runtime value already contains a hidden mirror suffix.
+	 *
+	 * @param string $label Current template label
+	 * @return string
+	 */
+	private static function getVisibleLabelFromNotificationMirrorLabel($label)
+	{
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$suffix = ' ['.$targettype.']';
+			if (substr($label, -strlen($suffix)) === $suffix) {
+				return substr($label, 0, -strlen($suffix));
+			}
+		}
+
+		return $label;
+	}
+
+	/**
+	 * Build a runtime key matching Dolibarr native email template uniqueness.
+	 *
+	 * @param int $entity Entity id
+	 * @param mixed $label Template label
+	 * @param mixed $lang Template language
+	 * @return string
+	 */
+	private static function getEmailTemplateUniqueRuntimeKey($entity, $label, $lang)
+	{
+		return serialize(array(
+			(int) $entity,
+			$label === null ? null : (string) $label,
+			$lang === null ? null : (string) $lang,
+		));
+	}
+
+	/**
+	 * Choose the visible template row to keep when legacy rows collide on entity, label and lang.
+	 *
+	 * @param array<int,array<string,mixed>> $rows Template rows sharing the same native unique key
+	 * @return int Array index to keep
+	 */
+	private static function getVisibleEmailTemplateKeeperIndex($rows)
+	{
+		foreach ($rows as $index => $row) {
+			if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION && !empty($row['active'])) {
+				return $index;
+			}
+		}
+
+		foreach ($rows as $index => $row) {
+			if ($row['type_template'] === self::EMAIL_TEMPLATE_TYPE_NOTIFICATION) {
+				return $index;
+			}
+		}
+
+		foreach ($rows as $index => $row) {
+			if (!empty($row['active'])) {
+				return $index;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Return a readable archived label for a duplicate legacy visible template.
+	 *
+	 * @param mixed $label Current template label
+	 * @param string $typeTemplate Previous template type
+	 * @param int $rowid Template row id
+	 * @return string
+	 */
+	private static function getLegacyVisibleEmailTemplateArchiveLabel($label, $typeTemplate, $rowid)
+	{
+		$suffix = ' [legacy '.$typeTemplate.' #'.((int) $rowid).']';
+		$baselabel = (string) $label;
+		if ($baselabel === '') {
+			$baselabel = 'Diffusion email template';
+		}
+
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr($baselabel, 0, $maxlabelsize).$suffix;
+	}
+
+	/**
+	 * Copy or update visible Diffusion templates into one hidden notification type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $targettype Hidden target template type
+	 * @param string $label Optional selected label to sync
+	 * @return int<-1,1> Return 1 if synced, 0 if no source template found, <0 if KO
+	 */
+	private static function syncEmailTemplateMirror($db, $targettype, $label = '')
+	{
+		$sql = "SELECT rowid, entity, lang, private, fk_user, label, position, defaultfortype, enabled, active,";
+		$sql .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template = '".$db->escape(self::EMAIL_TEMPLATE_TYPE_NOTIFICATION)."'";
+		if ($label !== '') {
+			$sql .= " AND label = '".$db->escape($label)."'";
+		}
+		$sql .= " ORDER BY entity, lang, position, rowid";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+
+		$nbsource = 0;
+		$neutralmirrorsdone = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$nbsource++;
+			$mirrorlabel = self::getNotificationMirrorLabel((string) $obj->label, $targettype);
+
+			$result = self::syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, $obj->lang);
+			if ($result < 0) {
+				$db->free($resql);
+				return -1;
+			}
+
+			$neutralkey = self::getEmailTemplateMirrorRuntimeKey($targettype, $obj, $mirrorlabel);
+			if (empty($neutralmirrorsdone[$neutralkey])) {
+				if ($obj->lang !== null) {
+					$result = self::syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, null);
+					if ($result < 0) {
+						$db->free($resql);
+						return -1;
+					}
+				}
+
+				$result = self::normalizeNeutralEmailTemplateMirrorDuplicates($db, $obj, $targettype, $mirrorlabel);
+				if ($result < 0) {
+					$db->free($resql);
+					return -1;
+				}
+				$neutralmirrorsdone[$neutralkey] = 1;
+			}
+		}
+
+		$db->free($resql);
+
+		return $nbsource > 0 ? 1 : 0;
+	}
+
+	/**
+	 * Disable stale hidden notification template mirrors for a label no longer available under the visible type.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param string $label Template label
+	 * @return int<-1,1>
+	 */
+	private static function disableNotificationEmailTemplateMirrors($db, $label)
+	{
+		$targettypes = array();
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$targettypes[] = "'".$db->escape($targettype)."'";
+		}
+		if (empty($targettypes)) {
+			return 1;
+		}
+
+		$mirrorlabels = array();
+		foreach (self::getNotificationMirrorEmailTemplateTypes() as $targettype) {
+			$mirrorlabels[] = "'".$db->escape(self::getNotificationMirrorLabel($label, $targettype))."'";
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " SET active = 0";
+		$sql .= " WHERE module = 'diffusion'";
+		$sql .= " AND type_template IN (".implode(',', $targettypes).")";
+		$sql .= " AND label IN (".implode(',', $mirrorlabels).")";
+
+		return $db->query($sql) ? 1 : -1;
+	}
+
+	/**
+	 * Copy or update one visible template row into one hidden notification mirror language.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @param mixed $mirrorlang Hidden mirror language, null for language-neutral fallback
+	 * @return int<-1,1>
+	 */
+	private static function syncEmailTemplateMirrorRow($db, $obj, $targettype, $mirrorlabel, $mirrorlang)
+	{
+		$where = self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, $mirrorlang);
+		$uniquewhere = self::getEmailTemplateUniqueWhere($db, (int) $obj->entity, $mirrorlabel, $mirrorlang);
+
+		$sqlinsert = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
+		$sqlinsert .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, defaultfortype, enabled, active,";
+		$sqlinsert .= " email_from, email_to, email_tocc, email_tobcc, topic, joinfiles, content, content_lines)";
+		$sqlinsert .= " SELECT ".((int) $obj->entity).", 'diffusion', '".$db->escape($targettype)."',";
+		$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlang).", ".((int) $obj->private).", ".self::sqlNullableInteger($obj->fk_user).", NOW(),";
+		$sqlinsert .= " ".self::sqlNullableString($db, $mirrorlabel).", ".self::sqlNullableInteger($obj->position).", ".((int) $obj->defaultfortype).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->enabled).", ".((int) $obj->active).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_from).", ".self::sqlNullableString($db, $obj->email_to).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->email_tocc).", ".self::sqlNullableString($db, $obj->email_tobcc).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->topic).", ".self::sqlNullableString($db, $obj->joinfiles).",";
+		$sqlinsert .= " ".self::sqlNullableString($db, $obj->content).", ".self::sqlNullableString($db, $obj->content_lines);
+		$sqlinsert .= " FROM DUAL";
+		$sqlinsert .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates WHERE ".$uniquewhere.")";
+
+		if (!$db->query($sqlinsert)) {
+			return -1;
+		}
+
+		$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+		$sqlupdate .= " SET position = ".self::sqlNullableInteger($obj->position);
+		$sqlupdate .= ", defaultfortype = ".((int) $obj->defaultfortype);
+		$sqlupdate .= ", enabled = ".self::sqlNullableString($db, $obj->enabled);
+		$sqlupdate .= ", active = ".((int) $obj->active);
+		$sqlupdate .= ", email_from = ".self::sqlNullableString($db, $obj->email_from);
+		$sqlupdate .= ", email_to = ".self::sqlNullableString($db, $obj->email_to);
+		$sqlupdate .= ", email_tocc = ".self::sqlNullableString($db, $obj->email_tocc);
+		$sqlupdate .= ", email_tobcc = ".self::sqlNullableString($db, $obj->email_tobcc);
+		$sqlupdate .= ", topic = ".self::sqlNullableString($db, $obj->topic);
+		$sqlupdate .= ", joinfiles = ".self::sqlNullableString($db, $obj->joinfiles);
+		$sqlupdate .= ", content = ".self::sqlNullableString($db, $obj->content);
+		$sqlupdate .= ", content_lines = ".self::sqlNullableString($db, $obj->content_lines);
+		$sqlupdate .= " WHERE ".$where;
+
+		return $db->query($sqlupdate) ? 1 : -1;
+	}
+
+	/**
+	 * Disable and rename duplicate neutral mirrors left by older MySQL NULL unique-key behavior.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @return int<-1,1>
+	 */
+	private static function normalizeNeutralEmailTemplateMirrorDuplicates($db, $obj, $targettype, $mirrorlabel)
+	{
+		$sql = "SELECT rowid";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE ".self::getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, null);
+		$sql .= " ORDER BY rowid";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return -1;
+		}
+
+		$keepid = 0;
+		$duplicateids = array();
+		while ($row = $db->fetch_object($resql)) {
+			$rowid = (int) $row->rowid;
+			if (empty($keepid)) {
+				$keepid = $rowid;
+				continue;
+			}
+			$duplicateids[] = $rowid;
+		}
+
+		$db->free($resql);
+
+		foreach ($duplicateids as $rowid) {
+			$archivedlabel = self::getNotificationMirrorDuplicateArchiveLabel($mirrorlabel, $targettype, $rowid);
+			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_email_templates";
+			$sqlupdate .= " SET label = ".self::sqlNullableString($db, $archivedlabel).", active = 0";
+			$sqlupdate .= " WHERE rowid = ".$rowid;
+			if (!$db->query($sqlupdate)) {
+				return -1;
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Build a runtime key for one hidden notification mirror independent of language.
+	 *
+	 * @param string $targettype Hidden target template type
+	 * @param stdClass $obj Source email template row
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @return string
+	 */
+	private static function getEmailTemplateMirrorRuntimeKey($targettype, $obj, $mirrorlabel)
+	{
+		return serialize(array(
+			$targettype,
+			(int) $obj->entity,
+			(int) $obj->private,
+			($obj->fk_user === null || $obj->fk_user === '') ? null : (int) $obj->fk_user,
+			$mirrorlabel,
+		));
+	}
+
+	/**
+	 * Return a readable archived label for duplicate hidden notification mirrors.
+	 *
+	 * @param string $label Current mirror label
+	 * @param string $targettype Hidden target template type
+	 * @param int $rowid Template row id
+	 * @return string
+	 */
+	private static function getNotificationMirrorDuplicateArchiveLabel($label, $targettype, $rowid)
+	{
+		$suffix = ' [duplicate '.$targettype.' #'.((int) $rowid).']';
+		$maxlabelsize = 180 - strlen($suffix);
+		if ($maxlabelsize < 1) {
+			$maxlabelsize = 1;
+		}
+
+		return substr((string) $label, 0, $maxlabelsize).$suffix;
+	}
+
+	/**
+	 * Build the key used to update one hidden notification template mirror.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param stdClass $obj Source email template row
+	 * @param string $targettype Hidden target template type
+	 * @param string $mirrorlabel Hidden mirror label
+	 * @param mixed $mirrorlang Hidden mirror language
+	 * @return string SQL where clause
+	 */
+	private static function getEmailTemplateMirrorWhere($db, $obj, $targettype, $mirrorlabel, $mirrorlang)
+	{
+		$where = "module = 'diffusion'";
+		$where .= " AND type_template = '".$db->escape($targettype)."'";
+		$where .= " AND entity = ".((int) $obj->entity);
+		$where .= " AND private = ".((int) $obj->private);
+		$where .= " AND label ".self::sqlNullableCondition($db, $mirrorlabel);
+		$where .= " AND lang ".self::sqlNullableCondition($db, $mirrorlang);
+		if ($obj->fk_user === null || $obj->fk_user === '') {
+			$where .= " AND fk_user IS NULL";
+		} else {
+			$where .= " AND fk_user = ".((int) $obj->fk_user);
+		}
+
+		return $where;
+	}
+
+	/**
+	 * Build the native unique key condition for email templates.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param int $entity Entity id
+	 * @param string $label Template label
+	 * @param mixed $lang Template language
+	 * @return string SQL where clause
+	 */
+	private static function getEmailTemplateUniqueWhere($db, $entity, $label, $lang)
+	{
+		$where = "entity = ".((int) $entity);
+		$where .= " AND label ".self::sqlNullableCondition($db, $label);
+		$where .= " AND lang ".self::sqlNullableCondition($db, $lang);
+
+		return $where;
+	}
+
+	/**
+	 * Check whether an email template label already exists for Dolibarr native unique key.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param int $entity Entity id
+	 * @param string $label Template label
+	 * @param mixed $lang Template language
+	 * @param int $excludeid Row id to exclude
+	 * @return bool
+	 */
+	private static function emailTemplateLabelExists($db, $entity, $label, $lang, $excludeid = 0)
+	{
+		$sql = "SELECT rowid";
+		$sql .= " FROM ".MAIN_DB_PREFIX."c_email_templates";
+		$sql .= " WHERE ".self::getEmailTemplateUniqueWhere($db, $entity, $label, $lang);
+		if ($excludeid > 0) {
+			$sql .= " AND rowid <> ".((int) $excludeid);
+		}
+		$sql .= " LIMIT 1";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return true;
+		}
+
+		$exists = ($db->num_rows($resql) > 0);
+		$db->free($resql);
+
+		return $exists;
+	}
+
+	/**
+	 * Return a SQL nullable string value.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableString($db, $value)
+	{
+		if ($value === null) {
+			return 'NULL';
+		}
+
+		return "'".$db->escape((string) $value)."'";
+	}
+
+	/**
+	 * Return a SQL nullable integer value.
+	 *
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableInteger($value)
+	{
+		if ($value === null || $value === '') {
+			return 'NULL';
+		}
+
+		return (string) ((int) $value);
+	}
+
+	/**
+	 * Return a SQL condition for a nullable string column.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param mixed $value Value
+	 * @return string
+	 */
+	private static function sqlNullableCondition($db, $value)
+	{
+		if ($value === null) {
+			return 'IS NULL';
+		}
+
+		return "= '".$db->escape((string) $value)."'";
+	}
 
 	/**
 	 * Constructor
@@ -52,7 +957,158 @@ class ActionsDiffusion
 	public function __construct($db)
 	{
 		$this->db = $db;
-		dol_syslog(__METHOD__ . " hook class initialized from class/actions_diffusion.class.php", LOG_WARNING);
+		self::getDiffusionOutputDirForEntity();
+		dol_syslog(__METHOD__ . " hook class initialized from class/actions_diffusion.class.php", LOG_DEBUG);
+	}
+
+	/**
+	 * Return and initialize the Diffusion document output directory for an entity.
+	 *
+	 * @param int $entity Entity id. Current entity is used when empty.
+	 * @return string
+	 */
+	private static function getDiffusionOutputDirForEntity($entity = 0)
+	{
+		global $conf;
+
+		$entity = (int) $entity;
+		if ($entity <= 0) {
+			$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+		}
+
+		if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
+			$conf->diffusion = new stdClass();
+		}
+		if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
+			$conf->diffusion->multidir_output = array();
+		}
+
+		$defaultoutput = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
+		if (empty($conf->diffusion->multidir_output[$entity])) {
+			$conf->diffusion->multidir_output[$entity] = $defaultoutput;
+		}
+		if (empty($conf->diffusion->dir_output)) {
+			$conf->diffusion->dir_output = $conf->diffusion->multidir_output[$entity];
+		}
+		if (empty($conf->diffusion->dir_temp)) {
+			$conf->diffusion->dir_temp = $conf->diffusion->multidir_output[$entity].'/temp';
+		}
+
+		if (!isset($conf->diffusiondoc) || !is_object($conf->diffusiondoc)) {
+			$conf->diffusiondoc = new stdClass();
+		}
+		$conf->diffusiondoc->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
+		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
+		$conf->diffusiondoc->multidir_output = $conf->diffusion->multidir_output;
+		$conf->diffusiondoc->dir_temp = $conf->diffusion->dir_temp;
+
+		return $conf->diffusion->multidir_output[$entity];
+	}
+
+	/**
+	 * Describe Diffusion object aliases to Dolibarr generic object APIs.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function getElementProperties($parameters, &$object, &$action, $hookmanager)
+	{
+		global $conf;
+
+		$elementtype = !empty($parameters['elementType']) ? (string) $parameters['elementType'] : '';
+		if (!in_array($elementtype, array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+
+		$diroutput = self::getDiffusionOutputDirForEntity();
+
+		$this->results = array(
+			'module' => 'diffusion',
+			'element' => 'diffusiondoc',
+			'table_element' => 'diffusion',
+			'subelement' => 'diffusiondoc',
+			'classpath' => 'diffusion/class',
+			'classfile' => 'diffusiondoc',
+			'classname' => 'Diffusiondoc',
+			'dir_output' => $diroutput,
+			'dir_temp' => !empty($conf->diffusion->dir_temp) ? $conf->diffusion->dir_temp : $diroutput.'/temp',
+			'parent_element' => '',
+		);
+		$hookmanager->resArray = $this->results;
+
+		return 1;
+	}
+
+	/**
+	 * Replace the default Diffusion banner pictogram with the generated PDF preview when available.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function formDolBanner($parameters, &$object, &$action, $hookmanager)
+	{
+		if (!is_object($object) || !in_array((string) $object->element, array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+
+		dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
+		if (!function_exists('diffusionGetGeneratedDocumentPreviewHtml')) {
+			return 0;
+		}
+
+		$previewhtml = diffusionGetGeneratedDocumentPreviewHtml($object);
+		if ($previewhtml !== '') {
+			$parameters['morehtmlleft'] = $previewhtml;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Keep native AJAX drag-and-drop uploads in the Diffusion document directory.
+	 *
+	 * @param array<string,mixed> $parameters Hook parameters
+	 * @param CommonObject       $object Current object
+	 * @param string             $action Current action
+	 * @param HookManager        $hookmanager Hook manager
+	 * @return int
+	 */
+	public function overrideUploadOptions($parameters, &$object, &$action, $hookmanager)
+	{
+		if (empty($parameters['element']) || !in_array((string) $parameters['element'], array('diffusiondoc', 'diffusiondoc@diffusion'), true)) {
+			return 0;
+		}
+		if (!is_object($object) || empty($object->id) || empty($object->ref)) {
+			return 0;
+		}
+
+		dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
+		if (!function_exists('diffusionGetDocumentUploadDir') || !function_exists('diffusionGetDocumentRelativePath')) {
+			return 0;
+		}
+
+		$relativePath = diffusionGetDocumentRelativePath($object);
+		$uploadDir = diffusionGetDocumentUploadDir($object);
+		$uploadDir = rtrim((string) $uploadDir, '/\\').'/';
+		$fileUrl = DOL_URL_ROOT.'/document.php?modulepart='.diffusionGetDocumentModulepart().'&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$relativePath);
+
+		if (empty($parameters['options']) || !is_array($parameters['options'])) {
+			$parameters['options'] = array();
+		}
+		$parameters['options']['upload_dir'] = $uploadDir;
+		$parameters['options']['upload_url'] = $fileUrl;
+		$parameters['options']['image_versions']['thumbnail']['upload_dir'] = $uploadDir.'thumbs/';
+		$parameters['options']['image_versions']['thumbnail']['upload_url'] = DOL_URL_ROOT.'/document.php?modulepart='.diffusionGetDocumentModulepart().'&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$relativePath.'thumbs/');
+
+		$this->results = array('options' => $parameters['options']);
+
+		return 0;
 	}
 
 	/**
@@ -179,9 +1235,12 @@ class ActionsDiffusion
 
 		$langs->load('diffusion@diffusion');
 
-		$this->results = array(
-			'diffusion' => img_picto('', 'fa-paper-plane', 'class="pictofixedwidth"') . dol_escape_htmltag($langs->trans('MailToSendDiffusion')),
-		);
+		$this->results = array();
+		foreach (self::getEmailTemplateTypes() as $type => $typeconf) {
+			$picto = !empty($typeconf['picto']) ? $typeconf['picto'] : 'email';
+			$label = !empty($typeconf['label']) ? $typeconf['label'] : $type;
+			$this->results[$type] = img_picto('', $picto, 'class="pictofixedwidth"') . dol_escape_htmltag($langs->trans($label));
+		}
 
 		return 0;
 	}
@@ -248,42 +1307,6 @@ class ActionsDiffusion
 	}
 
 	/**
-	 * Check if user can read diffusion objects.
-	 *
-	 * @param User $user Current user
-	 * @return bool
-	 */
-	private function userCanReadDiffusion($user)
-	{
-		if (!is_object($user)) {
-			return false;
-		}
-
-		return (!empty($user->admin)
-			|| $user->hasRight('diffusion', 'diffusiondoc', 'read')
-			|| $user->hasRight('diffusion', 'diffusion', 'read')
-			|| $user->hasRight('diffusion', 'read'));
-	}
-
-	/**
-	 * Check if user can write diffusion objects.
-	 *
-	 * @param User $user Current user
-	 * @return bool
-	 */
-	private function userCanWriteDiffusion($user)
-	{
-		if (!is_object($user)) {
-			return false;
-		}
-
-		return (!empty($user->admin)
-			|| $user->hasRight('diffusion', 'diffusiondoc', 'write')
-			|| $user->hasRight('diffusion', 'diffusion', 'write')
-			|| $user->hasRight('diffusion', 'write'));
-	}
-
-	/**
 	 * Complete project tabs head to include diffusion count on overview tab.
 	 *
 	 * @param array<string,mixed>	$parameters Hook parameters
@@ -294,23 +1317,26 @@ class ActionsDiffusion
 	 */
 	public function completeTabsHead(&$parameters, &$object, &$action, $hookmanager)
 	{
-		$objectType = !empty($parameters['type']) ? (string) $parameters['type'] : '';
-		if ($objectType !== 'project') {
+		global $user;
+
+		// complete_head_from_modules() only supplies type from Dolibarr 24.
+		// Earlier versions identify the tab owner through the Project object.
+		if (isset($parameters['type']) && $parameters['type'] !== 'project') {
 			return 0;
 		}
-		if (empty($object) || empty($object->id)) {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
+			return 0;
+		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
 			return 0;
 		}
 		if (empty($parameters['head']) || !is_array($parameters['head'])) {
 			return 0;
 		}
 
-		$nbdiffusions = $this->getDiffusionCountByProject((int) $object->id);
-		if ($nbdiffusions <= 0) {
-			return 0;
-		}
-
-		$updated = false;
 		foreach ($parameters['head'] as $tabKey => $tab) {
 			if (!is_array($tab) || empty($tab[2]) || $tab[2] !== 'element') {
 				continue;
@@ -319,6 +1345,10 @@ class ActionsDiffusion
 			$tabLabel = isset($tab[1]) ? (string) $tab[1] : '';
 			if (strpos($tabLabel, 'badge-diffusion-merged') !== false || strpos($tabLabel, 'badge-diffusion-added') !== false) {
 				continue;
+			}
+			$nbdiffusions = $this->getDiffusionCountByProject((int) $object->id);
+			if ($nbdiffusions <= 0) {
+				return 0;
 			}
 			if (preg_match('/(<span class=")([^"]*badge[^"]*)(">)([0-9]+)(<\/span>)/', $tabLabel, $matches)) {
 				$newValue = ((int) $matches[4]) + $nbdiffusions;
@@ -329,12 +1359,7 @@ class ActionsDiffusion
 			}
 
 			$parameters['head'][$tabKey] = $tab;
-			$updated = true;
 			break;
-		}
-
-		if (!$updated) {
-			return 0;
 		}
 
 		return 0;
@@ -401,13 +1426,15 @@ class ActionsDiffusion
 
 		dol_syslog(__METHOD__ . " called context=" . (is_object($object) && isset($object->element) ? $object->element : 'none') . " action=" . $action, LOG_WARNING);
 
-		if (empty($object) || $object->element !== 'project') {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
 			return 0;
 		}
-		$canReadDiffusion = $this->userCanReadDiffusion($user);
-		if (empty($canReadDiffusion)) {
-			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
+			dol_syslog(__METHOD__ . " skip: diffusion or project read access denied for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
 		}
 
@@ -415,6 +1442,9 @@ class ActionsDiffusion
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/diffusion.class.php');
 
+		$canWriteDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| $user->hasRight('diffusion', 'diffusion', 'write')
+			|| $user->hasRight('diffusion', 'write');
 		$this->results = array(
 			'diffusion' => array(
 				'name' => $langs->trans('Diffusion'),
@@ -425,17 +1455,18 @@ class ActionsDiffusion
 				'datefieldname' => 'date_expedition',
 				'margin' => 'minus',
 				'disableamount' => 1,
-				'urlnew' => DOL_URL_ROOT . '/custom/diffusion/diffusion_card.php?action=create&projectid=' . (int) $object->id,
+				'urlnew' => dol_buildpath('/diffusion/diffusion_card.php', 1) . '?action=create&projectid=' . (int) $object->id,
 				'lang' => 'diffusion',
 				'buttonnew' => $langs->trans('NewDiffusion'),
-				'testnew' => ($this->userCanWriteDiffusion($user)),
-				'test' => ($this->userCanReadDiffusion($user)),
+				'testnew' => $canWriteDiffusion,
+				'test' => $canReadDiffusion,
 			),
 		);
 
 		dol_syslog(__METHOD__ . " referent registered for project id=" . ((int) $object->id), LOG_WARNING);
 
-		return 1;
+		// Add our referent without replacing contributions from other modules.
+		return 0;
 	}
 
 	/**
@@ -453,13 +1484,8 @@ class ActionsDiffusion
 
 		dol_syslog(__METHOD__ . " called context=" . (is_object($object) && isset($object->element) ? $object->element : 'none') . " action=" . $action, LOG_WARNING);
 
-		if (empty($object) || $object->element !== 'project') {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
-			return 0;
-		}
-		$canReadDiffusion = $this->userCanReadDiffusion($user);
-		if (empty($canReadDiffusion)) {
-			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
 		}
 		$hasReferentContext = !empty($parameters['key']) || !empty($parameters['element']) || !empty($parameters['objecttype']) || !empty($parameters['type']);
@@ -470,11 +1496,20 @@ class ActionsDiffusion
 			dol_syslog(__METHOD__ . " skip: unmanaged referent context", LOG_DEBUG);
 			return 0;
 		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
+			dol_syslog(__METHOD__ . " skip: diffusion or project read access denied for user id=" . ((int) $user->id), LOG_DEBUG);
+			return 0;
+		}
 
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/diffusion.class.php');
 
-		$canWriteDiffusion = $this->userCanWriteDiffusion($user);
+		$canWriteDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| $user->hasRight('diffusion', 'diffusion', 'write')
+			|| $user->hasRight('diffusion', 'write');
 		if ($action === 'unlinkdiffusionfromproject' && !empty($canWriteDiffusion)) {
 			$diffusionId = GETPOSTINT('diffusionid');
 			$diffusionunlink = new Diffusion($this->db);
@@ -488,7 +1523,11 @@ class ActionsDiffusion
 					setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
 				}
 			}
-			$queryParams = $_GET;
+			$queryParams = array();
+			$queryString = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_QUERY);
+			if (!empty($queryString)) {
+				parse_str($queryString, $queryParams);
+			}
 			unset($queryParams['action']);
 			unset($queryParams['diffusionid']);
 			unset($queryParams['token']);
@@ -526,7 +1565,7 @@ class ActionsDiffusion
 			$title = $langs->trans($referentValue['title']);
 		}
 
-		$urlnew = DOL_URL_ROOT . '/custom/diffusion/diffusion_card.php?action=create&projectid=' . ((int) $object->id);
+		$urlnew = dol_buildpath('/diffusion/diffusion_card.php', 1) . '?action=create&projectid=' . ((int) $object->id);
 		if (!empty($referentValue['urlnew'])) {
 			$urlnew = (string) $referentValue['urlnew'];
 		}
@@ -534,9 +1573,9 @@ class ActionsDiffusion
 		if (!empty($referentValue['buttonnew'])) {
 			$buttonTitle = $langs->trans($referentValue['buttonnew']);
 		}
-		$canCreate = $this->userCanWriteDiffusion($user);
+		$canCreate = $canWriteDiffusion;
 		if (array_key_exists('testnew', $referentValue)) {
-			$canCreate = !empty($referentValue['testnew']);
+			$canCreate = $canCreate && !empty($referentValue['testnew']);
 		}
 		if (strpos($urlnew, 'backtopage=') === false) {
 			$backtopage = (string) $_SERVER['REQUEST_URI'];
@@ -590,7 +1629,7 @@ class ActionsDiffusion
 				}
 
 				$unlinkButton = '';
-				if ($this->userCanWriteDiffusion($user)) {
+				if ($canWriteDiffusion) {
 					$urlunlink = $_SERVER['PHP_SELF'] . '?id=' . ((int) $object->id) . '&action=unlinkdiffusionfromproject&diffusionid=' . ((int) $obj->rowid) . '&token=' . newToken() . '#table_diffusion';
 					$unlinkButton = '<a href="' . dol_escape_htmltag($urlunlink) . '" class="reposition"><span class="fas fa-unlink" title="' . dol_escape_htmltag($langs->trans('Unlink')) . '"></span></a>';
 				}
@@ -641,28 +1680,37 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$notificationElementAliases = array('diffusion', 'diffusion@diffusion', 'diffusion');
+		$notificationElementAliases = array('diffusion', 'diffusion@diffusion', 'diffusiondoc', 'diffusioncontact');
 		foreach ($notificationElementAliases as $alias) {
 			if (empty($conf->{$alias}) || !is_object($conf->{$alias})) {
 				$conf->{$alias} = new stdClass();
 			}
 			$conf->{$alias}->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
+			if (!empty($conf->diffusion->dir_output)) {
+				$conf->{$alias}->dir_output = $conf->diffusion->dir_output;
+			}
+			if (!empty($conf->diffusion->multidir_output)) {
+				$conf->{$alias}->multidir_output = $conf->diffusion->multidir_output;
+			}
 		}
 
-		$events = array(
-			'DIFFUSION_CREATE',
-			'DIFFUSION_VALIDATE',
-			'DIFFUSION_SENDMAIL',
-			'DIFFUSION_SETDIFFUSED',
-			'DIFFUSION_BACKTODRAFT',
-			'DIFFUSION_DELETE',
-		);
+		if (!empty($parameters['notifcode'])) {
+			$result = self::syncSelectedNotificationEmailTemplateMirrors($this->db, (string) $parameters['notifcode'], $object);
+			if ($result < 0) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+		}
+
+		$events = self::getNotificationEventCodes();
 
 		if (!empty($hookmanager->resArray['arrayofnotifsupported']) && is_array($hookmanager->resArray['arrayofnotifsupported'])) {
 			$events = array_merge($hookmanager->resArray['arrayofnotifsupported'], $events);
 		}
 
-		$this->results = array('arrayofnotifsupported' => array_values(array_unique($events)));
+		$events = array_values(array_diff(array_unique($events), self::getExcludedNotificationEventCodes()));
+
+		$this->results = array('arrayofnotifsupported' => $events);
 
 		return 0;
 	}
@@ -679,14 +1727,20 @@ class ActionsDiffusion
 	 */
 	public function printOverviewProfit($parameters, &$project, &$action, $hookmanager)
 	{
-		global $db, $langs, $form;
+		global $db, $langs, $form, $user;
 
-		dol_syslog(__METHOD__ . " called projectid=" . ((int) $project->id) . " action=" . $action, LOG_DEBUG);
-
-		if (!$this->isDiffusionReferentContext($parameters)) {
-			dol_syslog(__METHOD__ . " skip unmanaged referent context", LOG_DEBUG);
+		if (!($project instanceof Project) || $project->id <= 0 || !isModEnabled('diffusion')
+			|| !$this->isDiffusionReferentContext($parameters)) {
 			return 0;
 		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $project->restrictedProjectArea($user, 'read') <= 0) {
+			return 0;
+		}
+
+		dol_syslog(__METHOD__ . " called projectid=" . ((int) $project->id) . " action=" . $action, LOG_DEBUG);
 
 		$value = &$parameters['value'];
 		dol_syslog(__METHOD__ . " datefieldname=" . (!empty($value['datefieldname']) ? $value['datefieldname'] : 'undefined'), LOG_DEBUG);
@@ -736,10 +1790,4 @@ class ActionsDiffusion
 		return 1;
 	}
 
-}
-
-if (!class_exists('ActionsDiffusion')) {
-	class ActionsDiffusion extends ActionsDiffusion
-	{
-	}
 }

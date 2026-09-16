@@ -54,6 +54,8 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
 	}
 
 	$out = '';
+	$element = (empty($object->module) || $object->module == $object->element) ? $object->element : $object->element.'@'.$object->module;
+	$backtopageid = !empty($object->diffusion) ? (int) $object->diffusion : (int) $object->id;
 
 	if (!empty($conf->use_javascript_ajax) && empty($forcenojs)) {
 		$out .= '<script>
@@ -67,11 +69,18 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
                     action: \'set\',
                     field: \''.dol_escape_js($field).'\',
                     value: \'1\',
-                    element: \''.dol_escape_js((empty($object->module) || $object->module == $object->element) ? $object->element : $object->element.'@'.$object->module).'\',
+                    element: \''.dol_escape_js($element).'\',
                     id: \''.((int) $object->id).'\',
 					token: \''.currentToken().'\'
-                },
-                function() {
+                }).done(
+                function(response) {
+				    try {
+				        var data = JSON.parse(response);
+						console.log(data);
+				    } catch (e) {
+				        console.log(response);
+				    }
+
                     $("#set_'.$htmlname.'_'.$object->id.'").hide();
                     $("#del_'.$htmlname.'_'.$object->id.'").show();
                     // Enable another element
@@ -89,7 +98,12 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
                             $("#" + value).show();
                         });
                     }
-                });
+                }).fail(
+					function(response) {
+						console.warn(response.responseText);
+						Dolibarr.tools.setEventMessage(response.responseText, "errors");
+					}
+				);
             });
 
             // Del constant
@@ -99,11 +113,18 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
                     action: \'set\',
                     field: \''.dol_escape_js($field).'\',
                     value: \'0\',
-                    element: \''.dol_escape_js((empty($object->module) || $object->module == $object->element) ? $object->element : $object->element.'@'.$object->module).'\',
+                    element: \''.dol_escape_js($element).'\',
                     id: \''.((int) $object->id).'\',
 					token: \''.currentToken().'\'
-                },
-                function() {
+                }).done(
+                function(response) {
+				    try {
+				        var data = JSON.parse(response);
+						console.log(data);
+				    } catch (e) {
+				        console.log(response);
+				    }
+
                     $("#del_'.$htmlname.'_'.$object->id.'").hide();
                     $("#set_'.$htmlname.'_'.$object->id.'").show();
                     // Disable another element
@@ -121,7 +142,12 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
                             $("#" + value).hide();
                         });
                     }
-                });
+                }).fail(
+					function(response) {
+						console.warn(response.responseText);
+						Dolibarr.tools.setEventMessage(response.responseText, "errors");
+					}
+				);
             });
         });
     </script>';
@@ -149,8 +175,10 @@ function ajax_diffusion_onoff($object, $code, $field, $text_on, $text_off, $inpu
 	}
 
 	if (empty($conf->use_javascript_ajax) || $forcenojs) {
-		$out .= '<a id="set_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? 'hideobject' : '').($morecss ? ' '.$morecss : '').'" href="'.DOL_URL_ROOT.'/custom/diffusion/ajax/objectonoff.php?action=set&token='.newToken().'&id='.((int) $object->id).'&element='.urlencode($object->element).'&field='.urlencode($field).'&value=1&backtopage='.urlencode($_SERVER["PHP_SELF"].'?id='.$object->diffusion.($moreparam ? '&'.$moreparam : '')).'">'.img_picto($langs->trans($text_off), $switchoff, '', 0, 0, 0, '', $cssswitchoff).'</a>';
-		$out .= '<a id="del_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? '' : 'hideobject').($morecss ? ' '.$morecss : '').'" href="'.DOL_URL_ROOT.'/custom/diffusion/ajax/objectonoff.php?action=set&token='.newToken().'&id='.((int) $object->id).'&element='.urlencode($object->element).'&field='.urlencode($field).'&value=0&backtopage='.urlencode($_SERVER["PHP_SELF"].'?id='.$object->diffusion.($moreparam ? '&'.$moreparam : '')).'">'.img_picto($langs->trans($text_on), $switchon, '', 0, 0, 0, '', $cssswitchon).'</a>';
+		$url = DOL_URL_ROOT.'/custom/diffusion/ajax/objectonoff.php?action=set&token='.newToken().'&id='.((int) $object->id).'&element='.urlencode($element).'&field='.urlencode($field).'&value=1&backtopage='.urlencode($_SERVER["PHP_SELF"].'?id='.$backtopageid.($moreparam ? '&'.$moreparam : ''));
+		$out .= '<a id="set_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? 'hideobject' : '').($morecss ? ' '.$morecss : '').'" href="'.$url.'">'.img_picto($langs->trans($text_off), $switchoff, '', 0, 0, 0, '', $cssswitchoff).'</a>';
+		$url = DOL_URL_ROOT.'/custom/diffusion/ajax/objectonoff.php?action=set&token='.newToken().'&id='.((int) $object->id).'&element='.urlencode($element).'&field='.urlencode($field).'&value=0&backtopage='.urlencode($_SERVER["PHP_SELF"].'?id='.$backtopageid.($moreparam ? '&'.$moreparam : ''));
+		$out .= '<a id="del_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? '' : 'hideobject').($morecss ? ' '.$morecss : '').'" href="'.$url.'">'.img_picto($langs->trans($text_on), $switchon, '', 0, 0, 0, '', $cssswitchon).'</a>';
 	} else {
 		$out .= '<span id="set_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? 'hideobject' : '').($morecss ? ' '.$morecss : '').'">'.img_picto($langs->trans($text_off), $switchoff, '', 0, 0, 0, '', $cssswitchoff).'</span>';
 		$out .= '<span id="del_'.$htmlname.'_'.$object->id.'" class="linkobject '.($object->$code == 1 ? '' : 'hideobject').($morecss ? ' '.$morecss : '').'">'.img_picto($langs->trans($text_on), $switchon, '', 0, 0, 0, '', $cssswitchon).'</span>';

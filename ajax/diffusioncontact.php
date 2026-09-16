@@ -37,9 +37,6 @@ if (!defined('NOREQUIREAJAX')) {
 if (!defined('NOREQUIRESOC')) {
 	define('NOREQUIRESOC', '1');
 }
-if (!defined('NOCSRFCHECK')) {
-	define('NOCSRFCHECK', '1');
-}
 if (!defined('NOREQUIREHTML')) {
 	define('NOREQUIREHTML', '1');
 }
@@ -66,15 +63,15 @@ dol_include_once('/diffusion/class/diffusioncontact.class.php');
  */
 
 $mode = GETPOST('mode', 'aZ09');
-$objectId = GETPOST('objectId', 'aZ09');
+$objectId = GETPOSTINT('objectId');
 $field = GETPOST('field', 'aZ09');
-$value = GETPOST('value', 'aZ09');
+$value = GETPOSTINT('value');
 
 // @phan-suppress-next-line PhanUndeclaredClass
 $object = new DiffusionContact($db);
 
 // Security check
-if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'write') || $user->hasRight('diffusion', 'diffusioncontact', 'write'))) {
+if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'write'))) {
 	accessforbidden();
 }
 
@@ -87,17 +84,13 @@ dol_syslog("Call ajax diffusion/ajax/diffusioncontact.php");
 top_httphead();
 
 // Update the object field with the new value
-if ($objectId && $field && isset($value)) {
-	$object->fetch($objectId);
-	if ($object->id > 0) {
-		$object->$field = $value;
-	}
-	$result = $object->update($user);
+if ($objectId && $field) {
+	$result = $object->updateStatusField($objectId, $field, $value, $user);
 
 	if ($result < 0) {
-		print json_encode(['status' => 'error', 'message' => 'Error updating '. $field]);
+		print json_encode(array('status' => 'error', 'message' => 'Error updating '. $field));
 	} else {
-		print json_encode(['status' => 'success', 'message' => $field . ' updated successfully']);
+		print json_encode(array('status' => 'success', 'message' => $field . ' updated successfully'));
 	}
 }
 

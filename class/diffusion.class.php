@@ -66,6 +66,11 @@ class Diffusion extends CommonObject
 	public $modulepart;
 
 	/**
+	 * @var string Tracking id used by Dolibarr mail forms
+	 */
+	public $trackid;
+
+	/**
 	 * @var string Output directory for documents
 	 */
 
@@ -229,7 +234,7 @@ class Diffusion extends CommonObject
 			$diffusionRightsMigrationDone = true;
 		}
 
-                $this->ismultientitymanaged = 0;
+                $this->ismultientitymanaged = 1;
                 $this->isextrafieldmanaged = 1;
 
                 $entity = !empty($conf->entity) ? (int) $conf->entity : 1;
@@ -363,6 +368,13 @@ class Diffusion extends CommonObject
 
 		$last_id = $this->db->last_insert_id("'".MAIN_DB_PREFIX."diffusion'", 'rowid');
 		$this->id = $last_id;
+		$this->rowid = $last_id;
+		$this->ref = '(PROV'.$last_id.')';
+		$this->entity = (int) (!empty($conf->entity) ? $conf->entity : 1);
+		$this->fk_user_creat = (int) $user->id;
+		if (!isset($this->status) || $this->status === '') {
+			$this->status = self::STATUS_DRAFT;
+		}
 
 		$updatesql = "UPDATE ".MAIN_DB_PREFIX."diffusion SET ref = '(PROV".$last_id.")' WHERE rowid = ".$last_id;
 		$result = $this->db->query($updatesql);
@@ -376,6 +388,15 @@ class Diffusion extends CommonObject
 		if ((int) $this->fk_project > 0) {
 			$linkresult = $this->syncProjectObjectLink((int) $this->fk_project);
 			if ($linkresult < 0) {
+				$this->db->rollback();
+
+				return -1;
+			}
+		}
+
+		if (!empty($this->model_source) && (int) $this->model_source > 0 && !empty($this->description)) {
+			$substitutionresult = $this->replaceDescriptionSubstitutions($langs);
+			if ($substitutionresult < 0) {
 				$this->db->rollback();
 
 				return -1;
@@ -400,6 +421,51 @@ class Diffusion extends CommonObject
 		$this->db->commit();
 
 		return $last_id;
+	}
+
+	/**
+	 * Replace substitution variables in the stored description.
+	 *
+	 * This is used only when a diffusion is created from a template, so the
+	 * generated diffusion keeps a fixed description while the source template
+	 * remains unchanged.
+	 *
+	 * @param	Translate	$outputlangs	Output language
+	 * @return	int							Return 1 if OK, <0 if KO
+	 */
+	public function replaceDescriptionSubstitutions($outputlangs)
+	{
+		if (empty($this->description)) {
+			return 1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/functions.lib.php';
+		dol_include_once('/diffusion/core/substitutions/functions_diffusion.lib.php');
+
+		$substitutionarray = getCommonSubstitutionArray($outputlangs, 0, null, $this);
+		$parameters = array('mode' => 'diffusiondescription');
+		complete_substitutions_array($substitutionarray, $outputlangs, $this, $parameters);
+
+		$newdescription = make_substitutions($this->description, $substitutionarray);
+		if ($newdescription === $this->description) {
+			return 1;
+		}
+
+		$sql = "UPDATE ".MAIN_DB_PREFIX."diffusion";
+		$sql .= " SET description = '".$this->db->escape($newdescription)."'";
+		$sql .= " WHERE rowid = ".((int) $this->id);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			$this->errors[] = $this->error;
+
+			return -1;
+		}
+
+		$this->description = $newdescription;
+
+		return 1;
 	}
 
 	/**
@@ -602,7 +668,7 @@ class Diffusion extends CommonObject
 			$sql .= " LEFT JOIN ".$this->db->prefix().$this->table_element."_extrafields as te ON te.fk_object = t.rowid";
 		}
 		if (isset($this->ismultientitymanaged) && $this->ismultientitymanaged == 1) {
-			$sql .= " WHERE t.entity IN (".getEntity($this->element).")";
+			$sql .= " WHERE t.entity IN (".getEntity('diffusion').")";
 		} else {
 			$sql .= " WHERE 1 = 1";
 		}

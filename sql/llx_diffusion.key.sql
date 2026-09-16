@@ -16,11 +16,12 @@
 
 -- BEGIN MODULEBUILDER INDEXES
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_rowid (rowid);
-ALTER TABLE llx_diffusion ADD UNIQUE INDEX uk_diffusion_ref (ref);
+ALTER TABLE llx_diffusion ADD UNIQUE INDEX uk_diffusion_ref (ref, entity);
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_fk_project (fk_project);
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_entity (entity);
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_status (status);
 ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_fk_user_exped (fk_user_exped);
+ALTER TABLE llx_diffusion ADD INDEX idx_diffusion_date_creation (date_creation);
 -- END MODULEBUILDER INDEXES
 
 --ALTER TABLE llx_diffusion ADD UNIQUE INDEX uk_diffusion_fieldxy(fieldx, fieldy);

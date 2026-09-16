@@ -70,6 +70,7 @@ dol_include_once('/diffusion/class/diffusion.class.php');
 dol_include_once('/diffusion/class/diffusioncontact.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
+dol_include_once('/diffusion/core/substitutions/functions_diffusion.lib.php');
 
 /**
  * Resolve a contact type id compatible with current diffusion element/source.
@@ -358,6 +359,77 @@ function diffusionHasStoredContactLinkForNativeType(DoliDB $db, $diffusionid, $c
 }
 
 /**
+ * Normalize selected project contacts from classic POST arrays or Ajax formconfirm hidden field.
+ *
+ * @param array<int|string,mixed>|string $rawvalues Raw selected values
+ * @return array<int,string> Normalized selected tuples source:contactid:typeid
+ */
+function diffusionNormalizeProjectContactSelections($rawvalues)
+{
+	if (!is_array($rawvalues)) {
+		$rawvalues = array($rawvalues);
+	}
+
+	$selected = array();
+	$seen = array();
+	foreach ($rawvalues as $rawvalue) {
+		if (is_array($rawvalue)) {
+			$subselected = diffusionNormalizeProjectContactSelections($rawvalue);
+			foreach ($subselected as $subvalue) {
+				if (empty($seen[$subvalue])) {
+					$selected[] = $subvalue;
+					$seen[$subvalue] = true;
+				}
+			}
+			continue;
+		}
+
+		$chunks = explode(',', str_replace(array("\r", "\n", "\t", ';'), ',', (string) $rawvalue));
+		foreach ($chunks as $chunk) {
+			$value = trim((string) $chunk);
+			if ($value === '') {
+				continue;
+			}
+			if (!preg_match('/^(internal|external):([1-9][0-9]*):([1-9][0-9]*)$/', $value)) {
+				continue;
+			}
+			if (empty($seen[$value])) {
+				$selected[] = $value;
+				$seen[$value] = true;
+			}
+		}
+	}
+
+	return $selected;
+}
+
+/**
+ * Return project contacts selected in the import confirmation popup.
+ *
+ * @return array<int,string> Normalized selected tuples source:contactid:typeid
+ */
+function diffusionGetSelectedProjectContactsFromRequest()
+{
+	$rawvalues = array();
+	$projectcontacts = GETPOST('projectcontacts', 'array');
+	if (!empty($projectcontacts)) {
+		$rawvalues[] = $projectcontacts;
+	}
+
+	$projectcontactsbrackets = GETPOST('projectcontacts[]', 'array');
+	if (!empty($projectcontactsbrackets)) {
+		$rawvalues[] = $projectcontactsbrackets;
+	}
+
+	$projectcontactsselected = GETPOST('projectcontacts_selected', 'restricthtml');
+	if (!empty($projectcontactsselected)) {
+		$rawvalues[] = $projectcontactsselected;
+	}
+
+	return diffusionNormalizeProjectContactSelections($rawvalues);
+}
+
+/**
  * @var Conf $conf
  * @var DoliDB $db
  * @var HookManager $hookmanager
@@ -392,15 +464,8 @@ if (!empty($backtopagejsfields)) {
 }
 
 // Handle confirmation popup submit for project contacts import.
-$hasprojectcontactsrequest = false;
-if (is_array($_REQUEST)) {
-	foreach ($_REQUEST as $requestkey => $requestvalue) {
-		if (strpos((string) $requestkey, 'projectcontacts_') === 0 || $requestkey === 'projectcontacts' || $requestkey === 'projectcontacts[]') {
-			$hasprojectcontactsrequest = true;
-			break;
-		}
-	}
-}
+$projectcontactsrequest = diffusionGetSelectedProjectContactsFromRequest();
+$hasprojectcontactsrequest = count($projectcontactsrequest) > 0;
 if (($action === 'confirm_importprojectcontacts' || $action === 'ask_import_project_contacts') && ($confirm === 'yes' || $hasprojectcontactsrequest)) {
 	dol_syslog(__METHOD__.' remap action '.$action.' to importprojectcontacts (confirm='.$confirm.', hasprojectcontactsrequest='.(int) $hasprojectcontactsrequest.')', LOG_DEBUG);
 	$action = 'importprojectcontacts';
@@ -448,56 +513,22 @@ $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink
 
 
 $entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-	$conf->diffusion = new stdClass();
+$upload_dir = diffusionGetDocumentUploadDir($object);
+if (!empty($upload_dir)) {
+	diffusionMigrateFlatDocumentDirectory($db, $object);
 }
-if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-	$conf->diffusion->multidir_output = array();
-}
-$defaultdiffusionoutput = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-$diffusionoutput = !empty($conf->diffusion->multidir_output[$entityfordoc]) ? $conf->diffusion->multidir_output[$entityfordoc] : (!empty($conf->diffusion->dir_output) ? $conf->diffusion->dir_output : $defaultdiffusionoutput);
-if ($entityfordoc > 1 && preg_match('/\/'.preg_quote((string) $entityfordoc, '/').'\//', (string) $diffusionoutput) === 0) {
-	$diffusionoutput = $defaultdiffusionoutput;
-}
-$conf->diffusion->multidir_output[$entityfordoc] = $diffusionoutput;
-if (!isset($conf->diffusion->enabled)) {
-	$conf->diffusion->enabled = 1;
-}
-
-$objref = dol_sanitizeFileName($object->ref);
-$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
-dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
+dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 //include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
 // EN: Manage attachment upload and deletion with Dolibarr helper to keep buttons functional.
 // FR: Gère l'envoi et la suppression des pièces jointes avec l'aide Dolibarr pour garder les boutons fonctionnels.
 // Delete file in doc form
-	if ($action == 'remove_file' && $permissiontoadd) {
-		if ($object->id > 0) {
-			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
-			$langs->load("other");
-			//$upload_dir = $conf->diffusion->multidir_output[isset($object->entity) ? $object->entity : 1].'/'.$object->element.'/'.$objref;
-			$filetodelete = GETPOST('file', 'alpha');
-			$filetodelete = ltrim((string) $filetodelete, '/');
-			$fullpathtodelete = '';
-			if ($filetodelete !== '' && preg_match('/\.\./', $filetodelete)) {
-				$fullpathtodelete = '';
-			} elseif (preg_match('/^'.preg_quote($object->element, '/').'\//', $filetodelete)) {
-				$fullpathtodelete = $diffusionoutput.'/'.$filetodelete;
-			} else {
-				$fullpathtodelete = $upload_dir.'/'.basename($filetodelete);
-			}
-			dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete.' fullpath='.$fullpathtodelete, LOG_DEBUG);
-			$ret = (!empty($fullpathtodelete) ? dol_delete_file($fullpathtodelete, 0, 0, 0, $object) : 0);
-			if ($ret) {
-				setEventMessages($langs->trans("FileWasRemoved", $filetodelete), null, 'mesgs');
-			} else {
-				setEventMessages($langs->trans("ErrorFailToDeleteFile", $filetodelete), null, 'errors');
-			}
-			$action = '';
-		}
-	}
+if ($action == 'remove_file' && $permissiontoadd && $object->id > 0) {
+	$filetodelete = GETPOST('file', 'alpha');
+	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete, LOG_DEBUG);
+	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, $filetodelete);
+	$action = '';
+}
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
@@ -546,14 +577,58 @@ if (empty($reshook)) {
 		exit;
 	}
 
-	// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
-	include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
+	if ($action == 'updatedescription') {
+		if (empty($permissiontoadd) || empty($object->id) || empty($object->is_template)) {
+			accessforbidden();
+		}
+		if ($cancel) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+
+		$result = $object->setValueFrom('description', GETPOST('description', 'none'), '', null, 'text', '', $user, $triggermodname);
+		if ($result < 0) {
+			setEventMessages($object->error, $object->errors, 'errors');
+		} else {
+			setEventMessages($langs->trans('RecordSaved'), null, 'mesgs');
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.$object->id);
+			exit;
+		}
+	}
+
+		// Actions cancel, add, update, update_extras, confirm_validate, confirm_delete, confirm_deleteline, confirm_clone, confirm_close, confirm_setdraft, confirm_reopen
+		if ($action == 'add') {
+			$object->model_source = GETPOSTINT('model_source') ?: GETPOSTINT('fromtemplateid');
+		}
+		include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
 
 	// Actions when linking object each other
 	include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
 
 	// Actions when printing a doc from card
 	include DOL_DOCUMENT_ROOT.'/core/actions_printing.inc.php';
+
+	// Actions on linked files from the native attached files block.
+	$object->element = diffusionGetDocumentElement();
+	$modulepart = diffusionGetDocumentModulepart();
+	$relativepathwithnofile = diffusionGetDocumentRelativePath($object);
+	$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
+	$diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
+	$diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
+	$diffusionrenameto = $diffusionfilerename ? dol_string_nohtmltag(dol_sanitizeFileName(GETPOST('renamefileto', 'alpha'), '_', 0)) : '';
+	if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissiontoadd) && GETPOST('urlfile', 'alpha')) {
+		diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, GETPOST('urlfile', 'alpha', 0, null, null, 1));
+		$tmpurl = !empty($backtopage) ? $backtopage : $_SERVER["PHP_SELF"].'?id='.$object->id;
+		header('Location: '.$tmpurl);
+		exit;
+	}
+	include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
+	if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionRegenerateDocumentAfterLinkedFileChange')) {
+		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload');
+	}
+	if ($diffusionfilerename && !empty($permissiontoadd) && empty($error) && $diffusionrenamefrom !== $diffusionrenameto && is_file(diffusionResolveLinkedFilePath($object, $upload_dir, $diffusionrenameto)) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenamefrom) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenameto)) {
+		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'rename');
+	}
 
 // Action to move up and down lines of object
 //include DOL_DOCUMENT_ROOT.'/core/actions_lineupdown.inc.php';
@@ -758,25 +833,8 @@ if ($action == 'addcontact' && $permissiontoadd) {
 				dol_syslog(__METHOD__.' importprojectcontacts aborted: failed to load project id='.(int) $object->fk_project, LOG_ERR);
 				setEventMessages($langs->trans('ErrorFailedToLoadProject'), null, 'errors');
 			} else {
-				$selectedcontacts = GETPOST('projectcontacts', 'array');
-				dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from projectcontacts='.count((array) $selectedcontacts), LOG_DEBUG);
-				if (empty($selectedcontacts)) {
-					$selectedcontacts = GETPOST('projectcontacts[]', 'array');
-					dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from projectcontacts[]='.count((array) $selectedcontacts), LOG_DEBUG);
-				}
-				if (empty($selectedcontacts) && !empty($_REQUEST) && is_array($_REQUEST)) {
-					$selectedcontacts = array();
-					foreach ($_REQUEST as $postkey => $postvalue) {
-						if (strpos((string) $postkey, 'projectcontacts_') === 0 && !empty($postvalue)) {
-							if (strpos((string) $postvalue, ':') !== false) {
-								$selectedcontacts[] = (string) $postvalue;
-							} elseif (preg_match('/^projectcontacts_(internal|external)_([0-9]+)_([0-9]+)$/', (string) $postkey, $matches)) {
-								$selectedcontacts[] = $matches[1].':'.$matches[2].':'.$matches[3];
-							}
-						}
-					}
-					dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts from request scan='.count((array) $selectedcontacts), LOG_DEBUG);
-				}
+				$selectedcontacts = diffusionGetSelectedProjectContactsFromRequest();
+				dol_syslog(__METHOD__.' importprojectcontacts selectedcontacts='.count((array) $selectedcontacts), LOG_DEBUG);
 				if (empty($selectedcontacts)) {
 					dol_syslog(__METHOD__.' importprojectcontacts aborted: no selected contacts after parsing request', LOG_WARNING);
 					setEventMessages($langs->trans('ErrorNoContactSelectedForImport'), null, 'warnings');
@@ -853,6 +911,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 	$object->label = GETPOST('label');
 	$object->fk_project = GETPOSTINT('fk_project') ?: GETPOSTINT('projectid');
 	$object->description = GETPOST('description', 'none');
+	$object->model_source = GETPOSTINT('model_source') ?: GETPOSTINT('fromtemplateid');
 
 	//$id = $object->create($user, $db); 
 }
@@ -864,6 +923,7 @@ if ($action == 'addcontact' && $permissiontoadd) {
 $form = new Form($db);
 $formfile = new FormFile($db);
 $formproject = new FormProjets($db);
+$diffusionSubstitutionHelp = function_exists('diffusion_get_available_substitution_help_html') ? diffusion_get_available_substitution_help_html($langs) : '';
 
 //$title = $langs->trans("Diffusion")." - ".$langs->trans('Card');
 $title = $object->ref." - ".$langs->trans('Card');
@@ -974,7 +1034,11 @@ if ($action == 'create') {
 
 	// Description
 	print '<tr class="field_description">';
-	print '<td class="titlefieldcreate tdtop">'.$langs->trans('Description').'</td>';
+	print '<td class="titlefieldcreate tdtop">'.$langs->trans('Description');
+	if ($diffusionSubstitutionHelp !== '') {
+		print ' '.$form->textwithpicto('', $diffusionSubstitutionHelp, 1, 'help', '', 0, 2, 'diffusiondescriptionvariables');
+	}
+	print '</td>';
 	print '<td class="valuefieldcreate">';
 	$description = GETPOST('description', 'none');
 	if ($description === '') {
@@ -1070,45 +1134,84 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$internalcontacts = $project->liste_contact(-1, 'internal');
 			$externalcontacts = $project->liste_contact(-1, 'external');
 
+			$formquestion[] = array('type' => 'hidden', 'name' => 'projectcontacts_selected', 'value' => '');
 			$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_help', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('SelectProjectContactsToImport').'</span>');
 
+			$contactrows = array();
 			foreach (array('internal' => (array) $internalcontacts, 'external' => (array) $externalcontacts) as $source => $contacts) {
 				foreach ($contacts as $contactline) {
+					$contactid = (int) ($contactline['id'] ?? 0);
+					$contacttypeid = (int) ($contactline['fk_c_type_contact'] ?? 0);
+					if ($contactid <= 0 || $contacttypeid <= 0) {
+						continue;
+					}
+
 					$contactlabel = '';
 					if ($source === 'internal') {
 						$usercontact = new User($db);
-						if ($usercontact->fetch((int) $contactline['id']) > 0) {
+						if ($usercontact->fetch($contactid) > 0) {
 							$contactlabel = $usercontact->getFullName($langs);
 						}
 					} else {
 						$soccontact = new Contact($db);
-						if ($soccontact->fetch((int) $contactline['id']) > 0) {
+						if ($soccontact->fetch($contactid) > 0) {
 							$contactlabel = $soccontact->getFullName($langs);
 						}
 					}
 
 					if (empty($contactlabel)) {
-						$contactlabel = $langs->trans('Contact').' #'.((int) $contactline['id']);
+						$contactlabel = $langs->trans('Contact').' #'.$contactid;
 					}
 
-					$contacttype = dol_escape_htmltag($contactline['libelle']);
-					$checkboxlabel = dol_escape_htmltag($contactlabel).' <span class="opacitymedium">('.$contacttype.')</span>';
-					$formquestion[] = array(
-						'type' => 'checkbox',
-						'name' => 'projectcontacts_'.$source.'_'.((int) $contactline['id']).'_'.((int) $contactline['fk_c_type_contact']),
-						'label' => $checkboxlabel,
-						'value' => $source.':'.((int) $contactline['id']).':'.((int) $contactline['fk_c_type_contact'])
+					$contactrows[] = array(
+						'source' => $source,
+						'id' => $contactid,
+						'typeid' => $contacttypeid,
+						'label' => $contactlabel,
+						'type' => (string) ($contactline['libelle'] ?? ''),
 					);
 				}
 			}
 
-			if (count($formquestion) === 1) {
-				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_empty', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('NoProjectContactsToImport').'</span>');
+			$contactlinecount = count($contactrows);
+			$maxcontactchars = dol_strlen($langs->trans('Contact'));
+			$maxtypechars = dol_strlen($langs->trans('Type'));
+			foreach ($contactrows as $contactrow) {
+				$maxcontactchars = max($maxcontactchars, dol_strlen((string) $contactrow['label']));
+				$maxtypechars = max($maxtypechars, dol_strlen((string) $contactrow['type']));
 			}
-			$contactlinecount = max(0, count($formquestion) - 1);
-			$popupheight = 280 + (35 * $contactlinecount);
-			$popupheight = min(760, max(360, $popupheight));
-			$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('ImportProjectContacts'), $langs->trans('ConfirmImportProjectContacts'), 'importprojectcontacts', $formquestion, 'yes', 1, $popupheight);
+			$popupwidth = 380 + min(520, ($maxcontactchars * 6)) + min(360, ($maxtypechars * 6));
+			$popupwidth = min(1180, max(760, $popupwidth));
+			$popupheight = 280 + min(420, (35 * max(1, $contactlinecount)));
+			$popupheight = min(760, max(380, $popupheight));
+
+			if (empty($contactrows)) {
+				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_empty', 'label' => '', 'value' => '<span class="opacitymedium">'.$langs->trans('NoProjectContactsToImport').'</span>');
+			} else {
+				$tableid = 'diffusion-project-contacts-'.((int) $object->id);
+				$tablehtml = '<div class="diffusion-project-contacts-wrapper" data-dialog-min-width="'.((int) $popupwidth).'">';
+				$tablehtml .= '<table class="noborder centpercent diffusion-project-contacts-table" id="'.$tableid.'" style="table-layout:auto; min-width:720px;">';
+				$tablehtml .= '<tr class="liste_titre">';
+				$tablehtml .= '<th class="center nowraponall" style="width:130px; white-space:nowrap;"><a href="#" class="diffusion-select-all-project-contacts" data-target="'.$tableid.'">'.$langs->trans('SelectAllProjectContacts').'</a></th>';
+				$tablehtml .= '<th class="nowraponall" style="white-space:nowrap;">'.$langs->trans('Contact').'</th>';
+				$tablehtml .= '<th class="nowraponall" style="white-space:nowrap;">'.$langs->trans('Type').'</th>';
+				$tablehtml .= '<th class="nowraponall" style="width:95px; white-space:nowrap;">'.$langs->trans('Source').'</th>';
+				$tablehtml .= '</tr>';
+				foreach ($contactrows as $contactrow) {
+					$value = $contactrow['source'].':'.((int) $contactrow['id']).':'.((int) $contactrow['typeid']);
+					$tablehtml .= '<tr class="oddeven">';
+					$tablehtml .= '<td class="center nowraponall" style="white-space:nowrap;"><input type="checkbox" class="flat diffusion-project-contact-checkbox" name="projectcontacts[]" value="'.dol_escape_htmltag($value).'"></td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.dol_escape_htmltag($contactrow['label']).'</td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.dol_escape_htmltag($contactrow['type']).'</td>';
+					$tablehtml .= '<td class="nowraponall" style="white-space:nowrap;">'.$langs->trans($contactrow['source'] === 'internal' ? 'Internal' : 'External').'</td>';
+					$tablehtml .= '</tr>';
+				}
+				$tablehtml .= '</table>';
+				$tablehtml .= '</div>';
+
+				$formquestion[] = array('type' => 'other', 'name' => 'project_contacts_table', 'label' => '', 'value' => $tablehtml);
+			}
+			$formconfirm = $form->formconfirm($_SERVER['PHP_SELF'].'?id='.$object->id, $langs->trans('ImportProjectContacts'), $langs->trans('ConfirmImportProjectContacts'), 'importprojectcontacts', $formquestion, 'yes', 1, $popupheight, $popupwidth);
 		} else {
 			setEventMessages($langs->trans('ErrorFailedToLoadProject'), null, 'errors');
 		}
@@ -1131,80 +1234,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// ------------------------------------------------------------
 	$linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
-	$inlineEditable = ($permissiontoadd && $object->status == $object::STATUS_DRAFT);
-	$inlineEditableRef = ($permissiontoadd && !empty($object->is_template));
-
-	$morehtmlref = '<div class="refidno">';
-	if (!empty($object->is_template)) {
-		$morehtmlref .= $form->editfieldkey($langs->transnoentitiesnoconv('Ref'), 'ref', '', $object, $inlineEditableRef, 'string', '', 0, 1);
-		$morehtmlref .= $form->editfieldval($langs->transnoentitiesnoconv('Ref'), 'ref', $object->ref, $object, $inlineEditableRef, 'string', '', null, null, '', 1);
-	}
-	if (isset($object->fields['label'])) {
-		if (!empty($object->is_template)) {
-			$morehtmlref .= '<br>';
-		}
-		$morehtmlref .= $form->editfieldkey($object->fields['label']['label'], 'label', '', $object, $inlineEditable, 'string', '', 0, 1);
-		$morehtmlref .= $form->editfieldval($object->fields['label']['label'], 'label', $object->label, $object, $inlineEditable, 'string', '', null, null, '', 1);
-	}
-	if (isModEnabled('project')) {
-		$langs->load("projects");
-		$morehtmlref .= '<br>';
-		if ($permissiontoadd) {
-			$socidforproject = GETPOSTINT('socid');
-			$socidforproject = ($socidforproject > 0 ? $socidforproject : -1);
-			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"');
-			if ($action != 'classify') {
-				$morehtmlref .= '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=classify&token='.newToken().'&id='.$object->id.'">'.img_edit($langs->transnoentitiesnoconv('SetProject')).'</a> ';
-			}
-			$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $socidforproject, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
-		} elseif (!empty($object->fk_project)) {
-			$proj = new Project($db);
-			$proj->fetch($object->fk_project);
-			$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"').$proj->getNomUrl(1);
-			if (!empty($proj->title)) {
-				$morehtmlref .= '<span class="opacitymedium"> - '.dol_escape_htmltag($proj->title).'</span>';
-			}
-		}
-	}
-	if (empty($object->is_template)) {
-		$morehtmlref .= '<br>';
-		$morehtmlref .= img_picto($langs->trans("DateEnvoi"), 'calendar', 'class="pictofixedwidth"').$langs->trans("DateEnvoi").' : ';
-		$morehtmlref .= (!empty($object->date_expedition) ? dol_print_date($object->date_expedition, 'dayhour') : '<span class="opacitymedium">'.$langs->trans("None").'</span>');
-
-		$morehtmlref .= '<br>';
-		$morehtmlref .= img_picto($langs->trans("UserExpedition"), 'user', 'class="pictofixedwidth"').$langs->trans("UserExpedition").' : ';
-		if (!empty($object->fk_user_exped)) {
-			$userexped = new User($db);
-			if ($userexped->fetch((int) $object->fk_user_exped) > 0) {
-				$morehtmlref .= $userexped->getNomUrl(-1);
-			} else {
-				$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("Unknown").'</span>';
-			}
-		} else {
-			$morehtmlref .= '<span class="opacitymedium">'.$langs->trans("None").'</span>';
-		}
-	}
-
-	if (isModEnabled('multicompany') && !empty($object->entity) && (int) $object->entity !== (int) $conf->entity) {
-		$entitylabel = (string) $object->entity;
-		$sqlentity = 'SELECT label FROM '.MAIN_DB_PREFIX.'entity WHERE rowid = '.((int) $object->entity);
-		$resqlentity = $db->query($sqlentity);
-		if ($resqlentity) {
-			$objentity = $db->fetch_object($resqlentity);
-			if ($objentity && isset($objentity->label) && $objentity->label !== '') {
-				$entitylabel = $objentity->label;
-			}
-		}
-
-		$morehtmlref .= '<br>';
-		$morehtmlref .= '<div class="refidno multicompany-entity-card-container"><span class="fa fa-globe"></span><span class="multiselect-selected-title-text">'.dol_escape_htmltag($entitylabel).'</span></div>';
-	}
-	$morehtmlref .= '</div>';
-
-
-	$morehtmlstatus = (!empty($object->is_template) ? '&nbsp;' : '');
-	$fieldrefbanner = (!empty($object->is_template) ? '' : 'ref');
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', $fieldrefbanner, $morehtmlref, '', 0, '', $morehtmlstatus);
+	diffusionPrintObjectBanner($object, $form, $linkback, $permissiontoadd, $action);
 
 
 	print '<div class="fichecenter">';
@@ -1239,20 +1269,34 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	print '</div>';
 
 	if ($descriptionFieldDef !== null) {
+		$inlineEditable = (!empty($permissiontoadd) && isset($object->status) && $object->status == $object::STATUS_DRAFT && empty($object->is_template));
+		$templateDescriptionEditable = (!empty($permissiontoadd) && !empty($object->is_template));
+		$editDescriptionMode = ($action == 'editdescription' && $templateDescriptionEditable);
+
 		print '<div class="clearboth"></div>';
 		print '<table class="border centpercent tableforfield">';
 		print '<tr class="field_description">';
-		print '<td>'.$descriptionFieldDef['label'].'</td>';
+		print '<td>'.$descriptionFieldDef['label'];
+		if (($inlineEditable || $templateDescriptionEditable) && $diffusionSubstitutionHelp !== '') {
+			print ' '.$form->textwithpicto('', $diffusionSubstitutionHelp, 1, 'help', '', 0, 2, 'diffusiondescriptionvariablesedit');
+		}
+		if ($templateDescriptionEditable && !$editDescriptionMode) {
+			print ' <a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'&action=editdescription&token='.newToken().'">'.img_edit($langs->transnoentitiesnoconv('Modify')).'</a>';
+		}
+		print '</td>';
 		print '<td class="valuefield wordbreak">';
-		if ($inlineEditable) {
+		if ($inlineEditable || $editDescriptionMode) {
 			print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'?id='.$object->id.'">';
 			print '<input type="hidden" name="token" value="'.newToken().'">';
-			print '<input type="hidden" name="action" value="update">';
+			print '<input type="hidden" name="action" value="'.($editDescriptionMode ? 'updatedescription' : 'update').'">';
 			print '<input type="hidden" name="id" value="'.$object->id.'">';
 			$doleditor = new DolEditor('description', $object->description, '', 200, 'dolibarr_mailings', 'In', true, true, true, 40, '100%');
 			print $doleditor->Create(1);
 			print '<div class="center">';
 			print '<input type="submit" class="button button-save" value="'.$langs->trans('Save').'">';
+			if ($editDescriptionMode) {
+				print ' <input type="submit" class="button button-cancel" name="cancel" value="'.$langs->trans('Cancel').'">';
+			}
 			print '</div>';
 			print '</form>';
 		} else {
@@ -1433,13 +1477,12 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 		$object->element = "diffusiondoc";
 		if ($includedocgeneration) {
-			$objref = dol_sanitizeFileName($object->ref);
-			$relativepath = $object->element.'/'.$objref;
+			$relativepath = rtrim(diffusionGetDocumentRelativePath($object), '/');
 			$filedir = $upload_dir;
 			$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id.'&entity='.(int) $entityfordoc;
 			$genallowed = $permissiontoread; // If you can read, you can build the PDF to read content
 			$delallowed = $permissiontoadd; // If you can create/edit, you can remove a file on card
-			$modulepart = 'diffusion';
+			$modulepart = diffusionGetDocumentModulepart();
 			dol_syslog(__METHOD__.' showdocuments entity='.(int) $entityfordoc.' relativepath='.$relativepath.' filedir='.$filedir.' modulepart='.$modulepart, LOG_DEBUG);
 			$tmperrorreporting = error_reporting();
 			error_reporting($tmperrorreporting & ~E_WARNING);
@@ -1463,7 +1506,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		*/
 		print '</div><div class="fichehalfright">';
 
-		$MAXEVENT = 10;
+		$MAXEVENT = getDolUserInt('MAIN_SIZE_SHORTLIST_LIMIT', getDolGlobalInt('MAIN_SIZE_SHORTLIST_LIMIT', 5));
+		if ($MAXEVENT <= 0) {
+			$MAXEVENT = 5;
+		}
 
 		$morehtmlcenter = dolGetButtonTitle($langs->trans('SeeAll'), '', 'fa fa-bars imgforviewmode', dol_buildpath('/diffusion/diffusion_agenda.php', 1).'?id='.$object->id);
 
@@ -1486,28 +1532,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Presend form
 
-	if ($action == 'presend' && getDolGlobalInt('MAIN_MAIL_ENABLED_USER_DEST_SELECT') && !GETPOSTISSET('receiveruser')) {
-		$sql = 'SELECT DISTINCT dc.fk_contact';
-		$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
-		$sql .= ' WHERE dc.fk_diffusion = '.((int) $object->id);
-		$sql .= " AND dc.contact_source = 'internal'";
-		$sql .= ' AND dc.mail_status = 1';
-
-		$resql = $db->query($sql);
-		if ($resql) {
-			$receiveruser = array();
-			while ($obj = $db->fetch_object($resql)) {
-				$receiveruser[] = (int) $obj->fk_contact;
-			}
-
-			if (!empty($receiveruser)) {
-				$_POST['receiveruser'] = $receiveruser;
-				$_REQUEST['receiveruser'] = $receiveruser;
-			}
-		}
-	}
-
-	$modelmail = 'diffusion';
+	$modelmail = 'diffusion@diffusion';
 	$defaulttopic = 'InformationMessage';
 	$diroutput = $conf->diffusion->multidir_output[$conf->entity];
 	$trackid = 'diffusion'.$object->id;

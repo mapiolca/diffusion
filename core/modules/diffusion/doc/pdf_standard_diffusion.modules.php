@@ -35,6 +35,7 @@
  */
 
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
+dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
@@ -84,7 +85,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 * @var array{0:int,1:int} Minimum version of PHP required by module.
 	 * e.g.: PHP ≥ 7.0 = array(7, 0)
 	 */
-	public $phpmin = array(7, 0);
+	public $phpmin = array(8, 0);
 
 	/**
 	 * Dolibarr version of the loaded document
@@ -107,6 +108,16 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 * @var array<string,string> Recipient override used for letter copies
 	 */
 	public $recipient_override = array();
+
+	/**
+	 * @var float Reserved footer area for intermediate pages, measured from the native footer renderer
+	 */
+	protected $pdfIntermediateFooterReservedHeight = 0.0;
+
+	/**
+	 * @var float Reserved footer area for the last page, measured from the native footer renderer
+	 */
+	protected $pdfLastFooterReservedHeight = 0.0;
 
 
 	/**
@@ -317,11 +328,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$pdf = pdf_getInstance($this->format);
 				'@phan-var-force TCPDI|TCPDF $pdf';
 				$default_font_size = pdf_getPDFFontSize($outputlangs); // Must be after pdf_getInstance
-				$pdf->SetAutoPageBreak(1, 0);
 
 			    $heightforinfotot = $this->estimateSummaryHeight($contactSummaries, $attachmentSummaries);
-				$heightforfreetext = getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Height reserved to output the free text on last page
-				$heightforfooter = $this->marge_basse + (getDolGlobalInt('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS') ? 22 : 12); // Height reserved to output the footer (value include bottom margin)
+				$heightforfooter = $this->getNativeFooterReservedHeight() + $this->getPdfFooterSafetyMargin(); // Initial fallback, replaced by measured native footer height after first page creation.
+				$heightforlastpagefooter = $heightforfooter + getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5); // Initial fallback for the last page free text area.
+				$pdf->setAutoPageBreak(true, 0);
 
 				if (class_exists('TCPDF')) {
 					$pdf->setPrintHeader(false);
@@ -359,6 +370,9 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 				// New page
 				$pdf->AddPage();
+				$this->initPdfFooterReservedHeights($pdf, $object, $outputlangs);
+				$heightforlastpagefooter = $this->getPdfLastFooterReservedHeight();
+				$this->applyPdfPageBottomMargin($pdf, $heightforlastpagefooter);
 				if (!empty($tplidx)) {
 					$pdf->useTemplate($tplidx);
 				}
@@ -370,6 +384,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 
 				$tab_top = 90;
 				$tab_top_newpage = (!getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 : 10);
+				$availableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 
 				// Display notes
 				$notetoshow = empty($object->note_public) ? '' : $object->note_public;
@@ -388,36 +403,38 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 					$notetoshow = convertBackOfficeMediasLinksToPublicLinks($notetoshow);
 
 					$pdf->SetFont('', '', $default_font_size - 1);
-					$pdf->writeHTMLCell(190, 3, $this->posxdesc - 1, $tab_top - 1, dol_htmlentitiesbr($notetoshow), 0, 1);
+					$pdf->SetXY($this->posxdesc - 1, $tab_top - 1);
+					$noteStartPage = $pdf->getPage();
+					$noteStartY = $tab_top - 1;
+					$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, '', dol_htmlentitiesbr($notetoshow), $availableWidth, $heightforlastpagefooter, $default_font_size - 1, $tab_top_newpage, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null), true);
+					$noteEndPage = $pdf->getPage();
 					$nexY = $pdf->GetY();
-					$height_note = $nexY - $tab_top;
 
-					// Rect takes a length in 3rd parameter
-					$pdf->SetDrawColor(192, 192, 192);
-					$pdf->RoundedRect($this->marge_gauche, $tab_top - 1, $this->page_largeur - $this->marge_gauche - $this->marge_droite, $height_note + 2, $this->corner_radius, '1234', 'D');
+					if ($noteStartPage == $noteEndPage) {
+						// Rect takes a length in 3rd parameter.
+						$pdf->SetDrawColor(192, 192, 192);
+						$pdf->RoundedRect($this->marge_gauche, $noteStartY, $availableWidth, max(2, $nexY - $noteStartY + 1), $this->corner_radius, '1234', 'D');
+					}
 
 					$tab_top = $nexY + 6;
 				}
 
 				$descriptionText = trim($object->description);
-				$availableWidth = $this->page_largeur - $this->marge_gauche - $this->marge_droite;
 				if ($descriptionText !== '') {
-					$bottomlasttab = $this->renderDescriptionWithPagination($pdf, $object, $outputlangs, $descriptionText, $tab_top, $tab_top_newpage, $availableWidth, $heightforfooter, $default_font_size, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null), true);
+					$bottomlasttab = $this->renderDescriptionWithPagination($pdf, $object, $outputlangs, $descriptionText, $tab_top, $tab_top_newpage, $availableWidth, $heightforlastpagefooter, $default_font_size, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null), true);
 				} else {
 					$bottomlasttab = $tab_top;
 				}
 
 				// Display diffusion contacts and attachments summary
 				$summaryStartY = max($pdf->GetY(), $bottomlasttab + 2);
-				$afterContactsY = $this->renderContactsSection($pdf, $object, $contactSummaries, $outputlangs, $summaryStartY, $availableWidth, $heightforfooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
-				$this->renderAttachmentsSection($pdf, $object, $attachmentSummaries, $outputlangs, $afterContactsY + 4, $availableWidth, $heightforfooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
+				$afterContactsY = $this->renderContactsSection($pdf, $object, $contactSummaries, $outputlangs, $summaryStartY, $availableWidth, $heightforlastpagefooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
+				$this->renderAttachmentsSection($pdf, $object, $attachmentSummaries, $outputlangs, $afterContactsY + 4, $availableWidth, $heightforlastpagefooter, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null));
 
-				$nbpagesgenerated = $pdf->getNumPages();
-				for ($pageid = 1; $pageid <= $nbpagesgenerated; $pageid++) {
-					$pdf->setPage($pageid);
-					$this->_pagefoot($pdf, $object, $outputlangs);
+				if ($pdf->GetY() > $this->getPageBottomLimit($heightforlastpagefooter)) {
+					$this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, (is_object($outputlangsbis) ? $outputlangsbis : null), null, true);
 				}
-
+				$this->renderPdfPageFooter($pdf, $object, $outputlangs, 0, $heightforlastpagefooter);
 				if (method_exists($pdf, 'AliasNbPages')) {
 					$pdf->AliasNbPages();  // @phan-suppress-current-line PhanUndeclaredMethod
 				}
@@ -566,8 +583,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function prepareDocumentPaths($object)
 	{
-		$entity = !empty($object->entity) ? (int) $object->entity : 1;
-		$multidir = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion'.'/'.$object->element;
+		$multidir = function_exists('diffusionGetDocumentBaseOutputDir') ? diffusionGetDocumentBaseOutputDir($object) : '';
 		if (empty($multidir)) {
 			return null;
 		}
@@ -585,7 +601,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			return null;
 		}
 
-		$dir = $multidir.'/'.$objectref;
+		if (function_exists('diffusionMigrateFlatDocumentDirectory')) {
+			diffusionMigrateFlatDocumentDirectory($this->db, $object);
+		}
+
+		$dir = function_exists('diffusionGetDocumentUploadDir') ? diffusionGetDocumentUploadDir($object) : $multidir.'/diffusiondoc/'.$objectref;
 
 		return array(
 			'dir' => $dir,
@@ -969,7 +989,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$shareByFilename = $this->getSharedLinksByFilename($object, $dir);
 		}
 
-		$fileList = dol_dir_list($dir, 'files', 0, '', '(\.meta$|\.tmp$|\.preview\.png$)', 'name', SORT_ASC, 1);
+		$fileList = dol_dir_list($dir, 'files', 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', 'name', SORT_ASC, 1);
 		foreach ($fileList as $fileinfo) {
 			if (!empty($currentPdfName) && dol_strtolower($fileinfo['name']) == dol_strtolower($currentPdfName)) {
 				continue;
@@ -1075,6 +1095,252 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	}
 
 	/**
+	 * Return the native vertical space reserved for the footer without the free text area.
+	 *
+	 * @return float
+	 */
+	protected function getNativeFooterReservedHeight()
+	{
+		$heightforfooter = (float) ($this->marge_basse + 8);
+		if (getDolGlobalString('MAIN_GENERATE_DOCUMENTS_SHOW_FOOT_DETAILS')) {
+			$heightforfooter += 6;
+		}
+
+		return $heightforfooter;
+	}
+
+	/**
+	 * Return a small safety margin added to the native footer measurement.
+	 *
+	 * @return float
+	 */
+	protected function getPdfFooterSafetyMargin()
+	{
+		return 8.0;
+	}
+
+	/**
+	 * Return a fallback footer height before the native footer can be measured on an existing page.
+	 *
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @return float
+	 */
+	protected function getPdfFooterFallbackReservedHeight($hidefreetext = 0)
+	{
+		$reservedHeight = $this->getNativeFooterReservedHeight();
+		if (empty($hidefreetext)) {
+			$reservedHeight += getDolGlobalInt('MAIN_PDF_FREETEXT_HEIGHT', 5);
+		}
+
+		return (float) ($reservedHeight + $this->getPdfFooterSafetyMargin());
+	}
+
+	/**
+	 * Measure the native Dolibarr footer inside a PDF transaction and keep a safety margin above it.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @return float
+	 */
+	protected function measurePdfFooterReservedHeight(&$pdf, $object, $outputlangs, $hidefreetext = 0)
+	{
+		$fallbackHeight = $this->getPdfFooterFallbackReservedHeight($hidefreetext);
+		if (!is_object($pdf) || (int) $pdf->getPage() <= 0 || !method_exists($pdf, 'startTransaction') || !method_exists($pdf, 'rollbackTransaction')) {
+			return $fallbackHeight;
+		}
+
+		$currentPage = (int) $pdf->getPage();
+		$currentX = (float) $pdf->GetX();
+		$currentY = (float) $pdf->GetY();
+
+		$pdf->startTransaction();
+		$pdf->SetAutoPageBreak(false, 0);
+		$measuredHeight = (float) $this->_pagefoot($pdf, $object, $outputlangs, $hidefreetext);
+		$pdf = $pdf->rollbackTransaction(true);
+
+		if ($currentPage > 0) {
+			$pdf->setPage($currentPage);
+			$pdf->SetXY($currentX, $currentY);
+		}
+
+		return max($fallbackHeight, $measuredHeight + $this->getPdfFooterSafetyMargin());
+	}
+
+	/**
+	 * Initialize measured footer heights for this PDF generation.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @return void
+	 */
+	protected function initPdfFooterReservedHeights(&$pdf, $object, $outputlangs)
+	{
+		$this->pdfIntermediateFooterReservedHeight = $this->measurePdfFooterReservedHeight($pdf, $object, $outputlangs, 1);
+		$this->pdfLastFooterReservedHeight = $this->measurePdfFooterReservedHeight($pdf, $object, $outputlangs, 0);
+		$this->applyPdfPageBottomMargin($pdf, $this->pdfLastFooterReservedHeight);
+	}
+
+	/**
+	 * Return the measured intermediate footer height.
+	 *
+	 * @return float
+	 */
+	protected function getPdfIntermediateFooterReservedHeight()
+	{
+		if ($this->pdfIntermediateFooterReservedHeight > 0) {
+			return (float) $this->pdfIntermediateFooterReservedHeight;
+		}
+
+		return $this->getPdfFooterFallbackReservedHeight(1);
+	}
+
+	/**
+	 * Return the measured last-page footer height.
+	 *
+	 * @return float
+	 */
+	protected function getPdfLastFooterReservedHeight()
+	{
+		if ($this->pdfLastFooterReservedHeight > 0) {
+			return (float) $this->pdfLastFooterReservedHeight;
+		}
+
+		return $this->getPdfFooterFallbackReservedHeight(0);
+	}
+
+	/**
+	 * Render the native footer without letting TCPDF split it as regular page content.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int<0,1> $hidefreetext 1=Hide free text, 0=Show free text
+	 * @param ?float $reservedFooterHeight Reserved height to restore after footer rendering
+	 * @return float
+	 */
+	protected function renderPdfPageFooter(&$pdf, $object, $outputlangs, $hidefreetext = 0, $reservedFooterHeight = null)
+	{
+		$pdf->SetAutoPageBreak(false, 0);
+		$height = (float) $this->_pagefoot($pdf, $object, $outputlangs, $hidefreetext);
+
+		if ($reservedFooterHeight === null) {
+			$reservedFooterHeight = empty($hidefreetext) ? $this->getPdfLastFooterReservedHeight() : $this->getPdfIntermediateFooterReservedHeight();
+		}
+		$this->applyPdfPageBottomMargin($pdf, (float) $reservedFooterHeight);
+
+		return $height;
+	}
+
+	/**
+	 * Apply the generated document bottom margin to the current page.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @return void
+	 */
+	protected function applyPdfPageBottomMargin(&$pdf, $reservedFooterHeight)
+	{
+		$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
+		if (method_exists($pdf, 'setPageOrientation')) {
+			$pdf->setPageOrientation('', true, $reservedFooterHeight);
+		}
+	}
+
+	/**
+	 * Render the native intermediate footer without the free text area.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param ?int $pageid Page number to render, current page when null
+	 * @return void
+	 */
+	protected function renderIntermediatePdfFooter(&$pdf, $object, $outputlangs, $pageid = null)
+	{
+		$currentPage = (int) $pdf->getPage();
+		$currentX = (float) $pdf->GetX();
+		$currentY = (float) $pdf->GetY();
+
+		if ($pageid !== null) {
+			$pageid = (int) $pageid;
+			if ($pageid <= 0) {
+				return;
+			}
+			$pdf->setPage($pageid);
+		}
+
+		$this->renderPdfPageFooter($pdf, $object, $outputlangs, 1, $this->getPdfIntermediateFooterReservedHeight());
+
+		if ($pageid !== null && $currentPage > 0) {
+			$pdf->setPage($currentPage);
+			$pdf->SetXY($currentX, $currentY);
+		}
+	}
+
+	/**
+	 * Return the last safe Y position before the footer area.
+	 *
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @return float
+	 */
+	protected function getPageBottomLimit($reservedFooterHeight)
+	{
+		return (float) ($this->page_hauteur - $reservedFooterHeight);
+	}
+
+	/**
+	 * Return the content start position for a generated extra page.
+	 *
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return float
+	 */
+	protected function getExtraPageContentStartY($repeatPageHeadOnExtraPages = true)
+	{
+		if ($repeatPageHeadOnExtraPages) {
+			return !getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42.0 : 10.0;
+		}
+
+		return (float) ($this->marge_haute + 2);
+	}
+
+	/**
+	 * Add a generated content page with template, optional header and controlled cursor position.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param ?float $startY Start Y on the new page
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return float
+	 */
+	protected function addPdfContentPage(&$pdf, $object, $outputlangs, $tplidx, &$pagenb, $outputlangsbis = null, $startY = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$heightforlastpagefooter = $this->getPdfLastFooterReservedHeight();
+		$this->renderIntermediatePdfFooter($pdf, $object, $outputlangs);
+		$pdf->AddPage();
+		$this->applyPdfPageBottomMargin($pdf, $heightforlastpagefooter);
+		$pagenb++;
+		if (!empty($tplidx)) {
+			$pdf->useTemplate($tplidx);
+		}
+		if ($repeatPageHeadOnExtraPages) {
+			$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
+		}
+		if ($startY === null) {
+			$startY = $this->getExtraPageContentStartY($repeatPageHeadOnExtraPages);
+		}
+		$pdf->SetXY($this->marge_gauche, $startY);
+
+		return (float) $startY;
+	}
+
+	/**
 	 * Render description with manual pagination to preserve footer space.
 	 *
 	 * @param TCPDF|TCPDI $pdf PDF handler
@@ -1094,11 +1360,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function renderDescriptionWithPagination(&$pdf, $object, $outputlangs, $descriptionText, $startY, $startYNewPage, $width, $heightforfooter, $defaultFontSize, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
-		$reservedFooterHeight = $heightforfooter + 2;
+		$reservedFooterHeight = $heightforfooter;
 		$pdf->SetFont('', '', $defaultFontSize);
 		$pdf->SetXY($this->marge_gauche, $startY);
 		$lineHeight = 4;
-		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
+		$pageBottomLimit = $this->getPageBottomLimit($reservedFooterHeight);
 		$descriptionText = trim((string) $descriptionText);
 		$descriptionText = str_replace(array("\\r\\n", "\\n", "\\r"), "\n", $descriptionText);
 
@@ -1110,7 +1376,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$descriptionHtml = convertBackOfficeMediasLinksToPublicLinks($descriptionText);
 			$descriptionHtml = $this->normalizeDescriptionHtmlForPdf($descriptionHtml, (float) $width);
 			$posyafter = $this->renderHtmlDescriptionWithTableAwarePagination($pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
-			$pdf->SetAutoPageBreak(true, 0);
+			$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
 			return $posyafter;
 		}
 
@@ -1128,17 +1394,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			}
 
 			if (($pdf->GetY() + $requiredHeight) > $pageBottomLimit) {
-				$pdf->AddPage();
-				if (!empty($tplidx)) {
-					$pdf->useTemplate($tplidx);
-				}
-				$pagenb++;
-				if ($repeatPageHeadOnExtraPages) {
-					$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
-					$pdf->SetXY($this->marge_gauche, $startYNewPage);
-				} else {
-					$pdf->SetXY($this->marge_gauche, $this->marge_haute + 2);
-				}
+				$this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis, ($repeatPageHeadOnExtraPages ? $startYNewPage : null), $repeatPageHeadOnExtraPages);
 				$pdf->SetFont('', '', $defaultFontSize);
 			}
 
@@ -1171,6 +1427,12 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 */
 	protected function renderHtmlDescriptionWithTableAwarePagination(&$pdf, $object, $outputlangs, $descriptionHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
+		$stylePrefix = '';
+		if (preg_match('/^\s*(<style\b[^>]*>.*?<\/style>)/si', (string) $descriptionHtml, $styleMatch)) {
+			$stylePrefix = (string) $styleMatch[1];
+			$descriptionHtml = (string) preg_replace('/^\s*<style\b[^>]*>.*?<\/style>/si', '', (string) $descriptionHtml, 1);
+		}
+
 		$parts = preg_split('/(<table\b[^>]*>.*?<\/table>)/si', (string) $descriptionHtml, -1, PREG_SPLIT_DELIM_CAPTURE);
 		if (!is_array($parts)) {
 			$parts = array((string) $descriptionHtml);
@@ -1185,11 +1447,209 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$this->renderTableHtmlChunked($pdf, $object, $outputlangs, $part, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 				continue;
 			}
-			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $part, 0, 1, false, true, 'L', true);
+			$this->renderHtmlDescriptionBlockChunked($pdf, $object, $outputlangs, $stylePrefix, $part, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 		}
 
 		return $pdf->GetY();
+	}
+
+	/**
+	 * Render a non-table HTML block with controlled page breaks.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $stylePrefix CSS style block to repeat on each chunk
+	 * @param string $html HTML block
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function renderHtmlDescriptionBlockChunked(&$pdf, $object, $outputlangs, $stylePrefix, $html, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$chunks = $this->splitHtmlDescriptionBlockIntoChunks((string) $html);
+		for ($i = 0; $i < count($chunks); $i++) {
+			$chunk = (string) $chunks[$i];
+			if (trim($chunk) === '') {
+				continue;
+			}
+			$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, (string) $stylePrefix, $chunk, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+		}
+	}
+
+	/**
+	 * Split a HTML block on safe block boundaries.
+	 *
+	 * @param string $html HTML block
+	 * @return array<int,string>
+	 */
+	protected function splitHtmlDescriptionBlockIntoChunks($html)
+	{
+		$tokens = preg_split('/(<br\s*\/?>|<\/(?:p|div|h[1-6]|blockquote|pre)>)/i', (string) $html, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+		if (!is_array($tokens) || empty($tokens)) {
+			return array((string) $html);
+		}
+
+		$chunks = array();
+		$current = '';
+		for ($i = 0; $i < count($tokens); $i++) {
+			$current .= (string) $tokens[$i];
+			if (preg_match('/^(<br\s*\/?>|<\/(?:p|div|h[1-6]|blockquote|pre)>)$/i', (string) $tokens[$i])) {
+				$chunks[] = $current;
+				$current = '';
+			}
+		}
+		if ($current !== '') {
+			$chunks[] = $current;
+		}
+
+		return $chunks;
+	}
+
+	/**
+	 * Render one HTML chunk after measuring it against the footer area.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $stylePrefix CSS style block
+	 * @param string $html HTML chunk
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function renderHtmlDescriptionChunkWithPagination(&$pdf, $object, $outputlangs, $stylePrefix, $html, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$htmlToRender = (string) $stylePrefix.(string) $html;
+		$pageBottomLimit = $this->getPageBottomLimit($reservedFooterHeight);
+		$bufferY = 0.5;
+		$measurement = $this->measureHtmlDescriptionChunk($pdf, $htmlToRender, $width, $defaultFontSize, $reservedFooterHeight);
+		$fitsCurrentPage = ($measurement['endpage'] == $measurement['startpage'] && $measurement['endy'] <= ($pageBottomLimit - $bufferY));
+
+		if (!$fitsCurrentPage) {
+			$freshStartY = $this->getExtraPageContentStartY($repeatPageHeadOnExtraPages);
+			if ($pdf->GetY() > ($freshStartY + 1)) {
+				$this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis, ($repeatPageHeadOnExtraPages ? $startYNewPage : null), $repeatPageHeadOnExtraPages);
+				$measurement = $this->measureHtmlDescriptionChunk($pdf, $htmlToRender, $width, $defaultFontSize, $reservedFooterHeight);
+				$fitsCurrentPage = ($measurement['endpage'] == $measurement['startpage'] && $measurement['endy'] <= ($pageBottomLimit - $bufferY));
+			}
+		}
+
+		if ($fitsCurrentPage) {
+			$pdf->SetAutoPageBreak(false, 0);
+			$pdf->SetFont('', '', $defaultFontSize);
+			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $htmlToRender, 0, 1, false, true, 'L', true);
+			$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
+			return;
+		}
+
+		$this->renderOversizedHtmlChunkWithAutoPagination($pdf, $object, $outputlangs, $htmlToRender, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+	}
+
+	/**
+	 * Measure an HTML chunk without keeping writes in the PDF document.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param string $html HTML chunk
+	 * @param float $width Available content width
+	 * @param int $defaultFontSize Default font size
+	 * @param float $reservedFooterHeight Reserved footer height to restore after rollback
+	 * @return array{startpage:int,endpage:int,endy:float}
+	 */
+	protected function measureHtmlDescriptionChunk(&$pdf, $html, $width, $defaultFontSize, $reservedFooterHeight)
+	{
+		$pdf->startTransaction();
+		$startPage = $pdf->getPage();
+		$pdf->SetAutoPageBreak(false, 0);
+		$pdf->SetFont('', '', $defaultFontSize);
+		$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), (string) $html, 0, 1, false, true, 'L', true);
+		$endPage = $pdf->getPage();
+		$endY = $pdf->GetY();
+		$pdf = $pdf->rollbackTransaction(true);
+		$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
+
+		return array(
+			'startpage' => (int) $startPage,
+			'endpage' => (int) $endPage,
+			'endy' => (float) $endY,
+		);
+	}
+
+	/**
+	 * Render an indivisible HTML chunk with TCPDF auto pagination while preserving footer space.
+	 *
+	 * @param TCPDF|TCPDI $pdf PDF handler
+	 * @param Diffusion $object Diffusion object
+	 * @param Translate $outputlangs Output language handler
+	 * @param string $html HTML chunk
+	 * @param float $width Available content width
+	 * @param float $reservedFooterHeight Reserved footer height
+	 * @param int $defaultFontSize Default font size
+	 * @param float $startYNewPage Start Y on new pages
+	 * @param int|false $tplidx Background template index
+	 * @param int $pagenb Current page number
+	 * @param ?Translate $outputlangsbis Secondary language
+	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
+	 * @return void
+	 */
+	protected function renderOversizedHtmlChunkWithAutoPagination(&$pdf, $object, $outputlangs, $html, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
+	{
+		$originalTopMargin = (float) $this->marge_haute;
+		if (method_exists($pdf, 'getMargins')) {
+			$margins = $pdf->getMargins();
+			if (is_array($margins) && isset($margins['top'])) {
+				$originalTopMargin = (float) $margins['top'];
+			}
+		}
+
+		if (method_exists($pdf, 'SetTopMargin')) {
+			$pdf->SetTopMargin($this->getExtraPageContentStartY($repeatPageHeadOnExtraPages));
+		}
+
+		$startPage = $pdf->getPage();
+		$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
+		$pdf->SetFont('', '', $defaultFontSize);
+		$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), (string) $html, 0, 1, false, true, 'L', true);
+		$endPage = $pdf->getPage();
+		$endY = $pdf->GetY();
+		$addedPages = max(0, (int) $endPage - (int) $startPage);
+		$pagenb += $addedPages;
+
+		if ($addedPages > 0 && $repeatPageHeadOnExtraPages) {
+			for ($pageid = ((int) $startPage + 1); $pageid <= (int) $endPage; $pageid++) {
+				$pdf->setPage($pageid);
+				$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
+				$this->_pagehead($pdf, $object, $pageid, $outputlangs, $outputlangsbis);
+			}
+		}
+		if ($addedPages > 0) {
+			for ($pageid = (int) $startPage; $pageid < (int) $endPage; $pageid++) {
+				$this->renderIntermediatePdfFooter($pdf, $object, $outputlangs, $pageid);
+			}
+		}
+
+		if (method_exists($pdf, 'SetTopMargin')) {
+			$pdf->SetTopMargin($originalTopMargin);
+		}
+		$pdf->setPage($endPage);
+		$pdf->SetXY($this->marge_gauche, $endY);
+		$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
+
+		if ($pdf->GetY() > $this->getPageBottomLimit($reservedFooterHeight)) {
+			$this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis, ($repeatPageHeadOnExtraPages ? $startYNewPage : null), $repeatPageHeadOnExtraPages);
+		}
 	}
 
 	/**
@@ -1214,8 +1674,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$tableHtml = (string) $tableHtml;
 		$tableHtml = $this->applyColumnWidthsByContentRatio($tableHtml, (float) $width);
 		if (!preg_match('/^(\s*<table\b[^>]*>)(.*)(<\/table>\s*)$/si', $tableHtml, $tableParts)) {
-			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, '', $tableHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 			return;
 		}
 
@@ -1233,12 +1692,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		preg_match_all('/<tr\b[^>]*>.*?<\/tr>/si', (string) $tbody, $rowMatches);
 		$rows = isset($rowMatches[0]) ? $rowMatches[0] : array();
 		if (empty($rows)) {
-			$pdf->SetAutoPageBreak(true, $reservedFooterHeight);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $tableHtml, 0, 1, false, true, 'L', true);
+			$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, '', $tableHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 			return;
 		}
 
-		$pageBottomLimit = $this->page_hauteur - $reservedFooterHeight;
+		$pageBottomLimit = $this->getPageBottomLimit($reservedFooterHeight);
 		$bufferY = 0.5;
 		$rowsOnPage = array();
 		$rowCount = count($rows);
@@ -1256,6 +1714,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$endPage = $pdf->getPage();
 			$endY = $pdf->GetY();
 			$pdf = $pdf->rollbackTransaction(true);
+			$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
 
 			$fitsCurrentPage = ($endPage == $startPage && $endY <= ($pageBottomLimit - $bufferY));
 			if ($fitsCurrentPage) {
@@ -1268,16 +1727,15 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 				$pdf->SetAutoPageBreak(false, 0);
 				$pdf->SetFont('', '', $defaultFontSize);
 				$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+				$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
 				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 				$rowsOnPage = array($rows[$rowIndex]);
 				continue;
 			}
 
 			$singleRowHtml = $tableOpen.$thead.'<tbody>'.$rows[$rowIndex].'</tbody>'.$tableClose;
-			$pdf->SetAutoPageBreak(false, 0);
-			$pdf->SetFont('', '', $defaultFontSize);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $singleRowHtml, 0, 1, false, true, 'L', true);
-			if ($rowIndex < ($rowCount - 1)) {
+			$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, '', $singleRowHtml, $width, $reservedFooterHeight, $defaultFontSize, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
+			if ($rowIndex < ($rowCount - 1) && $pdf->GetY() > ($this->getExtraPageContentStartY($repeatPageHeadOnExtraPages) + 1)) {
 				$this->addPageForDescriptionOverflow($pdf, $object, $outputlangs, $startYNewPage, $tplidx, $pagenb, $outputlangsbis, $repeatPageHeadOnExtraPages);
 			}
 			$rowsOnPage = array();
@@ -1288,6 +1746,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$pdf->SetAutoPageBreak(false, 0);
 			$pdf->SetFont('', '', $defaultFontSize);
 			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $pdf->GetY(), $chunkHtml, 0, 1, false, true, 'L', true);
+			$this->applyPdfPageBottomMargin($pdf, $reservedFooterHeight);
 		}
 	}
 
@@ -1406,21 +1865,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	 * @param int $pagenb Current page number
 	 * @param ?Translate $outputlangsbis Secondary language
 	 * @param bool $repeatPageHeadOnExtraPages Repeat page header on extra pages
-	 * @return void
+	 * @return float
 	 */
 	protected function addPageForDescriptionOverflow(&$pdf, $object, $outputlangs, $startYNewPage, $tplidx, &$pagenb, $outputlangsbis = null, $repeatPageHeadOnExtraPages = true)
 	{
-		$pdf->AddPage();
-		$pagenb++;
-		if (!empty($tplidx)) {
-			$pdf->useTemplate($tplidx);
-		}
-		if ($repeatPageHeadOnExtraPages) {
-			$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
-			$pdf->SetXY($this->marge_gauche, $startYNewPage);
-		} else {
-			$pdf->SetXY($this->marge_gauche, $this->marge_haute + 2);
-		}
+		return $this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis, ($repeatPageHeadOnExtraPages ? $startYNewPage : null), $repeatPageHeadOnExtraPages);
 	}
 
 	/**
@@ -1541,7 +1990,7 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 	protected function renderContactsSection(&$pdf, $object, array $contacts, $outputlangs, $startY, $width, $heightforfooter, $tplidx, &$pagenb, $outputlangsbis = null)
 	{
 		$defaultFontSize = pdf_getPDFFontSize($outputlangs);
-		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$pageBottomLimit = $this->getPageBottomLimit($heightforfooter);
 		$minimumContinuationRatio = 0.5;
 
 		$printSectionHeader = function () use (&$pdf, $outputlangs, $defaultFontSize, $width, &$y) {
@@ -1726,7 +2175,7 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 	protected function renderAttachmentsSection(&$pdf, $object, array $attachments, $outputlangs, $startY, $width, $heightforfooter, $tplidx, &$pagenb, $outputlangsbis = null)
 	{
 		$defaultFontSize = pdf_getPDFFontSize($outputlangs);
-		$pageBottomLimit = $this->page_hauteur - $heightforfooter;
+		$pageBottomLimit = $this->getPageBottomLimit($heightforfooter);
 		$minimumContinuationRatio = 0.5;
 		$lineHeight = 4.5;
 
@@ -1762,8 +2211,10 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 			if (!empty($fileinfo['public_share_link'])) {
 				$lineToDisplay = '- '.dol_escape_htmltag($fileinfo['name']).' - '.dol_escape_htmltag($outputlangs->transnoentities('DiffusionAttachmentPublicLink')).' : <a href="'.dol_escape_htmltag((string) $fileinfo['public_share_link']).'">'.dol_escape_htmltag((string) $fileinfo['public_share_link']).'</a>';
 			}
-			$plainLine = preg_replace('/<[^>]+>/', '', $lineToDisplay);
-			$requiredHeight = max(5, max(1, (int) $pdf->getNumLines($outputlangs->convToOutputCharset($plainLine), $width)) * $lineHeight);
+			$lineHtml = $outputlangs->convToOutputCharset($lineToDisplay);
+			$pdf->SetXY($this->marge_gauche, $y);
+			$measurement = $this->measureHtmlDescriptionChunk($pdf, $lineHtml, $width, $defaultFontSize - 1, $heightforfooter);
+			$requiredHeight = max(5, ($measurement['endpage'] == $measurement['startpage'] ? $measurement['endy'] - $y : $pageBottomLimit - $y + 1));
 			$availableHeight = $pageBottomLimit - $y;
 			if ($availableHeight < $requiredHeight) {
 				if ($availableHeight <= 0 || ($availableHeight / $requiredHeight) < $minimumContinuationRatio) {
@@ -1776,7 +2227,7 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 				$printSectionTitle();
 			}
 			$pdf->SetXY($this->marge_gauche, $y);
-			$pdf->writeHTMLCell($width, 0, $this->marge_gauche, $y, $outputlangs->convToOutputCharset($lineToDisplay), 0, 1, false, true, 'L', true);
+			$this->renderHtmlDescriptionChunkWithPagination($pdf, $object, $outputlangs, '', $lineHtml, $width, $heightforfooter, $defaultFontSize - 1, $this->getExtraPageContentStartY(true), $tplidx, $pagenb, $outputlangsbis, true);
 			$y = $pdf->GetY();
 		}
 
@@ -1797,13 +2248,7 @@ img{max-width: '.$maxWidth.'mm !important;max-height:'.$maxHeight.'mm !important
 	 */
 	protected function addSummaryPage(&$pdf, $object, $outputlangs, $tplidx, &$pagenb, $outputlangsbis = null)
 	{
-		$pdf->AddPage();
-		$pagenb++;
-		if (!empty($tplidx)) {
-			$pdf->useTemplate($tplidx);
-		}
-		$this->_pagehead($pdf, $object, $pagenb, $outputlangs, $outputlangsbis);
-		return !getDolGlobalInt('MAIN_PDF_DONOTREPEAT_HEAD') ? 42 : 10;
+		return $this->addPdfContentPage($pdf, $object, $outputlangs, $tplidx, $pagenb, $outputlangsbis, null, true);
 	}
 
 

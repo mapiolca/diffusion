@@ -1,5 +1,36 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.3.0 (16/06/2026)
+
+- FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
+- EN: Harmonized the Diffusion, Attached files and Events/Agenda tab headers, added the generated PDF preview to the header and automatically regenerated the PDF after attached-file changes.
+- FR: Alignement du bloc des derniers événements de la fiche Diffusion sur le réglage natif Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT`.
+- EN: Aligned the latest events block on the Diffusion card with the native Dolibarr `MAIN_SIZE_SHORTLIST_LIMIT` setting.
+- FR: Alignement des switches de modes de contact Diffusion sur le paramètre natif Dolibarr de désactivation JavaScript/Ajax, avec fallback non-Ajax sécurisé et retour fiche.
+- EN: Aligned Diffusion contact method switches with the native Dolibarr JavaScript/Ajax disable setting, with a secured non-Ajax fallback and card redirect.
+- FR: Correction de la métadonnée native d'activation Dolibarr en laissant `_init()` / `_remove()` gérer `MAIN_MODULE_DIFFUSION`, ce qui restaure l'affichage de la dernière version d'activation.
+- EN: Fixed native Dolibarr activation metadata by letting `_init()` / `_remove()` manage `MAIN_MODULE_DIFFUSION`, restoring the last activation version display.
+- FR: Alignement du socle de compatibilité sur Dolibarr v20 et PHP 8.0, avec ajout d'une page de réglages Compatibilité centralisée.
+- EN: Aligned compatibility baseline to Dolibarr v20 and PHP 8.0, with a new centralized Compatibility settings page.
+- FR: Renforcement CSRF, droits serveur, mises à jour Ajax whitelistees, intégration Multicompany et chemins documentaires basés sur `getMultidirOutput()`.
+- EN: Strengthened CSRF, server-side permissions, whitelisted Ajax updates, Multicompany integration and document paths based on `getMultidirOutput()`.
+- FR: Complément des hooks/triggers Notifications et Agenda natifs avec substitutions pour les modèles d'e-mails.
+- EN: Completed native Notifications and Agenda hooks/triggers with substitutions for email templates.
+- FR: Déclaration des variables de substitution Diffusion dans l'aide native des modèles de courriel, avec libellés français et anglais.
+- EN: Declared Diffusion substitution variables in native email template help, with French and English labels.
+- FR: Ajout de l'aide native des variables Diffusion dans les modèles de courriel et les descriptions de modèles, avec substitution de la description à la création depuis modèle.
+- EN: Added native Diffusion variable help in email templates and template descriptions, with description substitution when creating from a template.
+- FR: Amélioration des listes Diffusion avec tri par défaut métier et meilleure prise en charge des filtres/ordres natifs de `/admin/defaultvalues.php`.
+- EN: Improved Diffusion lists with business default sorting and better support for native `/admin/defaultvalues.php` filters/sort orders.
+- FR: Amélioration de l'import des contacts projet avec une sélection décochée par défaut et un lien de sélection globale.
+- EN: Improved project contact import with unchecked rows by default and a select-all link.
+- FR: Alignement de la fiche principale sur la gestion native des fichiers joints et régénération non bloquante du PDF après upload.
+- EN: Aligned the main card with native attached-file handling and added non-blocking PDF regeneration after upload.
+- FR: Correction de l'upload natif par glisser-déposer des pièces jointes Diffusion en exposant l'élément `diffusiondoc` aux propriétés documentaires Dolibarr.
+- EN: Fixed native drag-and-drop upload for Diffusion attachments by exposing the `diffusiondoc` element to Dolibarr document properties.
+- FR: Et plus....
+- EN: And more...
+
 ## 1.2.4 (15/06/2026)
 
 - FR: Correction du pied de page du PDF standard Diffusion pour éviter la création de pages supplémentaires lorsque TCPDF déclenche un saut de page automatique pendant le rendu du footer.

@@ -65,6 +65,11 @@ class DiffusionContact extends CommonObject
 	public $modulepart;
 
 	/**
+	 * @var int Parent diffusion id used by inline status switches
+	 */
+	public $diffusion;
+
+	/**
 	 * @var string Output directory for documents
 	 */
 
@@ -211,10 +216,6 @@ class DiffusionContact extends CommonObject
                 if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
                         $this->fields['rowid']['visible'] = 0;
 		}
-		if (!isModEnabled('multicompany') && isset($this->fields['entity'])) {
-			$this->fields['entity']['enabled'] = 0;
-		}
-
 		// Example to show how to set values of fields definition dynamically
 		/*if ($user->hasRight('diffusion', 'diffusioncontact', 'read')) {
 			$this->fields['myfield']['visible'] = 1;
@@ -271,6 +272,10 @@ class DiffusionContact extends CommonObject
 		$source = strtolower((string) $source);
 		$source = preg_replace('/[^a-z0-9_]/', '', $source);
 		$typeContactId = (int) $typeContactId;
+		$this->fk_diffusion = $diffusionId;
+		$this->fk_contact = $contactId;
+		$this->contact_source = $source;
+		$this->fk_type_contact = $typeContactId;
 
 		if ($diffusionId <= 0 || $contactId <= 0 || empty($source)) {
 			$this->error = $langs->trans('DiffusionContactSyncError');
@@ -279,6 +284,16 @@ class DiffusionContact extends CommonObject
 		}
 
 		$this->db->begin();
+
+		$resultaccess = $this->checkDiffusionAccess($diffusionId);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
+			}
+			$this->db->rollback();
+
+			return -1;
+		}
 
 		$sql = 'SELECT rowid FROM '.MAIN_DB_PREFIX.'diffusion_contact';
 		$sql .= ' WHERE fk_diffusion = '.$diffusionId;
@@ -360,6 +375,66 @@ class DiffusionContact extends CommonObject
 		return 1;
 	}
 
+	/**
+	 * Check access to a parent Diffusion through its entity.
+	 *
+	 * @param int $diffusionId Diffusion identifier
+	 * @return int<-1,1> 1 if accessible, 0 if not found/not accessible, <0 on SQL error
+	 */
+	private function checkDiffusionAccess($diffusionId)
+	{
+		$diffusionId = (int) $diffusionId;
+		if ($diffusionId <= 0) {
+			return 0;
+		}
+
+		$sql = 'SELECT d.rowid FROM '.MAIN_DB_PREFIX.'diffusion as d';
+		$sql .= ' WHERE d.rowid = '.$diffusionId;
+		$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$found = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		return $found ? 1 : 0;
+	}
+
+	/**
+	 * Check access to a DiffusionContact line through its parent Diffusion entity.
+	 *
+	 * @param int $id DiffusionContact line identifier
+	 * @return int<-1,1> 1 if accessible, 0 if not found/not accessible, <0 on SQL error
+	 */
+	private function checkDiffusionContactLineAccess($id)
+	{
+		$id = (int) $id;
+		if ($id <= 0) {
+			return 0;
+		}
+
+		$sql = 'SELECT dc.rowid';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
+		$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'diffusion as d ON d.rowid = dc.fk_diffusion';
+		$sql .= ' WHERE dc.rowid = '.$id;
+		$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$found = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		return $found ? 1 : 0;
+	}
+
 		/**
 		 * FR: Récupère les liens de contacts d'une diffusion pour alimenter l'affichage et le PDF.
 		 * EN: Retrieve diffusion contact links to feed the user interface and the PDF.
@@ -404,6 +479,7 @@ class DiffusionContact extends CommonObject
 			$sql .= ' sp.fk_soc as contact_fk_soc,';
 			$sql .= ' s.nom as company_name';
 			$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
+			$sql .= ' INNER JOIN '.MAIN_DB_PREFIX.'diffusion as d ON d.rowid = dc.fk_diffusion';
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."element_contact as ec ON ec.element = 'diffusion'";
 			$sql .= ' AND ec.fk_element = dc.fk_diffusion';
 			$sql .= " AND ((dc.contact_source = 'internal' AND ec.source = 'internal' AND ec.fk_user = dc.fk_contact)";
@@ -413,6 +489,7 @@ class DiffusionContact extends CommonObject
 			$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."socpeople as sp ON (dc.contact_source = 'external' AND sp.rowid = dc.fk_contact)";
 			$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'societe as s ON sp.fk_soc = s.rowid';
 			$sql .= ' WHERE dc.fk_diffusion = ' . $diffusionId;
+			$sql .= ' AND d.entity IN ('.getEntity('diffusion').')';
 			$sql .= ' ORDER BY COALESCE(ec.position, dc.rowid), dc.rowid';
 
 			$resql = $this->db->query($sql);
@@ -468,6 +545,10 @@ class DiffusionContact extends CommonObject
                 $source = strtolower((string) $source);
                 $source = preg_replace('/[^a-z0-9_]/', '', $source);
                 $typeContactId = (int) $typeContactId;
+		$this->fk_diffusion = $diffusionId;
+		$this->fk_contact = $contactId;
+		$this->contact_source = $source;
+		$this->fk_type_contact = $typeContactId;
 
                 if ($diffusionId <= 0 || $contactId <= 0 || empty($source)) {
                         $this->error = $langs->trans('DiffusionContactRemoveError');
@@ -475,7 +556,35 @@ class DiffusionContact extends CommonObject
                         return -1;
                 }
 
-                $sql = 'DELETE FROM '.MAIN_DB_PREFIX."diffusion_contact";
+		$resultaccess = $this->checkDiffusionAccess($diffusionId);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
+			}
+
+			return -1;
+		}
+
+		$sqlselect = 'SELECT rowid FROM '.MAIN_DB_PREFIX."diffusion_contact";
+		$sqlselect .= ' WHERE fk_diffusion = '.$diffusionId;
+		$sqlselect .= ' AND fk_contact = '.$contactId;
+		$sqlselect .= " AND contact_source = '".$this->db->escape($source)."'";
+		if ($typeContactId > 0) {
+			$sqlselect .= ' AND fk_type_contact = '.$typeContactId;
+		} else {
+			$sqlselect .= ' AND fk_type_contact IS NULL';
+		}
+		$sqlselect .= ' LIMIT 1';
+		$resqlselect = $this->db->query($sqlselect);
+		if ($resqlselect) {
+			$objselect = $this->db->fetch_object($resqlselect);
+			if ($objselect) {
+				$this->id = (int) $objselect->rowid;
+			}
+			$this->db->free($resqlselect);
+		}
+
+		$sql = 'DELETE FROM '.MAIN_DB_PREFIX."diffusion_contact";
                 $sql .= ' WHERE fk_diffusion = '.$diffusionId;
                 $sql .= ' AND fk_contact = '.$contactId;
                 $sql .= " AND contact_source = '".$this->db->escape($source)."'";
@@ -614,77 +723,9 @@ class DiffusionContact extends CommonObject
 	 * @param	int<0,1>	$nolines		0=Default to load extrafields, 1=No extrafields
 	 * @return	int<-1,1>					Return integer <0 if KO, 0 if not found, >0 if OK
 	 */
-	public function fetch()
+	public function fetch($id = 0, $ref = null, $noextrafields = 0, $nolines = 0)
 	{
-		global $langs, $user, $conf, $object, $entry;
-
-		$element = "diffusioncontact";
-		$table_element = "diffusion_contact";
-		$module = "diffusion";
-
-		$this->db->begin();
-
-		$sql = "SELECT * FROM `".MAIN_DB_PREFIX."diffusion_contact`" ;
-		$sql.= " WHERE `fk_contact`='".$entry->contact_id."'";
-		$sql.= " AND `fk_diffusion`='".$object->id."'";
-		$sql.= " AND `contact_source`='".$entry->source."'";
-
-        //var_dump($sql);
-
-        dol_syslog("DiffusionContact::fetch sql=".$sql);
-
-	    $resql = $this->db->query($sql);
-	    
-	   if ($resql = 1)
-		{
-            $num = $this->db->num_rows($resql);
-            $i = 0;
-
-            //var_dump($num);
-
-            if ($num)
-			{
-                while ($i < $num)
-				{
-        			$obj = $this->db->fetch_object($resql);
-
-        			//var_dump($obj);
-					
-					$this->lines[$i]			= $obj;
-					$this->lines[$i]->id		= trim($obj->rowid);
-					$this->lines[$i]->mail_status		= trim($obj->mail_status);
-					$this->lines[$i]->letter_status		= trim($obj->letter_status);
-					$this->lines[$i]->hand_status		= trim($obj->hand_status);
-                    $i++;
-                }
-            }
-
-            $result = array(
-            	'id' => $this->lines[0]->id,
-            	'module' => $module,
-            	'element'=> $element,
-            	'table_element' =>$table_element,
-            	'fields' => $object->fields,
-            	'diffusion' => $object->id,
-            	'mail_status' => $this->lines[0]->mail_status,
-            	'letter_status' => $this->lines[0]->letter_status,
-            	'hand_status'=> $this->lines[0]->hand_status,
-
-            );
-
-			return $result;
-		}
-		else
-		{
-			$this->error = $this->db->error()." sql=".$sql;
-			return -1;
-		}
-
-		//$result = $this->fetchCommon($id, $ref, '', $noextrafields);
-		//if ($result > 0 && !empty($this->table_element_line) && empty($nolines)) {
-		//	$this->fetchLines($noextrafields);
-		//}
-		//return $result;
+		return $this->fetchCommon((int) $id, $ref, '', $noextrafields);
 	}
 
 	/**
@@ -725,14 +766,11 @@ class DiffusionContact extends CommonObject
 		$sql = "SELECT ";
 		$sql.= $this->getFieldList('t');
 		$sql.= " FROM ".$this->db->prefix().$this->table_element." as t";
+		$sql.= " INNER JOIN ".$this->db->prefix()."diffusion as d ON d.rowid = t.fk_diffusion";
 		if (isset($this->isextrafieldmanaged) && $this->isextrafieldmanaged == 1) {
 			$sql.= " LEFT JOIN ".$this->db->prefix().$this->table_element."_extrafields as te ON te.fk_object = t.rowid";
 		}
-		if (isset($this->ismultientitymanaged) && $this->ismultientitymanaged == 1) {
-			$sql.= " WHERE t.entity IN (".getEntity($this->element).")";
-		} else {
-			$sql.= " WHERE 1 = 1";
-		}
+		$sql.= " WHERE d.entity IN (".getEntity('diffusion').")";
 
 		// Manage filter
 		$errormessage = '';
@@ -788,45 +826,76 @@ class DiffusionContact extends CommonObject
 	 */
 	public function update(User $user, $notrigger = 0)
 	{
-		global $langs, $conf, $object, $field, $value, $id;
+		return $this->updateCommon($user, $notrigger);
+	}
 
-		dol_syslog(__METHOD__, LOG_DEBUG);
+	/**
+	 * Update a delivery method status from Ajax after field whitelisting.
+	 *
+	 * @param int $id Link id
+	 * @param string $field Allowed status field
+	 * @param int $value New status value
+	 * @param User $user Current user
+	 * @param int<0,1> $notrigger 1 to skip triggers
+	 * @return int<-1,1>
+	 */
+	public function updateStatusField($id, $field, $value, User $user, $notrigger = 0)
+	{
+		global $langs, $conf;
 
-		$sql = "UPDATE ".MAIN_DB_PREFIX."$object->table_element";
-		$sql .= " SET ".$field." = ".((int) $value);
-		$sql .= " , fk_user_modif = ".((int) $user->id);
-		$sql .= " WHERE rowid = ".((int) $id);
+		$id = (int) $id;
+		$value = (int) $value;
+		$allowedfields = array('mail_status', 'letter_status', 'hand_status');
 
-		dol_syslog("DiffusionContact::update sql=".$sql);
+		if ($id <= 0 || !in_array($field, $allowedfields, true) || !in_array($value, array(0, 1), true)) {
+			$this->error = 'ErrorBadParameters';
+			return -1;
+		}
 
 		$this->db->begin();
 
-		try {
-			$resql = $this->db->query($sql);
-			if (!$resql) {
-				throw new Exception($this->db->lasterror());
+		$resultaccess = $this->checkDiffusionContactLineAccess($id);
+		if ($resultaccess <= 0) {
+			if ($resultaccess == 0) {
+				$this->error = $langs->trans('NotEnoughPermissions');
 			}
+			$this->db->rollback();
 
-			// Trigger call
-			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
-			$interface = new Interfaces($this->db);
-			$result2 = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
-			if ($result2 < 0) {
-				$this->errors = $interface->errors;
-				throw new Exception(!empty($interface->error) ? $interface->error : implode(', ', $this->errors));
-			}
-			// End trigger call
+			return -1;
+		}
 
-			$this->db->commit();
-			return 1;
-		} catch (Exception $e) {
-			$this->error = $e->getMessage();
-			dol_syslog("DiffusionContact::update ".$this->error, LOG_ERR);
+		$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." as dc";
+		$sql .= " INNER JOIN ".MAIN_DB_PREFIX."diffusion as d ON d.rowid = dc.fk_diffusion";
+		$sql .= " SET dc.".$field." = ".$value;
+		$sql .= ", dc.fk_user_modif = ".((int) $user->id);
+		$sql .= " WHERE dc.rowid = ".$id;
+		$sql .= " AND d.entity IN (".getEntity('diffusion').")";
+
+		dol_syslog(__METHOD__." sql=".$sql, LOG_DEBUG);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
 			$this->db->rollback();
 			return -1;
 		}
 
-		//return $this->updateCommon($user, $notrigger);
+		$this->fetch($id);
+
+		if (!$notrigger) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
+			$interface = new Interfaces($this->db);
+			$result = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
+			if ($result < 0) {
+				$this->errors = $interface->errors;
+				$this->error = !empty($interface->error) ? $interface->error : implode(', ', $this->errors);
+				$this->db->rollback();
+				return -1;
+			}
+		}
+
+		$this->db->commit();
+
+		return 1;
 	}
 
 

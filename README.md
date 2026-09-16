@@ -18,8 +18,9 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Suivi des diffusions générées depuis un modèle (liaison `model_source` et onglet dédié).
 - Ajout et suivi des **documents joints**.
 - Génération/régénération des documents PDF de diffusion.
-- Envoi de diffusion par e-mail.
+- Envoi de diffusion par e-mail avec modèles de courriel natifs sous le type unique **Diffusions**.
 - Création automatique d’événements agenda sur les actions clés (validation, retour brouillon, envoi e-mail, marquage diffusé/remis, suppression).
+- Événements métier exposés aux Notifications natives Dolibarr avec modèles de courriel sélectionnables sous le même type **Diffusions**.
 - Compatibilité **Multicompany** (partage possible des diffusions et de la numérotation via options dédiées).
 
 ### Compatibilité
@@ -28,8 +29,8 @@ Le module permet de créer des fiches de diffusion liées à un projet, de gére
 - Dépendances module :
 	- **Projet** (`modProjet`)
 	- **Tiers** (`modSociete`)
-- Version minimum Dolibarr déclarée : **19+**.
-- Version PHP minimum déclarée : **7.1+**.
+- Version minimum Dolibarr déclarée : **20+**.
+- Version PHP minimum déclarée : **8.0+**.
 
 ### Installation
 
@@ -56,7 +57,7 @@ Copiez le dossier du module dans :
 Le module propose une page de configuration dans l’administration pour :
 
 - définir les options de numérotation et de modèles document,
-- ajuster les comportements automatiques (événements agenda),
+- ajuster les comportements automatiques (événements agenda et notifications),
 - paramétrer les options de partage multicompany.
 
 ### Permissions
@@ -64,6 +65,10 @@ Le module propose une page de configuration dans l’administration pour :
 Les droits sont séparés pour les objets **Diffusion** et **Contact de diffusion** avec des niveaux de lecture, création/modification et suppression.
 
 Pensez à attribuer ces droits aux profils concernés avant mise en production.
+
+Dans la vue d’ensemble d’un projet accessible, le bloc Diffusions et ses compteurs respectent le droit de lecture Diffusion et les entités autorisées, quel que soit le créateur des diffusions. La création et la déliaison restent soumises au droit d’écriture. Les hooks ajoutent leur bloc sans remplacer les contributions des autres modules ; déployer également la correction du hook de LMDB Advanced Project lorsque les deux modules sont utilisés. Voir [les tests de cette intégration](test/README.md) pour le scénario de non-régression et les limites de validation.
+
+Le badge de l’onglet **Vue d’ensemble** ajoute une seule fois les diffusions accessibles au compteur natif : trois éléments et cinq diffusions donnent **8**. L’identification du projet utilise l’objet natif transmis au hook, y compris sur Dolibarr 20 à 23 qui ne transmettent pas le paramètre `type` introduit en v24.
 
 ### Traductions
 
@@ -115,8 +120,9 @@ The module allows you to create distribution records linked to a project, manage
 - Tracking generated distributions from a template (`model_source` linkage and dedicated tab).
 - Add and track **attached documents**.
 - Generate/regenerate distribution PDF documents.
-- Send distributions by email.
+- Send distributions by email with native email templates under the single **Diffusions** type.
 - Automatic agenda event creation on key actions (validate, back to draft, email sent, marked as delivered/distributed, delete).
+- Business events exposed to native Dolibarr Notifications with selectable email templates under the same **Diffusions** type.
 - **Multicompany** compatibility (optional sharing of distributions and numbering).
 
 ### Compatibility
@@ -125,8 +131,8 @@ The module allows you to create distribution records linked to a project, manage
 - Module dependencies:
 	- **Project** (`modProjet`)
 	- **Third Party** (`modSociete`)
-- Declared minimum Dolibarr version: **19+**.
-- Declared minimum PHP version: **7.1+**.
+- Declared minimum Dolibarr version: **20+**.
+- Declared minimum PHP version: **8.0+**.
 
 ### Installation
 
@@ -153,7 +159,7 @@ Copy the module folder into:
 The module provides an admin setup page to:
 
 - define numbering and document model options,
-- adjust automatic behaviors (agenda events),
+- adjust automatic behaviors (agenda events and notifications),
 - configure multicompany sharing options.
 
 ### Permissions
@@ -161,6 +167,10 @@ The module provides an admin setup page to:
 Permissions are split for **Distribution** and **Distribution Contact** objects with read, create/update, and delete levels.
 
 Make sure these rights are assigned to the target user profiles before production use.
+
+On an accessible project's overview, the Diffusion block and counters require Diffusion read permission and respect authorized entities, regardless of who created the distributions. Creation and unlinking still require write permission. The hooks add their entry without replacing other modules' contributions; deploy the corresponding LMDB Advanced Project hook correction when both modules are used. See the [integration regression tests](test/README.md) for coverage and validation limits.
+
+The **Overview** tab badge adds accessible distributions to the native counter once: three elements and five distributions give **8**. The hook identifies the project from the native object, including on Dolibarr 20–23, which do not provide the `type` parameter introduced in v24.
 
 ### Translations
 

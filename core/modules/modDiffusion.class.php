@@ -76,7 +76,7 @@ class modDiffusion extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@diffusion'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.2.4';
+		$this->version = '1.3.0';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -131,7 +131,7 @@ class modDiffusion extends DolibarrModules
 			// Set this to 1 if module has its own login method file (core/login)
 			'login' => 0,
 			// Set this to 1 if module has its own substitution function file (core/substitutions)
-			'substitutions' => 0,
+			'substitutions' => 1,
 			// Set this to 1 if module has its own menus handler directory (core/menus)
 			'menus' => 0,
 			// Set this to 1 if module overwrite template dir (core/tpl)
@@ -155,7 +155,7 @@ class modDiffusion extends DolibarrModules
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
 			'hooks' => array(
-				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'toprightmenu', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
+				'data' => array('projectoverview', 'projectcard', 'projectOverview', 'projectCard', 'projectoverviewprofit', 'projectOverviewProfit', 'globalcard', 'notification', 'emailtemplates', 'toprightmenu', 'elementproperties', 'fileupload', 'multicompanyexternalmodulesharing', 'multicompanyexternalmodules', 'multicompanysharingoptions'),
 				'entity' => '0',
 			),
 			/* END MODULEBUILDER HOOKSCONTEXTS */
@@ -191,8 +191,8 @@ class modDiffusion extends DolibarrModules
 		$this->langfiles = array("diffusion@diffusion");
 
 		// Prerequisites
-		$this->phpmin = array(7, 1); // Minimum version of PHP required by module
-		$this->need_dolibarr_version = array(19, -3); // Minimum version of Dolibarr required by module
+		$this->phpmin = array(8, 0); // Minimum version of PHP required by module
+		$this->need_dolibarr_version = array(20, 0); // Minimum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
 		// Messages at activation
@@ -345,7 +345,6 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusiondoc';
 		$this->rights[$r][5] = 'delete';
 		$r++;
-		/*
 		$this->rights[$r][0] = $this->numero . sprintf('%02d', (1 * 10) + 0 + 1);
 		$this->rights[$r][1] = 'ReadDiffusionContact';
 		$this->rights[$r][4] = 'diffusioncontact';
@@ -361,7 +360,6 @@ class modDiffusion extends DolibarrModules
 		$this->rights[$r][4] = 'diffusioncontact';
 		$this->rights[$r][5] = 'delete';
 		$r++;
-		*/
 		/* END MODULEBUILDER PERMISSIONS */
 
 
@@ -589,6 +587,15 @@ class modDiffusion extends DolibarrModules
 		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
 			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD COLUMN model_source integer");
 		}
+		$resqlcheck = $this->db->query("SHOW COLUMNS FROM ".MAIN_DB_PREFIX."diffusion_contact LIKE 'fk_type_contact'");
+		if ($resqlcheck && !$this->db->num_rows($resqlcheck)) {
+			$this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion_contact ADD COLUMN fk_type_contact integer");
+		}
+		$this->ensureDiffusionRefEntityUniqueIndex();
+		$this->ensureDiffusionIndex('diffusion', 'idx_diffusion_date_creation', 'date_creation');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_diffusion', 'fk_diffusion');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_contact', 'fk_contact');
+		$this->ensureDiffusionIndex('diffusion_contact', 'idx_diffusion_contact_fk_type_contact', 'fk_type_contact');
 
 		// Create extrafields during init
 		//include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
@@ -643,8 +650,6 @@ class modDiffusion extends DolibarrModules
 			if (!getDolGlobalInt('DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED')) {
 				dolibarr_set_const($this->db, 'DIFFUSION_DIFFUSION_DOCTEMPLATE_BOOTSTRAPPED', '1', 'yesno', 0, '', $conf->entity);
 			}
-			dolibarr_set_const($this->db, 'MAIN_MODULE_DIFFUSION', '1', 'chaine', 0, '', $conf->entity);
-
 			dol_include_once('/diffusion/class/actions_diffusion.class.php');
 
 			$externalmodule = json_decode((string) ($conf->global->MULTICOMPANY_EXTERNAL_MODULES_SHARING ?? ''), true);
@@ -663,6 +668,11 @@ class modDiffusion extends DolibarrModules
 			if ($resultregister < 0) {
 				return -1;
 			}
+
+			$resultregistertemplates = $this->registerDiffusionEmailTemplates();
+			if ($resultregistertemplates < 0) {
+				return -1;
+			}
 		}
 
 		return $result;
@@ -678,22 +688,24 @@ class modDiffusion extends DolibarrModules
 		global $langs;
 
 		$langs->load('diffusion@diffusion');
+		dol_include_once('/diffusion/class/actions_diffusion.class.php');
 
-		$triggers = array(
-			'DIFFUSION_CREATE' => array('DiffusionTriggerLabelCreate', 'DiffusionTriggerDescCreate', 2000),
-			'DIFFUSION_VALIDATE' => array('DiffusionTriggerLabelValidate', 'DiffusionTriggerDescValidate', 2001),
-			'DIFFUSION_SENDMAIL' => array('DiffusionTriggerLabelSendMail', 'DiffusionTriggerDescSendMail', 2002),
-			'DIFFUSION_SETDIFFUSED' => array('DiffusionTriggerLabelSetDiffused', 'DiffusionTriggerDescSetDiffused', 2003),
-			'DIFFUSION_BACKTODRAFT' => array('DiffusionTriggerLabelBackToDraft', 'DiffusionTriggerDescBackToDraft', 2004),
-			'DIFFUSION_DELETE' => array('DiffusionTriggerLabelDelete', 'DiffusionTriggerDescDelete', 2005),
-		);
+		if (!class_exists('ActionsDiffusion')) {
+			$this->error = 'ActionsDiffusion class not found';
+			return -1;
+		}
+
+		$triggers = ActionsDiffusion::getBusinessEventsDefinition();
 
 		foreach ($triggers as $code => $triggerconf) {
-			$label = $this->db->escape($langs->transnoentities($triggerconf[0]));
-			$description = $this->db->escape($langs->transnoentities($triggerconf[1]));
+			$label = $this->db->escape($langs->transnoentities($triggerconf['label']));
+			$description = $this->db->escape($langs->transnoentities($triggerconf['description']));
+			$notificationElementtype = $this->db->escape((string) $triggerconf['notification_elementtype']);
+			$agendaElementtype = $this->db->escape((string) $triggerconf['agenda_elementtype']);
+			$rang = (int) $triggerconf['rang'];
 
 			$sql = "INSERT INTO ".MAIN_DB_PREFIX."c_action_trigger (code, label, description, elementtype, rang)";
-			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', 'diffusion@diffusion', ".((int) $triggerconf[2]);
+			$sql .= " SELECT '".$this->db->escape($code)."', '".$label."', '".$description."', '".$notificationElementtype."', ".$rang;
 			$sql .= " FROM DUAL";
 			$sql .= " WHERE NOT EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."c_action_trigger WHERE code = '".$this->db->escape($code)."')";
 
@@ -704,7 +716,7 @@ class modDiffusion extends DolibarrModules
 			}
 
 			$sqlupdate = "UPDATE ".MAIN_DB_PREFIX."c_action_trigger";
-			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = 'diffusion@diffusion', rang = ".((int) $triggerconf[2]);
+			$sqlupdate .= " SET label = '".$label."', description = '".$description."', elementtype = '".$notificationElementtype."', rang = ".$rang;
 			$sqlupdate .= " WHERE code = '".$this->db->escape($code)."'";
 
 			$resql = $this->db->query($sqlupdate);
@@ -712,6 +724,171 @@ class modDiffusion extends DolibarrModules
 				$this->error = $this->db->lasterror();
 				return -2;
 			}
+
+			$sqlupdateagenda = "UPDATE ".MAIN_DB_PREFIX."actioncomm";
+			$sqlupdateagenda .= " SET elementtype = '".$agendaElementtype."'";
+			$sqlupdateagenda .= " WHERE code = '".$this->db->escape($code)."'";
+			$sqlupdateagenda .= " AND elementtype = 'diffusion@diffusion'";
+
+			$resql = $this->db->query($sqlupdateagenda);
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -3;
+			}
+		}
+
+		$resultrepair = ActionsDiffusion::repairNotificationActionTriggerElementTypes($this->db);
+		if ($resultrepair < 0) {
+			$this->error = $this->db->lasterror();
+			return -4;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Register default Diffusion email templates without selecting them as notification defaults.
+	 *
+	 * @return int<-1,1> Return 1 if OK, <0 if KO
+	 */
+	private function registerDiffusionEmailTemplates()
+	{
+		global $conf;
+
+		dol_include_once('/diffusion/class/actions_diffusion.class.php');
+		if (!class_exists('ActionsDiffusion')) {
+			$this->error = 'ActionsDiffusion class not found';
+			return -1;
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+
+		$resultnormalize = ActionsDiffusion::normalizeNotificationEmailTemplateMirrorLabels($this->db);
+		if ($resultnormalize < 0) {
+			$this->error = $this->db->lasterror();
+			return -2;
+		}
+
+		$resultmigrate = ActionsDiffusion::migrateLegacyVisibleEmailTemplateTypes($this->db);
+		if ($resultmigrate < 0) {
+			$this->error = $this->db->lasterror();
+			return -3;
+		}
+
+		$resultsubstitutionmigrate = ActionsDiffusion::migrateLegacyEmailTemplateSubstitutionKeys($this->db);
+		if ($resultsubstitutionmigrate < 0) {
+			$this->error = $this->db->lasterror();
+			return -4;
+		}
+
+		$templates = ActionsDiffusion::getDefaultEmailTemplatesDefinition();
+		$langcodes = array('fr_FR', 'en_US');
+		$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+
+		foreach ($langcodes as $langcode) {
+			$outputlangs = new Translate('', $conf);
+			$outputlangs->setDefaultLang($langcode);
+			$outputlangs->loadLangs(array('diffusion@diffusion'));
+
+			foreach ($templates as $templateconf) {
+				$typeTemplate = $this->db->escape((string) $templateconf['type_template']);
+				$label = $this->db->escape($outputlangs->transnoentities((string) $templateconf['label']));
+				$topic = $this->db->escape($outputlangs->transnoentities((string) $templateconf['topic']));
+				$content = $this->db->escape($outputlangs->transnoentities((string) $templateconf['content']));
+				$joinfiles = (int) $templateconf['joinfiles'];
+				$position = (int) $templateconf['position'];
+
+				$sql = "INSERT INTO ".MAIN_DB_PREFIX."c_email_templates";
+				$sql .= " (entity, module, type_template, lang, private, fk_user, datec, label, position, active, enabled, joinfiles, topic, content)";
+				$sql .= " SELECT ".$entity.", 'diffusion', '".$typeTemplate."', '".$this->db->escape($langcode)."', 0, NULL, NOW(),";
+				$sql .= " '".$label."', ".$position.", 1, 'isModEnabled(\"diffusion\")', '".$joinfiles."', '".$topic."', '".$content."'";
+				$sql .= " FROM DUAL";
+				$sql .= " WHERE NOT EXISTS (";
+				$sql .= "SELECT 1 FROM ".MAIN_DB_PREFIX."c_email_templates";
+				$sql .= " WHERE lang = '".$this->db->escape($langcode)."'";
+				$sql .= " AND label = '".$label."'";
+				$sql .= " AND entity = ".$entity;
+				$sql .= ")";
+
+				$resql = $this->db->query($sql);
+				if (!$resql) {
+					$this->error = $this->db->lasterror();
+					return -5;
+				}
+			}
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Create a missing index during module upgrade.
+	 *
+	 * @param string $table Table without prefix
+	 * @param string $index Index name
+	 * @param string $columns SQL column list
+	 * @return int<-1,1>
+	 */
+	private function ensureDiffusionIndex($table, $index, $columns)
+	{
+		$sql = "SHOW INDEX FROM ".MAIN_DB_PREFIX.$table." WHERE Key_name = '".$this->db->escape($index)."'";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+		if ($this->db->num_rows($resql) > 0) {
+			$this->db->free($resql);
+			return 1;
+		}
+		$this->db->free($resql);
+
+		$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX.$table." ADD INDEX ".$index." (".$columns.")");
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Ensure the diffusion reference unique key includes entity.
+	 *
+	 * @return int<-1,1>
+	 */
+	private function ensureDiffusionRefEntityUniqueIndex()
+	{
+		$sql = "SHOW INDEX FROM ".MAIN_DB_PREFIX."diffusion WHERE Key_name = 'uk_diffusion_ref'";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
+		}
+
+		$columns = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$columns[(int) $obj->Seq_in_index] = $obj->Column_name;
+		}
+		$this->db->free($resql);
+		ksort($columns);
+
+		if ($columns === array(1 => 'ref', 2 => 'entity')) {
+			return 1;
+		}
+
+		if (!empty($columns)) {
+			$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion DROP INDEX uk_diffusion_ref");
+			if (!$resql) {
+				$this->error = $this->db->lasterror();
+				return -1;
+			}
+		}
+
+		$resql = $this->db->query("ALTER TABLE ".MAIN_DB_PREFIX."diffusion ADD UNIQUE INDEX uk_diffusion_ref (ref, entity)");
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			return -1;
 		}
 
 		return 1;
@@ -741,8 +918,6 @@ class modDiffusion extends DolibarrModules
 
 		$jsonformat = json_encode($externalmodule);
 		dolibarr_set_const($this->db, 'MULTICOMPANY_EXTERNAL_MODULES_SHARING', $jsonformat, 'chaine', 0, '', $conf->entity);
-		dolibarr_del_const($this->db, 'MAIN_MODULE_DIFFUSION', $conf->entity);
-
 		$sql = array();
 		return $this->_remove($sql, $options);
 	}

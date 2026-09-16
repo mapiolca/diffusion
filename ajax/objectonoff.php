@@ -110,7 +110,7 @@ if (!empty($user->socid)) {
 // Check is done on $user->rights->element->create or $user->rights->element->subelement->create (because $action = 'set')
 if (preg_match('/stat[u][st]$/', $field) || ($field == 'evenunsubscribe' && $object->table_element == 'mailing')) {
 	if ($object->element === 'diffusioncontact') {
-		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'))) {
+		if (!(!empty($user->admin) || $user->hasRight('diffusion', 'diffusioncontact', 'write') || $user->hasRight('diffusion', 'diffusiondoc', 'write'))) {
 			httponly_accessforbidden('Not enough permissions');
 		}
 	} else {
@@ -136,8 +136,6 @@ if (preg_match('/stat[u][st]$/', $field) || ($field == 'evenunsubscribe' && $obj
 
 top_httphead();
 
-print '<!-- Ajax page called with url '.dol_escape_htmltag($_SERVER["PHP_SELF"]).'?'.dol_escape_htmltag($_SERVER["QUERY_STRING"]).' -->'."\n";
-
 // Registering new values
 if (($action == 'set') && !empty($id)) {	// Test on permission already done in header according to object and field.
 	$triggerkey = strtoupper(($module != $element ? $module.'_' : '').$element).'_UPDATE';
@@ -148,12 +146,31 @@ if (($action == 'set') && !empty($id)) {	// Test on permission already done in h
 	if ($triggerkey == 'PRODUCT_UPDATE') {
 		$triggerkey = 'PRODUCT_MODIFY';
 	}
-	$update = $object->update($user, $field, $value, $object->table_element, $id);
+	if ($object->element === 'diffusioncontact') {
+		$result = $object->updateStatusField($id, $field, $value, $user);
+	} else {
+		$result = $object->update($user, $field, $value, $object->table_element, $id);
+	}
 
-	
+	if ($result < 0) {
+		if (!empty($object->error)) {
+			print $object->error."\n";
+		}
+		foreach ((array) $object->errors as $msg) {
+			print $msg."\n";
+		}
+
+		$db->close();
+
+		http_response_code(500);
+		exit;
+	}
 
 	if ($backtopage) {
+		$db->close();
 		header('Location: '.$backtopage);
 		exit;
 	}
 }
+
+$db->close();

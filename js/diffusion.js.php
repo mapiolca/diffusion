@@ -29,9 +29,6 @@ if (!defined('NOREQUIRESOC')) {
 if (!defined('NOREQUIRETRAN')) {
 	define('NOREQUIRETRAN', '1');
 }
-if (!defined('NOCSRFCHECK')) {
-	define('NOCSRFCHECK', 1);
-}
 if (!defined('NOTOKENRENEWAL')) {
 	define('NOTOKENRENEWAL', 1);
 }
@@ -96,12 +93,304 @@ if (empty($dolibarr_nocache)) {
 } else {
 	header('Cache-Control: no-cache');
 }
+
+$diffusionSubstitutionHelpHtml = '';
+dol_include_once('/diffusion/core/substitutions/functions_diffusion.lib.php');
+if (function_exists('diffusion_get_available_substitution_help_html')) {
+	if (empty($langs) || !is_object($langs)) {
+		require_once DOL_DOCUMENT_ROOT.'/core/class/translate.class.php';
+
+		$langs = new Translate('', $conf);
+		$defaultlang = '';
+		if (!empty($_SESSION['dol_lang'])) {
+			$defaultlang = $_SESSION['dol_lang'];
+		} elseif (function_exists('getDolGlobalString')) {
+			$defaultlang = getDolGlobalString('MAIN_LANG_DEFAULT');
+		} elseif (!empty($conf->global->MAIN_LANG_DEFAULT)) {
+			$defaultlang = $conf->global->MAIN_LANG_DEFAULT;
+		}
+		$langs->setDefaultLang($defaultlang ?: 'en_US');
+	}
+
+	$diffusionSubstitutionHelpHtml = diffusion_get_available_substitution_help_html($langs);
+}
 ?>
 
 /* Javascript library of module Diffusion */
 
+var diffusionSubstitutionHelpHtml = <?php echo json_encode($diffusionSubstitutionHelpHtml, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+var diffusionRegenerateDocumentUrl = <?php echo json_encode(dol_buildpath('/diffusion/ajax/regeneratedocument.php', 1), JSON_UNESCAPED_SLASHES); ?>;
+var diffusionFileUploadUrl = <?php echo json_encode(DOL_URL_ROOT.'/core/ajax/fileupload.php', JSON_UNESCAPED_SLASHES); ?>;
+
+function diffusionAppendSubstitutionHelp(existingHtml) {
+	'use strict';
+
+	existingHtml = existingHtml || '';
+	if (!diffusionSubstitutionHelpHtml || existingHtml.indexOf('__DIFFUSIONCONTACT_ID__') !== -1) {
+		return existingHtml;
+	}
+
+	return existingHtml + '<br><br>' + diffusionSubstitutionHelpHtml;
+}
+
+function diffusionEnhanceEmailTemplateSubstitutionTooltips() {
+	'use strict';
+
+	if (window.location.pathname.indexOf('/admin/mails_templates.php') === -1) {
+		return;
+	}
+
+	jQuery('#idfortooltiponclick_topic, #idfortooltiponclick_content, #idfortooltiponclick_content_lines').each(function () {
+		var $tooltip = jQuery(this);
+		$tooltip.html(diffusionAppendSubstitutionHelp($tooltip.html()));
+	});
+
+	jQuery('.classfortooltip[title], .classfortooltiponclick[title]').each(function () {
+		var $element = jQuery(this);
+		var title = $element.attr('title') || '';
+
+		if (title && (title.indexOf('__REF__') !== -1 || title.indexOf('__ID__') !== -1 || title.indexOf('Available') !== -1)) {
+			$element.attr('title', diffusionAppendSubstitutionHelp(title));
+		}
+	});
+}
+
+function diffusionUpdateProjectContactsSelection($context) {
+	'use strict';
+
+	var values = [];
+	var $container = $context && $context.length ? $context.closest('.ui-dialog-content') : jQuery();
+	if (!$container.length) {
+		$container = jQuery('.diffusion-project-contacts-wrapper').closest('.ui-dialog-content');
+	}
+	if (!$container.length) {
+		$container = jQuery(document);
+	}
+
+	$container.find('input.diffusion-project-contact-checkbox:checked').each(function () {
+		var value = jQuery(this).val();
+		if (value) {
+			values.push(value);
+		}
+	});
+
+	$container.find('input[name="projectcontacts_selected"]').val(values.join(','));
+}
+
+function diffusionResizeProjectContactsDialog() {
+	'use strict';
+
+	var $wrapper = jQuery('.diffusion-project-contacts-wrapper:visible').first();
+	if (!$wrapper.length) {
+		return;
+	}
+
+	var $dialogContent = $wrapper.closest('.ui-dialog-content');
+	if (!$dialogContent.length || typeof $dialogContent.dialog !== 'function') {
+		return;
+	}
+
+	var $table = $wrapper.find('table.diffusion-project-contacts-table').first();
+	var minWidth = parseInt($wrapper.data('dialog-min-width'), 10) || 760;
+	var viewportWidth = jQuery(window).width() || minWidth;
+	var viewportHeight = jQuery(window).height() || 600;
+	var contentWidth = $table.length ? Math.ceil($table.outerWidth(true)) + 90 : minWidth;
+	var dialogWidth = Math.min(Math.max(minWidth, contentWidth), Math.max(320, viewportWidth - 40));
+	var maxContentHeight = Math.max(220, viewportHeight - 190);
+
+	$wrapper.css({
+		'max-height': maxContentHeight + 'px',
+		'overflow-x': 'auto',
+		'overflow-y': 'auto'
+	});
+	$table.find('th,td').css('white-space', 'nowrap');
+
+	$dialogContent.dialog('option', 'width', dialogWidth);
+	$dialogContent.dialog('option', 'height', 'auto');
+	$dialogContent.dialog('option', 'position', { my: 'center', at: 'center', of: window });
+}
+
+function diffusionScheduleProjectContactsDialogResize() {
+	'use strict';
+
+	window.setTimeout(function () {
+		diffusionUpdateProjectContactsSelection(jQuery('.diffusion-project-contacts-wrapper:visible').first());
+		diffusionResizeProjectContactsDialog();
+	}, 50);
+}
+
+function diffusionGetAjaxUploadResponseInfo(responseData) {
+	'use strict';
+
+	var files;
+	var info = {
+		hasErrors: true,
+		names: []
+	};
+
+	try {
+		files = (typeof responseData === 'string') ? JSON.parse(responseData) : responseData;
+	} catch (e) {
+		return info;
+	}
+	if (!jQuery.isArray(files)) {
+		return info;
+	}
+
+	info.hasErrors = false;
+	for (var i = 0; i < files.length; i++) {
+		if (files[i] && files[i].error) {
+			info.hasErrors = true;
+			continue;
+		}
+		if (files[i] && files[i].name) {
+			info.names.push(files[i].name);
+		}
+	}
+
+	return info;
+}
+
+function diffusionGetCurrentPageDiffusionId() {
+	'use strict';
+
+	var urlParams = new URLSearchParams(window.location.search || '');
+	var id = urlParams.get('id') || '';
+
+	if (!id) {
+		id = jQuery('input[name="id"]').first().val() || '';
+	}
+
+	return id;
+}
+
+function diffusionRedirectAfterDragDrop(id, eventMessages) {
+	'use strict';
+
+	var redirectUrl = new URL(window.location.href);
+	redirectUrl.searchParams.set('id', id);
+	redirectUrl.searchParams.set('seteventmessages', eventMessages);
+	window.location.href = redirectUrl.pathname + redirectUrl.search;
+}
+
+function diffusionHandleDragDropUpload(event) {
+	'use strict';
+
+	var dropArea;
+	var dataTransfer;
+	var droppedFiles;
+	var formData;
+	var id;
+	var token;
+
+	if (!document.body || (!document.body.classList.contains('page-card') && !document.body.classList.contains('page-card_document'))) {
+		return;
+	}
+
+	dropArea = event.target && event.target.closest ? event.target.closest('.cssDragDropArea') : null;
+	if (!dropArea) {
+		return;
+	}
+	dataTransfer = event.dataTransfer;
+	if (!dataTransfer || !dataTransfer.files || !dataTransfer.files.length) {
+		return;
+	}
+
+	id = diffusionGetCurrentPageDiffusionId();
+	token = jQuery('meta[name="anti-csrf-currenttoken"]').attr('content') || '';
+	if (!id || !token || !diffusionFileUploadUrl) {
+		return;
+	}
+
+	event.preventDefault();
+	event.stopPropagation();
+	event.stopImmediatePropagation();
+
+	formData = new FormData();
+	formData.append('fk_element', id);
+	formData.append('element', 'diffusiondoc');
+	formData.append('token', token);
+	formData.append('action', 'linkit');
+
+	droppedFiles = dataTransfer.files;
+	jQuery.each(droppedFiles, function (index, file) {
+		formData.append('files[]', file, file.name);
+	});
+
+	jQuery('.cssDragDropArea').removeClass('highlightDragDropArea');
+	jQuery('.dragDropAreaMessage').addClass('hidden');
+
+	jQuery.ajax({
+		url: diffusionFileUploadUrl,
+		type: 'POST',
+		processData: false,
+		contentType: false,
+		data: formData
+	}).done(function (responseData) {
+		var uploadInfo = diffusionGetAjaxUploadResponseInfo(responseData);
+
+		if (uploadInfo.hasErrors) {
+			diffusionRedirectAfterDragDrop(id, 'ErrorOnAtLeastOneFileUpload:warnings');
+			return;
+		}
+
+		jQuery.ajax({
+			url: diffusionRegenerateDocumentUrl,
+			type: 'POST',
+			data: {
+				action: 'regenerate',
+				id: id,
+				token: token,
+				files: uploadInfo.names
+			}
+		}).done(function () {
+			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs');
+		}).fail(function () {
+			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs,DiffusionDocumentRegenerationAfterFileChangeFailed:warnings');
+		});
+	}).fail(function (jqXHR) {
+		if (jqXHR && jqXHR.status === 403) {
+			diffusionRedirectAfterDragDrop(id, 'ErrorUploadPermissionDenied:errors');
+			return;
+		}
+		diffusionRedirectAfterDragDrop(id, 'ErrorUploadFileDragDropPermissionDenied:errors');
+	});
+}
+
 jQuery(document).ready(function () {
 	'use strict';
+
+	diffusionEnhanceEmailTemplateSubstitutionTooltips();
+	diffusionScheduleProjectContactsDialogResize();
+
+	document.addEventListener('drop', diffusionHandleDragDropUpload, true);
+
+	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
+		var target = jQuery(this).data('target');
+		var $table;
+
+		event.preventDefault();
+		if (!target) {
+			return;
+		}
+
+		$table = jQuery('#' + target);
+		$table.find('input.diffusion-project-contact-checkbox').prop('checked', true);
+		diffusionUpdateProjectContactsSelection($table);
+		diffusionResizeProjectContactsDialog();
+	});
+
+	jQuery(document).on('change', 'input.diffusion-project-contact-checkbox', function () {
+		diffusionUpdateProjectContactsSelection(jQuery(this));
+	});
+
+	jQuery(document).on('dialogopen', '.ui-dialog-content', function () {
+		if (jQuery(this).find('.diffusion-project-contacts-wrapper').length) {
+			diffusionScheduleProjectContactsDialogResize();
+		}
+	});
+
+	jQuery(window).on('resize', diffusionScheduleProjectContactsDialogResize);
 
 	if (!jQuery('body').hasClass('page-notification')) {
 		return;

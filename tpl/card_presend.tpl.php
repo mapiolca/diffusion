@@ -436,31 +436,6 @@ if ($action == 'presend') {
 			}
 		}
 
-		if (!GETPOSTISSET('receiver')) {
-			$receiverdefaultids = array();
-			$sql = 'SELECT DISTINCT dc.fk_contact';
-			$sql .= ' FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
-			$sql .= ' WHERE dc.fk_diffusion = '.((int) $object->id);
-			$sql .= " AND dc.contact_source = 'external'";
-			$sql .= ' AND dc.mail_status = 1';
-
-			$resql = $db->query($sql);
-			if ($resql) {
-				while ($obj = $db->fetch_object($resql)) {
-					$receiverdefaultids[] = (int) $obj->fk_contact;
-				}
-			}
-
-			if (!empty($receiverdefaultids)) {
-				$receiverdefaultids = array_values(array_filter($receiverdefaultids, static function ($contactid) use ($liste) {
-					return isset($liste[(int) $contactid]);
-				}));
-				if (!empty($receiverdefaultids)) {
-					$_POST['receiver'] = $receiverdefaultids;
-					$_REQUEST['receiver'] = $receiverdefaultids;
-				}
-			}
-		}
 	}
 
 	$formmail->withto = $liste;

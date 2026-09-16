@@ -103,6 +103,7 @@ $action  = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm');
 $id  = (GETPOSTINT('socid') ? GETPOSTINT('socid') : GETPOSTINT('id'));
 $ref = GETPOST('ref', 'alpha');
+$backtopage = GETPOST('backtopage', 'alpha');
 
 $limit = GETPOSTINT('limit') ? GETPOSTINT('limit') : $conf->liste_limit;
 $sortfield = GETPOST('sortfield', 'aZ09comma');
@@ -141,38 +142,16 @@ if (empty($object->fk_element) && !empty($object->element)) {
 
 if ($id > 0 || !empty($ref)) {
 	$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-	if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-		$conf->diffusion = new stdClass();
+	$upload_dir = diffusionGetDocumentUploadDir($object);
+	if (!empty($upload_dir)) {
+		diffusionMigrateFlatDocumentDirectory($db, $object);
 	}
-	if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-		$conf->diffusion->multidir_output = array();
-	}
-	$defaultdiffusionoutput = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-	$diffusionoutput = !empty($conf->diffusion->multidir_output[$entityfordoc]) ? $conf->diffusion->multidir_output[$entityfordoc] : (!empty($conf->diffusion->dir_output) ? $conf->diffusion->dir_output : $defaultdiffusionoutput);
-	if ($entityfordoc > 1 && preg_match('/\/'.preg_quote((string) $entityfordoc, '/').'\//', (string) $diffusionoutput) === 0) {
-		$diffusionoutput = $defaultdiffusionoutput;
-	}
-	$conf->diffusion->multidir_output[$entityfordoc] = $diffusionoutput;
-	if (!isset($conf->diffusion->enabled)) {
-		$conf->diffusion->enabled = 1;
-	}
-
-	$objref = dol_sanitizeFileName($object->ref);
-	$upload_dir = $diffusionoutput.'/'.$object->element.'/'.$objref;
-	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' diffusionoutput='.$diffusionoutput.' upload_dir='.$upload_dir, LOG_DEBUG);
+	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 }
 
 // Permissions
-// (There are several ways to check permission.)
-// Set $enablepermissioncheck to 1 to enable a minimum low level of checks
-$enablepermissioncheck = getDolGlobalInt('DIFFUSION_ENABLE_PERMISSION_CHECK');
-if ($enablepermissioncheck) {
-	$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-	$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
-} else {
-	$permissiontoread = 1;
-	$permissiontoadd  = 1;
-}
+$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
+$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
@@ -195,56 +174,35 @@ if (empty($object->id)) {
  * Actions
  */
 
+$error = 0;
+
 if ($action == 'remove_file' && !empty($permissiontoadd) && $object->id > 0) {
-	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 	$filetodelete = GETPOST('file', 'alpha');
-	$filetodelete = ltrim((string) $filetodelete, '/');
-	$fullpathtodelete = '';
-	if ($filetodelete !== '' && preg_match('/\.\./', $filetodelete)) {
-		$fullpathtodelete = '';
-	} elseif (preg_match('/^'.preg_quote($object->element, '/').'\//', $filetodelete)) {
-		$fullpathtodelete = $diffusionoutput.'/'.$filetodelete;
-	} else {
-		$fullpathtodelete = $upload_dir.'/'.basename($filetodelete);
-	}
-	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete.' fullpath='.$fullpathtodelete, LOG_DEBUG);
-	$ret = (!empty($fullpathtodelete) ? dol_delete_file($fullpathtodelete, 0, 0, 0, $object) : 0);
-	if ($ret) {
-		setEventMessages($langs->trans("FileWasRemoved", $filetodelete), null, 'mesgs');
-	} else {
-		setEventMessages($langs->trans("ErrorFailToDeleteFile", $filetodelete), null, 'errors');
-	}
+	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete, LOG_DEBUG);
+	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, $filetodelete);
 	$action = '';
 }
 
+$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
+$diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
+$diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
+$diffusionrenameto = $diffusionfilerename ? dol_string_nohtmltag(dol_sanitizeFileName(GETPOST('renamefileto', 'alpha'), '_', 0)) : '';
+$object->element = diffusionGetDocumentElement();
+$modulepart = diffusionGetDocumentModulepart();
+$relativepathwithnofile = diffusionGetDocumentRelativePath($object);
+if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissiontoadd) && GETPOST('urlfile', 'alpha')) {
+	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, GETPOST('urlfile', 'alpha', 0, null, null, 1));
+	$tmpurl = !empty($backtopage) ? $backtopage : $_SERVER["PHP_SELF"].'?id='.$object->id;
+	header('Location: '.$tmpurl);
+	exit;
+}
 include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
-
-if (GETPOST('sendit', 'alpha') && !empty($permissiontoadd) && getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD')) {
-	$relUploadDir = preg_replace('/^'.preg_quote(DOL_DATA_ROOT, '/').'/', '', $upload_dir);
-	dol_syslog(__METHOD__.' sendit entity='.(int) $entityfordoc.' upload_dir='.$upload_dir.' relUploadDir='.$relUploadDir, LOG_DEBUG);
-	if (!preg_match('/[\\/]temp[\\/]|[\\/]thumbs|\.meta$/', $relUploadDir)) {
-		$relUploadDir = preg_replace('/[\\/]$/', '', $relUploadDir);
-		$relUploadDir = preg_replace('/^[\\/]/', '', $relUploadDir);
-
-		require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
-
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."ecm_files";
-		$sql .= " WHERE src_object_type = '".$db->escape($object->table_element)."'";
-		$sql .= " AND src_object_id = ".((int) $object->id);
-		$sql .= " AND filepath = '".$db->escape($relUploadDir)."'";
-		$sql .= " AND (share IS NULL OR share = '')";
-		$resql = $db->query($sql);
-		if ($resql) {
-			while ($objFile = $db->fetch_object($resql)) {
-				$ecmfile = new EcmFiles($db);
-				if ($ecmfile->fetch((int) $objFile->rowid) > 0 && empty($ecmfile->share)) {
-					$ecmfile->share = getRandomPassword(true);
-					$ecmfile->update($user);
-				}
-			}
-		}
-	}
+if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionRegenerateDocumentAfterLinkedFileChange')) {
+	dol_syslog(__METHOD__.' post upload processing entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
+	diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload');
+}
+if ($diffusionfilerename && !empty($permissiontoadd) && empty($error) && $diffusionrenamefrom !== $diffusionrenameto && is_file(diffusionResolveLinkedFilePath($object, $upload_dir, $diffusionrenameto)) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenamefrom) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenameto)) {
+	diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'rename');
 }
 
 /*
@@ -268,7 +226,7 @@ print dol_get_fiche_head($head, 'document', $langs->trans("Diffusion"), -1, $obj
 
 
 // Build file list
-$filearray = dol_dir_list($upload_dir, "files", 0, '', '(\.meta|_preview.*\.png)$', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1);
+$filearray = (!empty($upload_dir) && is_dir(dol_osencode($upload_dir))) ? dol_dir_list($upload_dir, "files", 0, '', '(\.meta$|\.tmp$|_preview.*\.png$|\.preview\.png$)', $sortfield, (strtolower($sortorder) == 'desc' ? SORT_DESC : SORT_ASC), 1) : array();
 $totalsize = 0;
 foreach ($filearray as $key => $file) {
 	$totalsize += $file['size'];
@@ -278,46 +236,7 @@ foreach ($filearray as $key => $file) {
 // ------------------------------------------------------------
 $linkback = '<a href="'.dol_buildpath('/diffusion/diffusion_list.php', 1).'?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
 
-$morehtmlref = '<div class="refidno">';
-/*
- // Ref customer
- $morehtmlref.=$form->editfieldkey("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', 0, 1);
- $morehtmlref.=$form->editfieldval("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', null, null, '', 1);
- // Thirdparty
- $morehtmlref.='<br>'.$langs->trans('ThirdParty') . ' : ' . (is_object($object->thirdparty) ? $object->thirdparty->getNomUrl(1) : '');
- // Project
- if (isModEnabled('project')) {
- $langs->load("projects");
- $morehtmlref.='<br>'.$langs->trans('Project') . ' ';
- if ($permissiontoadd)
- {
- if ($action != 'classify')
- //$morehtmlref.='<a class="editfielda" href="' . $_SERVER['PHP_SELF'] . '?action=classify&token='.newToken().'&id=' . $object->id . '">' . img_edit($langs->transnoentitiesnoconv('SetProject')) . '</a> : ';
- $morehtmlref.=' : ';
- if ($action == 'classify') {
- //$morehtmlref.=$form->form_project($_SERVER['PHP_SELF'] . '?id=' . $object->id, $object->socid, $object->fk_project, 'projectid', 0, 0, 1, 1);
- $morehtmlref.='<form method="post" action="'.$_SERVER['PHP_SELF'].'?id='.$object->id.'">';
- $morehtmlref.='<input type="hidden" name="action" value="classin">';
- $morehtmlref.='<input type="hidden" name="token" value="'.newToken().'">';
- $morehtmlref.=$formproject->select_projects($object->socid, $object->fk_project, 'projectid', $maxlength, 0, 1, 0, 1, 0, 0, '', 1);
- $morehtmlref.='<input type="submit" class="button valignmiddle" value="'.$langs->trans("Modify").'">';
- $morehtmlref.='</form>';
- } else {
- $morehtmlref.=$form->form_project($_SERVER['PHP_SELF'] . '?id=' . $object->id, $object->socid, $object->fk_project, 'none', 0, 0, 0, 1);
- }
- } else {
- if (!empty($object->fk_project)) {
- $proj = new Project($db);
- $proj->fetch($object->fk_project);
- $morehtmlref .= ': '.$proj->getNomUrl();
- } else {
- $morehtmlref .= '';
- }
- }
- }*/
-$morehtmlref .= '</div>';
-
-dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+diffusionPrintObjectBanner($object, $form, $linkback, $permissiontoadd, $action);
 
 print '<div class="fichecenter">';
 
@@ -336,10 +255,9 @@ print '</div>';
 
 print dol_get_fiche_end();
 
-$modulepart = 'diffusion';
 $param = '&id='.$object->id.'&entity='.(int) $entityfordoc;
+$permtoedit = $permissiontoadd;
 //$relativepathwithnofile='diffusion/' . dol_sanitizeFileName($object->id).'/';
-$relativepathwithnofile = $object->element.'/'.dol_sanitizeFileName($object->ref).'/';
 dol_syslog(__METHOD__.' document_actions_post_headers entity='.(int) $entityfordoc.' relativepathwithnofile='.$relativepathwithnofile.' modulepart='.$modulepart, LOG_DEBUG);
 
 $tmperrorreporting = error_reporting();
