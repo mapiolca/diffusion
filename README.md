@@ -66,6 +66,8 @@ Les droits sont séparés pour les objets **Diffusion** et **Contact de diffusio
 
 Pensez à attribuer ces droits aux profils concernés avant mise en production.
 
+Dans la vue d’ensemble d’un projet accessible, le bloc Diffusions et ses compteurs respectent le droit de lecture Diffusion et les entités autorisées, quel que soit le créateur des diffusions. La création et la déliaison restent soumises au droit d’écriture. Les hooks ajoutent leur bloc sans remplacer les contributions des autres modules ; déployer également la correction du hook de LMDB Advanced Project lorsque les deux modules sont utilisés. Voir [les tests de cette intégration](test/README.md) pour le scénario de non-régression et les limites de validation.
+
 ### Traductions
 
 Les fichiers de langue du module sont disponibles dans :
@@ -163,6 +165,8 @@ The module provides an admin setup page to:
 Permissions are split for **Distribution** and **Distribution Contact** objects with read, create/update, and delete levels.
 
 Make sure these rights are assigned to the target user profiles before production use.
+
+On an accessible project's overview, the Diffusion block and counters require Diffusion read permission and respect authorized entities, regardless of who created the distributions. Creation and unlinking still require write permission. The hooks add their entry without replacing other modules' contributions; deploy the corresponding LMDB Advanced Project hook correction when both modules are used. See the [integration regression tests](test/README.md) for coverage and validation limits.
 
 ### Translations
 

@@ -1307,42 +1307,6 @@ class ActionsDiffusion
 	}
 
 	/**
-	 * Check if user can read diffusion objects.
-	 *
-	 * @param User $user Current user
-	 * @return bool
-	 */
-	private function userCanReadDiffusion($user)
-	{
-		if (!is_object($user)) {
-			return false;
-		}
-
-		return (!empty($user->admin)
-			|| $user->hasRight('diffusion', 'diffusiondoc', 'read')
-			|| $user->hasRight('diffusion', 'diffusion', 'read')
-			|| $user->hasRight('diffusion', 'read'));
-	}
-
-	/**
-	 * Check if user can write diffusion objects.
-	 *
-	 * @param User $user Current user
-	 * @return bool
-	 */
-	private function userCanWriteDiffusion($user)
-	{
-		if (!is_object($user)) {
-			return false;
-		}
-
-		return (!empty($user->admin)
-			|| $user->hasRight('diffusion', 'diffusiondoc', 'write')
-			|| $user->hasRight('diffusion', 'diffusion', 'write')
-			|| $user->hasRight('diffusion', 'write'));
-	}
-
-	/**
 	 * Complete project tabs head to include diffusion count on overview tab.
 	 *
 	 * @param array<string,mixed>	$parameters Hook parameters
@@ -1353,11 +1317,19 @@ class ActionsDiffusion
 	 */
 	public function completeTabsHead(&$parameters, &$object, &$action, $hookmanager)
 	{
+		global $user;
+
 		$objectType = !empty($parameters['type']) ? (string) $parameters['type'] : '';
 		if ($objectType !== 'project') {
 			return 0;
 		}
-		if (empty($object) || empty($object->id)) {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
+			return 0;
+		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
 			return 0;
 		}
 		if (empty($parameters['head']) || !is_array($parameters['head'])) {
@@ -1460,13 +1432,15 @@ class ActionsDiffusion
 
 		dol_syslog(__METHOD__ . " called context=" . (is_object($object) && isset($object->element) ? $object->element : 'none') . " action=" . $action, LOG_WARNING);
 
-		if (empty($object) || $object->element !== 'project') {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
 			return 0;
 		}
-		$canReadDiffusion = $this->userCanReadDiffusion($user);
-		if (empty($canReadDiffusion)) {
-			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
+			dol_syslog(__METHOD__ . " skip: diffusion or project read access denied for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
 		}
 
@@ -1474,6 +1448,9 @@ class ActionsDiffusion
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/diffusion.class.php');
 
+		$canWriteDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| $user->hasRight('diffusion', 'diffusion', 'write')
+			|| $user->hasRight('diffusion', 'write');
 		$this->results = array(
 			'diffusion' => array(
 				'name' => $langs->trans('Diffusion'),
@@ -1484,17 +1461,18 @@ class ActionsDiffusion
 				'datefieldname' => 'date_expedition',
 				'margin' => 'minus',
 				'disableamount' => 1,
-				'urlnew' => DOL_URL_ROOT . '/custom/diffusion/diffusion_card.php?action=create&projectid=' . (int) $object->id,
+				'urlnew' => dol_buildpath('/diffusion/diffusion_card.php', 1) . '?action=create&projectid=' . (int) $object->id,
 				'lang' => 'diffusion',
 				'buttonnew' => $langs->trans('NewDiffusion'),
-				'testnew' => ($this->userCanWriteDiffusion($user)),
-				'test' => ($this->userCanReadDiffusion($user)),
+				'testnew' => $canWriteDiffusion,
+				'test' => $canReadDiffusion,
 			),
 		);
 
 		dol_syslog(__METHOD__ . " referent registered for project id=" . ((int) $object->id), LOG_WARNING);
 
-		return 1;
+		// Add our referent without replacing contributions from other modules.
+		return 0;
 	}
 
 	/**
@@ -1512,13 +1490,8 @@ class ActionsDiffusion
 
 		dol_syslog(__METHOD__ . " called context=" . (is_object($object) && isset($object->element) ? $object->element : 'none') . " action=" . $action, LOG_WARNING);
 
-		if (empty($object) || $object->element !== 'project') {
+		if (!($object instanceof Project) || $object->id <= 0 || !isModEnabled('diffusion')) {
 			dol_syslog(__METHOD__ . " skip: not a project context", LOG_DEBUG);
-			return 0;
-		}
-		$canReadDiffusion = $this->userCanReadDiffusion($user);
-		if (empty($canReadDiffusion)) {
-			dol_syslog(__METHOD__ . " skip: missing read right for user id=" . ((int) $user->id), LOG_DEBUG);
 			return 0;
 		}
 		$hasReferentContext = !empty($parameters['key']) || !empty($parameters['element']) || !empty($parameters['objecttype']) || !empty($parameters['type']);
@@ -1529,11 +1502,20 @@ class ActionsDiffusion
 			dol_syslog(__METHOD__ . " skip: unmanaged referent context", LOG_DEBUG);
 			return 0;
 		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $object->restrictedProjectArea($user, 'read') <= 0) {
+			dol_syslog(__METHOD__ . " skip: diffusion or project read access denied for user id=" . ((int) $user->id), LOG_DEBUG);
+			return 0;
+		}
 
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/diffusion.class.php');
 
-		$canWriteDiffusion = $this->userCanWriteDiffusion($user);
+		$canWriteDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| $user->hasRight('diffusion', 'diffusion', 'write')
+			|| $user->hasRight('diffusion', 'write');
 		if ($action === 'unlinkdiffusionfromproject' && !empty($canWriteDiffusion)) {
 			$diffusionId = GETPOSTINT('diffusionid');
 			$diffusionunlink = new Diffusion($this->db);
@@ -1589,7 +1571,7 @@ class ActionsDiffusion
 			$title = $langs->trans($referentValue['title']);
 		}
 
-		$urlnew = DOL_URL_ROOT . '/custom/diffusion/diffusion_card.php?action=create&projectid=' . ((int) $object->id);
+		$urlnew = dol_buildpath('/diffusion/diffusion_card.php', 1) . '?action=create&projectid=' . ((int) $object->id);
 		if (!empty($referentValue['urlnew'])) {
 			$urlnew = (string) $referentValue['urlnew'];
 		}
@@ -1597,9 +1579,9 @@ class ActionsDiffusion
 		if (!empty($referentValue['buttonnew'])) {
 			$buttonTitle = $langs->trans($referentValue['buttonnew']);
 		}
-		$canCreate = $this->userCanWriteDiffusion($user);
+		$canCreate = $canWriteDiffusion;
 		if (array_key_exists('testnew', $referentValue)) {
-			$canCreate = !empty($referentValue['testnew']);
+			$canCreate = $canCreate && !empty($referentValue['testnew']);
 		}
 		if (strpos($urlnew, 'backtopage=') === false) {
 			$backtopage = (string) $_SERVER['REQUEST_URI'];
@@ -1653,7 +1635,7 @@ class ActionsDiffusion
 				}
 
 				$unlinkButton = '';
-				if ($this->userCanWriteDiffusion($user)) {
+				if ($canWriteDiffusion) {
 					$urlunlink = $_SERVER['PHP_SELF'] . '?id=' . ((int) $object->id) . '&action=unlinkdiffusionfromproject&diffusionid=' . ((int) $obj->rowid) . '&token=' . newToken() . '#table_diffusion';
 					$unlinkButton = '<a href="' . dol_escape_htmltag($urlunlink) . '" class="reposition"><span class="fas fa-unlink" title="' . dol_escape_htmltag($langs->trans('Unlink')) . '"></span></a>';
 				}
@@ -1751,14 +1733,20 @@ class ActionsDiffusion
 	 */
 	public function printOverviewProfit($parameters, &$project, &$action, $hookmanager)
 	{
-		global $db, $langs, $form;
+		global $db, $langs, $form, $user;
 
-		dol_syslog(__METHOD__ . " called projectid=" . ((int) $project->id) . " action=" . $action, LOG_DEBUG);
-
-		if (!$this->isDiffusionReferentContext($parameters)) {
-			dol_syslog(__METHOD__ . " skip unmanaged referent context", LOG_DEBUG);
+		if (!($project instanceof Project) || $project->id <= 0 || !isModEnabled('diffusion')
+			|| !$this->isDiffusionReferentContext($parameters)) {
 			return 0;
 		}
+		$canReadDiffusion = $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			|| $user->hasRight('diffusion', 'diffusion', 'read')
+			|| $user->hasRight('diffusion', 'read');
+		if (!$canReadDiffusion || $project->restrictedProjectArea($user, 'read') <= 0) {
+			return 0;
+		}
+
+		dol_syslog(__METHOD__ . " called projectid=" . ((int) $project->id) . " action=" . $action, LOG_DEBUG);
 
 		$value = &$parameters['value'];
 		dol_syslog(__METHOD__ . " datefieldname=" . (!empty($value['datefieldname']) ? $value['datefieldname'] : 'undefined'), LOG_DEBUG);
