@@ -58,6 +58,8 @@ Copiez le dossier du module dans :
 
 Après déploiement, effectuer un rechargement forcé du navigateur pour remplacer l’ancien script éventuellement en cache.
 
+Recharger également Diffusion depuis la liste des modules pour actualiser les hooks enregistrés d’une ancienne installation, en conservant les réglages existants.
+
 Le glisser-déposer natif est disponible dès Dolibarr 20 sur les onglets **Diffusion**, **Fichiers joints** et **Événements/Agenda**, pour une diffusion enregistrée et un utilisateur disposant des droits de lecture et d’écriture. Il suit le réglage JavaScript/Ajax de Dolibarr. L’upload classique reste disponible dans Fichiers joints. Les modèles de diffusion ne reçoivent pas de pièces jointes.
 
 L’aperçu et le téléchargement d’un document existant utilisent le droit de lecture de la diffusion, y compris avec le contrôle par objet de Dolibarr 25. La régénération après dépôt charge la société émettrice native ; une société indisponible produit un message explicite et conserve les fichiers ajoutés.
@@ -171,6 +173,8 @@ Copy the module folder into:
 ### Attachments and public links
 
 Native drag and drop is available from Dolibarr 20 on the **Diffusion**, **Attached files** and **Events/Agenda** tabs for a saved distribution and a user with read/write permission. It follows Dolibarr's JavaScript/Ajax setting; the standard upload remains available. Distribution templates do not accept attachments.
+
+After upgrading, reload Diffusion from the module list to refresh persisted hooks from an older installation while retaining existing settings, then refresh the browser cache.
 
 Previewing and downloading existing documents use the distribution read permission, including Dolibarr 25's per-object check. Regeneration after upload loads the native issuing company; an unavailable issuer produces an explicit error and preserves uploaded files.
 

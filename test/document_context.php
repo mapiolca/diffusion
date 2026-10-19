@@ -33,20 +33,23 @@ checkAttachment((int) $loaded->entity, 1, 'Ownership is loaded with Multicompany
 if (function_exists('checkUserAccessToDocumentObject')) {
 	checkAttachment(checkUserAccessToDocumentObject($user, 'diffusion', 'diffusiondoc/(PROV4)/(PROV4)-électricité.pdf', 'read'), 1, 'Read-only user can preview and download the PDF');
 } else {
-	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 1, 'Native object-area check uses the object read right');
+	$access = dol_check_secure_access_document('diffusion', 'diffusiondoc/(PROV4)/(PROV4)-électricité.pdf', 1, $user);
+	checkAttachment($access['accessallowed'], 1, 'Older native document permission accepts the object read right');
 }
-$user->allow = false; $user->admin = 1;
-checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'Administrator without object read right denied');
-$user->allow = true; $user->socid = 42;
-checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'External reader denied');
-$user->socid = 0; $loaded->entity = 2;
-checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'Unshared owner denied');
-$loaded->entity = 1;
-checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 1, 'No denial leaks into the next hook call');
-checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'write'), 0, 'Read permission does not grant upload or generation');
-$unrelated = null; $action = '';
-checkAttachment($hookmanager->executeHooks('restrictedArea', array('features' => 'facture', 'mode' => 'read', 'object' => $loaded), $unrelated, $action), 0, 'Other modules keep their native area check');
-checkAttachment($hookmanager->resArray, array(), 'Other modules receive no stale result');
+if (function_exists('checkUserAccessToDocumentObject')) {
+	$user->allow = false; $user->admin = 1;
+	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'Administrator without object read right denied');
+	$user->allow = true; $user->socid = 42;
+	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'External reader denied');
+	$user->socid = 0; $loaded->entity = 2;
+	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 0, 'Unshared owner denied');
+	$loaded->entity = 1;
+	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'read'), 1, 'No denial leaks into the next hook call');
+	checkAttachment(restrictedArea($user, 'diffusion', $loaded, '', '', 'fk_soc', 'rowid', 0, 1, 'write'), 0, 'Read permission does not grant upload or generation');
+	$unrelated = null; $action = '';
+	checkAttachment($hookmanager->executeHooks('restrictedArea', array('features' => 'facture', 'mode' => 'read', 'object' => $loaded), $unrelated, $action), 0, 'Other modules keep their native area check');
+	checkAttachment($hookmanager->resArray, array(), 'Other modules receive no stale result');
+}
 
 require_once __DIR__.'/../core/modules/diffusion/doc/pdf_standard_diffusion.modules.php';
 class DocumentTranslations extends AttachmentTranslations

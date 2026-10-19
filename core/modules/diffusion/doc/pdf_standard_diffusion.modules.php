@@ -163,7 +163,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$this->atleastonediscount = 0;
 
 		if (!($mysoc instanceof Societe)) {
-			dol_syslog(get_class($this).'::__construct() Global $mysoc should not be null.'. getCallerInfoString(), LOG_ERR);
+			dol_syslog(get_class($this).'::__construct() Native issuer is not initialized.', LOG_ERR);
 			return;
 		}
 

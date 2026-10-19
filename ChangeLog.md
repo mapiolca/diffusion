@@ -8,8 +8,8 @@
 - EN: Fixed preview denial with Dolibarr 25's per-object document check and issuer loading during regeneration after upload; retained document ownership without Multicompany.
 - FR : Conservation des URL publiques à la validation, déplacements documentaires contrôlés et restauration après échec ; réparation par diffusion des index récupérables sans réupload ni réactivation des partages révoqués.
 - EN: Preserved public URLs during validation, checked file relocation with failure recovery, and added per-distribution index repair without reuploading or reactivating revoked sharing.
-- FR : Contrôles de droits et d’entité renforcés, refus des chemins documentaires indisponibles ; tests de régression et matrice CI Dolibarr 20–25 (v25 alpha identifiée). Aucune modification de schéma ni réactivation du module nécessaire.
-- EN: Strengthened permission/entity checks and rejected unavailable document paths; added regression tests and a Dolibarr 20–25 CI matrix (identified v25 alpha). No schema migration or module reactivation is required.
+- FR : Contrôles de droits et d’entité renforcés, refus des chemins documentaires indisponibles ; tests de régression et matrice CI Dolibarr 20–25 (v25 alpha identifiée). Aucun changement de schéma ; recharger le module après mise à jour pour actualiser les hooks persistés d’une ancienne installation.
+- EN: Strengthened permission/entity checks and rejected unavailable document paths; added regression tests and a Dolibarr 20–25 CI matrix (identified v25 alpha). No schema change; reload the module after upgrading to refresh persisted hooks from an older installation.
 
 ## 1.3.0 (16/06/2026)
 
