@@ -237,35 +237,7 @@ class Diffusion extends CommonObject
                 $this->ismultientitymanaged = 1;
                 $this->isextrafieldmanaged = 1;
 
-                $entity = !empty($conf->entity) ? (int) $conf->entity : 1;
-
-                if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-                        $conf->diffusion = new stdClass();
-                }
-
-			if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-				$conf->diffusion->multidir_output = array();
-			}
-
-			if (empty($conf->diffusion->multidir_output[$entity])) {
-				$conf->diffusion->multidir_output[$entity] = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
-			}
-
-               if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-                       $conf->diffusion = new stdClass();
-               }
-
-			if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-				$conf->diffusion->multidir_output = array();
-			}
-			$conf->diffusion->multidir_output[$entity] = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
-
-               $this->modulepart = 'diffusion';
-               $diffusionoutput = $conf->diffusion->multidir_output[$entity];
-
-               if (!empty($diffusionoutput)) {
-                       dol_mkdir($diffusionoutput);
-               }
+		$this->modulepart = 'diffusion';
 
                 if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
                         $this->fields['rowid']['visible'] = 0;
@@ -798,139 +770,98 @@ class Diffusion extends CommonObject
 	 *
 	 *	@param	User		$user		User making status change
 	 *  @param	int<0,1>	$notrigger	1=Does not execute triggers, 0= execute triggers
-	 *	@return	int<-1,1>				Return integer <=0 if OK, 0=Nothing done, >0 if KO
+	 *	@return	int<-1,1>				1 on success, 0 if already validated, -1 on error
 	 */
 	public function validate($user, $notrigger = 0)
 	{
-		global $conf, $langs;
+		global $langs;
 
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
-		$error = 0;
-
-		// Protection
+		require_once __DIR__.'/diffusionattachments.class.php';
+		$langs->load('diffusion@diffusion');
+		if (!isModEnabled('diffusion') || !$user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| !DiffusionAttachments::checkObjectScope($this, $user) || !empty($this->is_template)) {
+			$this->error = $langs->trans('NotEnoughPermissions');
+			return -1;
+		}
 		if ($this->status == self::STATUS_VALIDATED) {
-			dol_syslog(get_class($this)."::validate action abandoned: already validated", LOG_WARNING);
 			return 0;
 		}
-
-		/* if (! ((!getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('diffusion', 'diffusion', 'write'))
-		 || (getDolGlobalInt('MAIN_USE_ADVANCED_PERMS') && $user->hasRight('diffusion', 'diffusion_advance', 'validate')))
-		 {
-		 $this->error='NotEnoughPermissions';
-		 dol_syslog(get_class($this)."::valid ".$this->error, LOG_ERR);
-		 return -1;
-		 }*/
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// Define new ref
-		if (!$error && (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref))) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = $this->ref;
+		$before = clone $this;
+		if (!$this->db->begin()) {
+			$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+			return -1;
 		}
-		$this->newref = $num;
-
-		if (!empty($num)) {
-			// Validate
-			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
-			$sql .= " SET ";
-			if (!empty($this->fields['ref'])) {
-				$sql .= " ref = '".$this->db->escape($num)."',";
-			}
-			$sql .= " status = ".self::STATUS_VALIDATED;
+		$resql = $this->db->query('SELECT ref, status, entity FROM '.MAIN_DB_PREFIX.$this->table_element.' WHERE rowid = '.((int) $this->id).' FOR UPDATE');
+		$stored = $resql ? $this->db->fetch_object($resql) : false;
+		if ($resql) {
+			$this->db->free($resql);
+		}
+		if (!is_object($stored) || $stored->ref !== $this->ref || (int) $stored->status !== (int) $this->status || (int) $stored->entity !== (int) $this->entity) {
+			$this->db->rollback();
+			$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+			return -1;
+		}
+		$num = (preg_match('/^[\(]?PROV/i', $this->ref) || $this->ref === '') ? $this->getNextNumRef() : $this->ref;
+		if (!is_string($num) || $num === '') {
+			$this->db->rollback();
+			$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+			return -1;
+		}
+		$documents = new DiffusionAttachments($this->db);
+		$error = 0;
+		if ($num !== $this->ref && $documents->relocate($this, $num, $user) < 0) {
+			$this->error = $langs->trans($documents->error);
+			$error++;
+		}
+		if (!$error) {
+			$sql = 'UPDATE '.MAIN_DB_PREFIX.$this->table_element;
+			$sql .= " SET ref = '".$this->db->escape($num)."', status = ".self::STATUS_VALIDATED;
 			if (!empty($this->fields['date_validation'])) {
-				$sql .= ", date_validation = '".$this->db->idate($now)."'";
+				$sql .= ", date_validation = '".$this->db->idate(dol_now())."'";
 			}
 			if (!empty($this->fields['fk_user_valid'])) {
-				$sql .= ", fk_user_valid = ".((int) $user->id);
+				$sql .= ', fk_user_valid = '.((int) $user->id);
 			}
-			$sql .= " WHERE rowid = ".((int) $this->id);
-
-			dol_syslog(get_class($this)."::validate()", LOG_DEBUG);
-			$resql = $this->db->query($sql);
-			if (!$resql) {
-				dol_print_error($this->db);
+			$sql .= ", last_main_doc = '".$this->db->escape((string) $this->last_main_doc)."'";
+			$sql .= ' WHERE rowid = '.((int) $this->id);
+			if (!$this->db->query($sql)) {
 				$this->error = $this->db->lasterror();
 				$error++;
 			}
-
-			if (!$error && !$notrigger) {
-				$langs->load('diffusion@diffusion');
-				$this->actionmsg2 = $langs->transnoentities('DiffusionValidatedInDolibarr', ($this->newref ? $this->newref : $this->ref));
-				$this->actionmsg = $this->actionmsg2;
-				// Call trigger
-				$result = $this->call_trigger('DIFFUSION_VALIDATE', $user);
-				if ($result < 0) {
-					$error++;
-				}
-				// End call triggers
-			}
 		}
-
 		if (!$error) {
 			$this->oldref = $this->ref;
-
-			// Rename directory if dir was a temporary ref
-			if (preg_match('/^[\(]?PROV/i', $this->ref)) {
-				// Now we rename also files into index
-				$sql = 'UPDATE '.MAIN_DB_PREFIX."ecm_files set filename = CONCAT('".$this->db->escape($this->newref)."', SUBSTR(filename, ".(strlen($this->ref) + 1).")), filepath = 'diffusion/".$this->element."/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filename LIKE '".$this->db->escape($this->ref)."%' AND filepath = 'diffusion/".$this->element."/".$this->db->escape($this->ref)."' and entity = ".((int) (!empty($this->entity) ? $this->entity : 1));
-				$resql = $this->db->query($sql);
-				if (!$resql) {
+			$this->oldcopy = $before;
+			$this->ref = $num;
+			$this->newref = $num;
+			$this->status = self::STATUS_VALIDATED;
+			if (!$notrigger) {
+				$this->actionmsg2 = $langs->transnoentities('DiffusionValidatedInDolibarr', $num);
+				$this->actionmsg = $this->actionmsg2;
+				// Historical notification contract retained; no new transition trigger is introduced.
+				if ($this->call_trigger('DIFFUSION_VALIDATE', $user) < 0) {
 					$error++;
-					$this->error = $this->db->lasterror();
 				}
-				$sql = 'UPDATE '.MAIN_DB_PREFIX."ecm_files set filepath = 'diffusion/".$this->element."/".$this->db->escape($this->newref)."'";
-				$sql .= " WHERE filepath = 'diffusion/".$this->element."/".$this->db->escape($this->ref)."' and entity = ".((int) (!empty($this->entity) ? $this->entity : 1));
-				$resql = $this->db->query($sql);
-				if (!$resql) {
-					$error++;
-					$this->error = $this->db->lasterror();
-				}
-
-				// We rename directory ($this->ref = old ref, $num = new ref) in order not to lose the attachments
-				$oldref = dol_sanitizeFileName($this->ref);
-				$newref = dol_sanitizeFileName($num);
-				$dirsource = $conf->diffusion->multidir_output[!empty($this->entity) ? (int) $this->entity : 1].'/'.$this->element.'/'.$oldref;
-				$dirdest = $conf->diffusion->multidir_output[!empty($this->entity) ? (int) $this->entity : 1].'/'.$this->element.'/'.$newref;
-				if (!$error && file_exists($dirsource)) {
-					dol_syslog(get_class($this)."::validate() rename dir ".$dirsource." into ".$dirdest);
-
-					if (@rename($dirsource, $dirdest)) {
-						dol_syslog("Rename ok");
-						// Rename docs starting with $oldref with $newref
-						$listoffiles = dol_dir_list($conf->diffusion->multidir_output[!empty($this->entity) ? (int) $this->entity : 1].'/'.$this->element.'/'.$newref, 'files', 1, '^'.preg_quote($oldref, '/'));
-						foreach ($listoffiles as $fileentry) {
-							$dirsource = $fileentry['name'];
-							$dirdest = preg_replace('/^'.preg_quote($oldref, '/').'/', $newref, $dirsource);
-							$dirsource = $fileentry['path'].'/'.$dirsource;
-							$dirdest = $fileentry['path'].'/'.$dirdest;
-							@rename($dirsource, $dirdest);
-						}
-					}
-				}
+				$this->actionmsg = $this->actionmsg2 = '';
 			}
 		}
-
-		// Set new ref and current status
-		if (!$error) {
-			$this->ref = $num;
-			$this->status = self::STATUS_VALIDATED;
-		}
-
-		if (!$error) {
-			$this->db->commit();
+		if (!$error && $this->db->commit() > 0) {
 			return 1;
-		} else {
-			$this->db->rollback();
-			return -1;
 		}
+		$this->db->rollback();
+		if (!$documents->rollbackMoves()) {
+			$this->errors[] = $langs->trans($documents->error);
+		}
+		$this->ref = $before->ref;
+		$this->newref = $before->newref;
+		$this->oldref = $before->oldref;
+		$this->status = $before->status;
+		$this->last_main_doc = $before->last_main_doc;
+		if (empty($this->error)) {
+			$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+		}
+		return -1;
 	}
-
 
 	/**
 	 *	Set draft status

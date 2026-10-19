@@ -67,6 +67,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/doleditor.class.php';
 
 
 dol_include_once('/diffusion/class/diffusion.class.php');
+dol_include_once('/diffusion/class/diffusionattachments.class.php');
 dol_include_once('/diffusion/class/diffusioncontact.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
@@ -505,31 +506,21 @@ if (empty($action) && empty($id) && empty($ref)) {
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'include', not 'include_once'.
 
 
-$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
-$permissiontodelete = ((!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'delete'))) || ($permissiontoadd && isset($object->status) && $object->status == $object::STATUS_DRAFT);
+$permissiontoread = $user->hasRight('diffusion', 'diffusiondoc', 'read');
+$permissiontoadd = $user->hasRight('diffusion', 'diffusiondoc', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_lineupdown.inc.php
+$permissiontodelete = $user->hasRight('diffusion', 'diffusiondoc', 'delete');
 $permissionnote = $permissiontoadd; // Used by the include of actions_setnotes.inc.php
 $permissiondellink = $permissiontoadd; // Used by the include of actions_dellink.inc.php
 
 
 $entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
 $upload_dir = diffusionGetDocumentUploadDir($object);
-if (!empty($upload_dir)) {
-	diffusionMigrateFlatDocumentDirectory($db, $object);
-}
 dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 //include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
 // EN: Manage attachment upload and deletion with Dolibarr helper to keep buttons functional.
 // FR: Gère l'envoi et la suppression des pièces jointes avec l'aide Dolibarr pour garder les boutons fonctionnels.
 // Delete file in doc form
-if ($action == 'remove_file' && $permissiontoadd && $object->id > 0) {
-	$filetodelete = GETPOST('file', 'alpha');
-	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete, LOG_DEBUG);
-	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, $filetodelete);
-	$action = '';
-}
-
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
 //if ($user->socid > 0) $socid = $user->socid;
@@ -541,8 +532,20 @@ if (!isModEnabled('diffusion')) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
+if ($object->id > 0 && !DiffusionAttachments::checkObjectScope($object, $user)) {
+	accessforbidden();
+}
 
 $error = 0;
+
+if ($action == 'remove_file' && $permissiontoadd && $object->id > 0 && empty($object->is_template)) {
+	$filetodelete = GETPOST('file', 'alpha');
+	dol_syslog(__METHOD__.' remove_file entity='.(int) $entityfordoc.' file_param='.$filetodelete, LOG_DEBUG);
+	diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, $filetodelete);
+	$action = '';
+}
+
+
 
 
 /*
@@ -600,7 +603,14 @@ if (empty($reshook)) {
 		if ($action == 'add') {
 			$object->model_source = GETPOSTINT('model_source') ?: GETPOSTINT('fromtemplateid');
 		}
+		$validationrequested = ($action === 'confirm_validate' && $confirm === 'yes');
 		include DOL_DOCUMENT_ROOT.'/core/actions_addupdatedelete.inc.php';
+		$upload_dir = diffusionGetDocumentUploadDir($object);
+		$entityfordoc = (int) $object->entity;
+		if ($validationrequested && isset($result) && $result >= 0 && (int) $object->status === Diffusion::STATUS_VALIDATED) {
+			header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+			exit;
+		}
 
 	// Actions when linking object each other
 	include DOL_DOCUMENT_ROOT.'/core/actions_dellink.inc.php';
@@ -613,18 +623,27 @@ if (empty($reshook)) {
 	$modulepart = diffusionGetDocumentModulepart();
 	$relativepathwithnofile = diffusionGetDocumentRelativePath($object);
 	$diffusionfileupload = (GETPOST('sendit', 'alpha') && !empty($_FILES['userfile']));
+	if (!empty($object->is_template) && ($diffusionfileupload || in_array($action, array('remove_file', 'confirm_deletefile', 'renamefile'), true))) {
+		accessforbidden();
+	}
 	$diffusionfilerename = ($action == 'renamefile' && GETPOST('renamefilesave', 'alpha'));
 	$diffusionrenamefrom = $diffusionfilerename ? dol_sanitizeFileName(GETPOST('renamefilefrom', 'alpha'), '_', 0) : '';
 	$diffusionrenameto = $diffusionfilerename ? dol_string_nohtmltag(dol_sanitizeFileName(GETPOST('renamefileto', 'alpha'), '_', 0)) : '';
+	if ($upload_dir === '' && ($action === 'builddoc' || GETPOST('sendit', 'alpha'))) {
+		accessforbidden($langs->trans('DiffusionDocumentDirectoryUnavailable'));
+	}
 	if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissiontoadd) && GETPOST('urlfile', 'alpha')) {
 		diffusionDeleteLinkedFileAndRegenerate($db, $object, $upload_dir, $user, $langs, GETPOST('urlfile', 'alpha', 0, null, null, 1));
 		$tmpurl = !empty($backtopage) ? $backtopage : $_SERVER["PHP_SELF"].'?id='.$object->id;
 		header('Location: '.$tmpurl);
 		exit;
 	}
+	$filesbeforeupload = $diffusionfileupload && is_dir($upload_dir) ? array_column(dol_dir_list($upload_dir, 'files', 0), 'name') : array();
 	include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
 	if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionRegenerateDocumentAfterLinkedFileChange')) {
-		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload');
+		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload', array_values(array_diff(array_column(dol_dir_list($upload_dir, 'files', 0), 'name'), $filesbeforeupload)));
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+		exit;
 	}
 	if ($diffusionfilerename && !empty($permissiontoadd) && empty($error) && $diffusionrenamefrom !== $diffusionrenameto && is_file(diffusionResolveLinkedFilePath($object, $upload_dir, $diffusionrenameto)) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenamefrom) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenameto)) {
 		diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'rename');
@@ -1104,7 +1123,7 @@ if (($id || $ref) && $action == 'edit') {
 if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'create'))) {
 	$head = diffusionPrepareHead($object);
 
-	print dol_get_fiche_head($head, 'card', $langs->trans((!empty($object->is_template) ? "DiffusionModele" : "Diffusion")), -1, $object->picto, 0, '', '', 0, '', 1);
+	print dol_get_fiche_head($head, 'card', $langs->trans((!empty($object->is_template) ? "DiffusionModele" : "Diffusion")), -1, $object->picto, 0, '', '', 0, '', diffusionUseNativeFileDrop($object, $permissiontoadd));
 
 	$formconfirm = '';
 
@@ -1480,14 +1499,16 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			$relativepath = rtrim(diffusionGetDocumentRelativePath($object), '/');
 			$filedir = $upload_dir;
 			$urlsource = $_SERVER["PHP_SELF"]."?id=".$object->id.'&entity='.(int) $entityfordoc;
-			$genallowed = $permissiontoread; // If you can read, you can build the PDF to read content
+			$genallowed = $permissiontoadd; // Generating a document requires write permission.
 			$delallowed = $permissiontoadd; // If you can create/edit, you can remove a file on card
 			$modulepart = diffusionGetDocumentModulepart();
 			dol_syslog(__METHOD__.' showdocuments entity='.(int) $entityfordoc.' relativepath='.$relativepath.' filedir='.$filedir.' modulepart='.$modulepart, LOG_DEBUG);
 			$tmperrorreporting = error_reporting();
 			error_reporting($tmperrorreporting & ~E_WARNING);
 			$moreparam = '&entity='.(int) $entityfordoc;
-			print $formfile->showdocuments($modulepart, $relativepath, $filedir, $urlsource, $genallowed, $delallowed, $object->model_pdf, 1, 0, 0, 28, 0, $moreparam, '', '', $langs->defaultlang);
+			if ($filedir !== '') {
+				print $formfile->showdocuments($modulepart, $relativepath, $filedir, $urlsource, $genallowed, $delallowed, $object->model_pdf, 1, 0, 0, 28, 0, $moreparam, '', '', $langs->defaultlang);
+			}
 			error_reporting($tmperrorreporting);
 		}
 		/*

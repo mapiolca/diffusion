@@ -399,3 +399,11 @@ Notify_DIFFUSIONCONTACT_INSERT=Ajout d'un contact de diffusion
 Notify_DIFFUSIONCONTACT_DELETELINE=Retrait d'un contact de diffusion
 Notify_DIFFUSIONCONTACT_UPDATELINE=Modification d'un contact de diffusion
 Notify_DIFFUSIONCONTACT_DELETEALL=Suppression des contacts de diffusion
+
+DiffusionRepairAttachmentLinks=Réparer les liens des pièces jointes
+DiffusionAttachmentRepairResult=Pièces jointes : %s réparée(s), %s index recréé(s) sans ancienne clé publique, %s conflit(s) laissé(s) inchangé(s). Si une ancienne clé manque, créez une nouvelle URL avec le partage natif.
+DiffusionAttachmentOperationFailed=La mise à jour des pièces jointes a échoué. Vérifiez le répertoire documentaire, les collisions et l’index des fichiers.
+DiffusionAttachmentRestoreFailed=La restauration des fichiers est incomplète. Une intervention est nécessaire avant de réessayer.
+DiffusionDocumentDirectoryUnavailable=Le répertoire documentaire de l’entité propriétaire est indisponible.
+DiffusionCompatibilityFeatureDragDrop=Glisser-déposer natif des pièces jointes
+DiffusionCompatibilityFeatureDragDropDesc=Disponible dès Dolibarr 20 dans les onglets Diffusion, Fichiers joints et Événements/Agenda, avec droit d’écriture et JavaScript/Ajax actif.

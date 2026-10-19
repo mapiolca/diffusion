@@ -1,5 +1,7 @@
 # Diffusion for Dolibarr ERP/CRM
 
+Version du code / Code version: **1.4.0**.
+
 ## 🇫🇷 Français
 
 ### Présentation
@@ -51,6 +53,16 @@ Copiez le dossier du module dans :
 - Vérifiez que les répertoires de données du module sont accessibles en écriture.
 - Vérifiez les permissions utilisateurs/groupes liées aux diffusions.
 - Vérifiez les constantes de configuration (numérotation, modèles, automatisations agenda).
+
+### Pièces jointes et liens publics
+
+Après déploiement, effectuer un rechargement forcé du navigateur pour remplacer l’ancien script éventuellement en cache.
+
+Le glisser-déposer natif est disponible dès Dolibarr 20 sur les onglets **Diffusion**, **Fichiers joints** et **Événements/Agenda**, pour une diffusion enregistrée et un utilisateur disposant des droits de lecture et d’écriture. Il suit le réglage JavaScript/Ajax de Dolibarr. L’upload classique reste disponible dans Fichiers joints. Les modèles de diffusion ne reçoivent pas de pièces jointes.
+
+Une validation conserve les clés publiques existantes des pièces jointes, y compris avec Multicompany. Les nouveaux fichiers suivent l’option de partage automatique ; une validation ou une réparation ne crée pas de nouvelle clé et ne réactive pas un partage révoqué.
+
+Pour les anciens liens cassés, utiliser **Fichiers joints > Réparer les liens des pièces jointes**. Cette action concerne uniquement la diffusion affichée et ne nécessite aucun réupload. Elle conserve l’ancienne URL lorsque son index et sa clé peuvent être identifiés avec certitude. Si la clé a disparu, une nouvelle URL doit être créée avec le partage natif. Les conflits sont signalés sans fusion automatique des identités publiques. Consulter [les preuves et limites des tests](test/README.md#attachment-regression--140).
 
 ### Configuration
 
@@ -153,6 +165,12 @@ Copy the module folder into:
 - Check that module data directories are writable.
 - Check user/group permissions for distributions.
 - Check module constants (numbering, templates, automatic agenda actions).
+
+### Attachments and public links
+
+Native drag and drop is available from Dolibarr 20 on the **Diffusion**, **Attached files** and **Events/Agenda** tabs for a saved distribution and a user with read/write permission. It follows Dolibarr's JavaScript/Ajax setting; the standard upload remains available. Distribution templates do not accept attachments.
+
+Validation preserves existing public attachment URLs, including across entities. New uploads follow the automatic-sharing setting; validation and repair do not generate keys or reactivate revoked sharing. Use **Attached files > Repair attachment links** to recover a reliable old index without reuploading. Missing original keys require a new URL through native sharing. Ambiguous public identities are reported unchanged. See the [test evidence and limits](test/README.md#attachment-regression--140).
 
 ### Configuration
 

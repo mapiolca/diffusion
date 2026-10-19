@@ -85,6 +85,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
 dol_include_once('/diffusion/class/diffusion.class.php');
+dol_include_once('/diffusion/class/diffusionattachments.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 
 /**
@@ -158,25 +159,10 @@ $extrafields->fetch_name_optionals_label($object->table_element);
 
 // Load object
 include DOL_DOCUMENT_ROOT.'/core/actions_fetchobject.inc.php'; // Must be 'include', not 'include_once'. Include fetch and fetch_thirdparty but not fetch_optionals
-if ($id > 0 || !empty($ref)) {
-	$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
-	if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-		$conf->diffusion = new stdClass();
-	}
-	if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-		$conf->diffusion->multidir_output = array();
-	}
-	if (empty($conf->diffusion->multidir_output[$entityfordoc])) {
-		$conf->diffusion->multidir_output[$entityfordoc] = DOL_DATA_ROOT.($entityfordoc > 1 ? '/'.$entityfordoc : '').'/diffusion';
-	}
-	$upload_dir = function_exists('getMultidirOutput') ? getMultidirOutput($object, 'diffusion', 1) : '';
-	if (empty($upload_dir)) {
-		$upload_dir = $conf->diffusion->multidir_output[$entityfordoc].'/'.dol_sanitizeFileName($object->ref);
-	}
-}
+$upload_dir = diffusionGetDocumentUploadDir($object);
 
-$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-$permissiontoadd = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write'));
+$permissiontoread = $user->hasRight('diffusion', 'diffusiondoc', 'read');
+$permissiontoadd = $user->hasRight('diffusion', 'diffusiondoc', 'write');
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
@@ -187,6 +173,9 @@ if (!isModEnabled("diffusion")) {
 	accessforbidden();
 }
 if (!$permissiontoread) {
+	accessforbidden();
+}
+if ($object->id > 0 && !DiffusionAttachments::checkObjectScope($object, $user)) {
 	accessforbidden();
 }
 
@@ -241,7 +230,7 @@ if ($object->id > 0) {
 	$head = diffusionPrepareHead($object);
 
 
-	print dol_get_fiche_head($head, 'agenda', $langs->trans("Diffusion"), -1, $object->picto);
+	print dol_get_fiche_head($head, 'agenda', $langs->trans("Diffusion"), -1, $object->picto, 0, '', '', 0, '', diffusionUseNativeFileDrop($object, $permissiontoadd));
 
 	// Object card
 	// ------------------------------------------------------------

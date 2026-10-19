@@ -399,3 +399,11 @@ Notify_DIFFUSIONCONTACT_INSERT=Diffusion contact added
 Notify_DIFFUSIONCONTACT_DELETELINE=Diffusion contact removed
 Notify_DIFFUSIONCONTACT_UPDATELINE=Diffusion contact updated
 Notify_DIFFUSIONCONTACT_DELETEALL=Diffusion contacts deleted
+
+DiffusionRepairAttachmentLinks=Repair attachment links
+DiffusionAttachmentRepairResult=Attachments: %s repaired, %s indexes recreated without the original public key, %s conflicts left unchanged. If an original key is missing, create a new URL using native sharing.
+DiffusionAttachmentOperationFailed=Attachments could not be updated. Check the document directory, name collisions and file index.
+DiffusionAttachmentRestoreFailed=File restoration is incomplete. Intervention is required before trying again.
+DiffusionDocumentDirectoryUnavailable=The document directory of the owning entity is unavailable.
+DiffusionCompatibilityFeatureDragDrop=Native attachment drag and drop
+DiffusionCompatibilityFeatureDragDropDesc=Available from Dolibarr 20 on the Diffusion, Attached files and Events/Agenda tabs, with write permission and JavaScript/Ajax enabled.

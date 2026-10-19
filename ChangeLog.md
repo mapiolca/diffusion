@@ -1,5 +1,14 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.0 (à publier / unreleased)
+
+- FR : Correction de l’interception des uploads des autres modules et ajout du glisser-déposer natif dans les trois onglets documentaires des diffusions, avec conservation de l’upload classique.
+- EN: Fixed interference with other modules' uploads and enabled native drag and drop on the three distribution tabs while retaining standard uploads.
+- FR : Conservation des URL publiques à la validation, déplacements documentaires contrôlés et restauration après échec ; réparation par diffusion des index récupérables sans réupload ni réactivation des partages révoqués.
+- EN: Preserved public URLs during validation, checked file relocation with failure recovery, and added per-distribution index repair without reuploading or reactivating revoked sharing.
+- FR : Contrôles de droits et d’entité renforcés, refus des chemins documentaires indisponibles ; tests de régression et matrice CI Dolibarr 20–25 (v25 alpha identifiée). Aucune modification de schéma ni réactivation du module nécessaire.
+- EN: Strengthened permission/entity checks and rejected unavailable document paths; added regression tests and a Dolibarr 20–25 CI matrix (identified v25 alpha). No schema migration or module reactivation is required.
+
 ## 1.3.0 (16/06/2026)
 
 - FR: Harmonisation des entêtes des onglets Diffusion, Fichiers joints et Événements/Agenda, ajout de la miniature du PDF généré dans l'entête et régénération automatique du PDF après modification des pièces jointes.
