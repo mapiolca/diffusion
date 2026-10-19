@@ -162,7 +162,7 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 		$this->atleastoneratenotnull = 0;
 		$this->atleastonediscount = 0;
 
-		if ($mysoc === null) {
+		if (!($mysoc instanceof Societe)) {
 			dol_syslog(get_class($this).'::__construct() Global $mysoc should not be null.'. getCallerInfoString(), LOG_ERR);
 			return;
 		}
@@ -198,6 +198,11 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			$outputlangs = $langs;
 		}
 
+		if (!($this->emetteur instanceof Societe)) {
+			$outputlangs->load('diffusion@diffusion');
+			$this->error = $outputlangs->trans('DiffusionDocumentIssuerUnavailable');
+			return -1;
+		}
 		$this->setEmitterFromObjectEntity($object, $outputlangs);
 		// For backward compatibility with FPDF, force output charset to ISO, because FPDF expect text to be encoded in ISO
 		if (getDolGlobalInt('MAIN_USE_FPDF')) {

@@ -243,7 +243,8 @@ class Diffusion extends CommonObject
                         $this->fields['rowid']['visible'] = 0;
                 }
 		if (!isModEnabled('multicompany') && isset($this->fields['entity'])) {
-			$this->fields['entity']['enabled'] = 0;
+			// Ownership is required even without Multicompany; only hide the field.
+			$this->fields['entity']['visible'] = 0;
 		}
 
 		// Example to show how to set values of fields definition dynamically

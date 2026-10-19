@@ -407,3 +407,4 @@ DiffusionAttachmentRestoreFailed=File restoration is incomplete. Intervention is
 DiffusionDocumentDirectoryUnavailable=The document directory of the owning entity is unavailable.
 DiffusionCompatibilityFeatureDragDrop=Native attachment drag and drop
 DiffusionCompatibilityFeatureDragDropDesc=Available from Dolibarr 20 on the Diffusion, Attached files and Events/Agenda tabs, with write permission and JavaScript/Ajax enabled.
+DiffusionDocumentIssuerUnavailable=The issuing company could not be loaded. The PDF was not generated; attached files have been preserved.

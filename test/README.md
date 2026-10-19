@@ -32,6 +32,7 @@ Before deployment acceptance, verify both modified files are served, compare the
 
 ```sh
 php -d extension=pdo_sqlite test/attachments.php ../dolibarr/htdocs
+php -d extension=pdo_sqlite test/document_context.php ../dolibarr/htdocs
 node test/attachment_upload.js
 ```
 
@@ -40,6 +41,8 @@ The PHP runner uses the actual native `EcmFiles`, `dol_move()`, `dol_move_dir()`
 Coverage includes exact public-key/ECM-ID preservation and identical file bytes after validation in entities 1 and 2, canonical/legacy layouts, accented names, reference prefixes, main-document paths, SQL/trigger/commit failure recovery, target collisions, stale validation, conservative recovery of a shared orphan with a native neutral mirror, ambiguous public identities, revoked sharing, absent indexes and missing owner-directory configuration, simulated shared-owner scope, traversal and automatic-sharing selection. Public download resolution is checked against the ECM path and file bytes; the HTTP `document.php` endpoint is not executed.
 
 The Node runner checks the actual module completion code with a simulated DOM and Ajax transport: supplier orders, invoices, customer orders, projects and products with the same ID remain untouched; foreign endpoints/IDs, duplicate initialization, multiple files, partial success, invalid/empty responses and PDF failures are covered. No browser request or actual HTTP upload is made.
+
+`document_context.php` reuses the attachment fixtures (86 assertions), then adds **17 assertions** with the native object resolver, `CommonObject::fetchCommon()`, HookManager, `restrictedArea()` and PDF model. On a core exposing `checkUserAccessToDocumentObject()`, it executes that function too; older versions exercise the existing native area check. The v25 preview refusal was reproduced before the fix (reader has only `diffusion.diffusiondoc.read`, result 0). The existing `elementproperties` registration loads the hook class; the native manager retains its loaded hooks for the subsequent area check. No new global hook or activation is needed. The tests cover reader/admin denial, external and unshared owners, successive hook results, write denial, native issuer preparation, controlled missing-issuer failure, uploaded-file preservation and actual Ajax bootstrap flags. They do not render a complete PDF or execute an HTTP endpoint.
 
 ## Evidence — 2026-10-19
 

@@ -1022,6 +1022,33 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Apply the Diffusion object read right in native document-object checks.
+	 * The native resolver loads our existing elementproperties context before restrictedArea().
+	 * No module-level read permission exists, and project/entity restrictions still apply.
+	 *
+	 * @param array<string,mixed> $parameters Native area parameters
+	 * @param CommonObject|null $object Hook object (the area object is in parameters)
+	 * @param string $action Current action
+	 * @param HookManager $hookmanager Native manager
+	 * @return int
+	 */
+	public function restrictedArea($parameters, &$object, &$action, $hookmanager)
+	{
+		$areaobject = isset($parameters['object']) ? $parameters['object'] : null;
+		if (($parameters['features'] ?? '') !== 'diffusion' || ($parameters['mode'] ?? '') !== 'read'
+			|| !($areaobject instanceof Diffusion)) {
+			return 0;
+		}
+		global $user;
+		require_once __DIR__.'/../../class/diffusionattachments.class.php';
+		$allowed = isModEnabled('diffusion') && $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			&& DiffusionAttachments::checkObjectScope($areaobject, $user);
+		// Set the result after nested project checks, which use the same HookManager.
+		$this->results = array('result' => $allowed ? 1 : 0);
+		return 1;
+	}
+
+	/**
 	 * Replace the default Diffusion banner pictogram with the generated PDF preview when available.
 	 *
 	 * @param array<string,mixed> $parameters Hook parameters

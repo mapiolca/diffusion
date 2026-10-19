@@ -407,3 +407,4 @@ DiffusionAttachmentRestoreFailed=La restauration des fichiers est incomplète. U
 DiffusionDocumentDirectoryUnavailable=Le répertoire documentaire de l’entité propriétaire est indisponible.
 DiffusionCompatibilityFeatureDragDrop=Glisser-déposer natif des pièces jointes
 DiffusionCompatibilityFeatureDragDropDesc=Disponible dès Dolibarr 20 dans les onglets Diffusion, Fichiers joints et Événements/Agenda, avec droit d’écriture et JavaScript/Ajax actif.
+DiffusionDocumentIssuerUnavailable=La société émettrice n’a pas pu être chargée. Le PDF n’a pas été généré ; les pièces jointes sont conservées.
