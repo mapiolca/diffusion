@@ -85,10 +85,10 @@ class DiffusionAttachments
 		return true;
 	}
 
-	/** @return int Always -1; callers roll back their SQL transaction. */
-	private function fail()
+	/** @param string $message Translation key; no physical path is exposed. @return int Always -1. */
+	private function fail($message = 'DiffusionAttachmentOperationFailed')
 	{
-		$this->error = 'DiffusionAttachmentOperationFailed';
+		$this->error = $message;
 		return -1;
 	}
 
@@ -114,7 +114,7 @@ class DiffusionAttachments
 			return $this->fail();
 		}
 		if (is_dir($source) && is_dir($flat)) {
-			return $this->fail();
+			return $this->fail('DiffusionAttachmentDirectoryConflict');
 		}
 		if (!is_dir($source) && is_dir($flat)) {
 			$source = $flat;
@@ -123,7 +123,7 @@ class DiffusionAttachments
 			return 0;
 		}
 		if (!self::isSafeDirectory($source, true) || file_exists($target)) {
-			return $this->fail();
+			return $this->fail('DiffusionAttachmentPathConflict');
 		}
 		$oldrelative = diffusionGetDocumentPathRelativeToDataRoot($source);
 		$newrelative = diffusionGetDocumentPathRelativeToDataRoot($target);
@@ -138,7 +138,7 @@ class DiffusionAttachments
 			$newname = strpos($name, $oldref) === 0 ? $newref.substr($name, strlen($oldref)) : $name;
 			$newpath = (dirname($relative) === '.' ? '' : dirname($relative).'/').$newname;
 			if (isset($destinations[$newpath])) {
-				return $this->fail();
+				return $this->fail('DiffusionAttachmentPathConflict');
 			}
 			$destinations[$newpath] = true;
 			$names[$relative] = $newpath;
@@ -156,20 +156,20 @@ class DiffusionAttachments
 			if ($entry->fetch((int) $row->rowid) <= 0
 				|| (!empty($entry->src_object_id) && ((int) $entry->src_object_id !== (int) $object->id || !in_array($entry->src_object_type, array($object->table_element, $object->element, 'diffusiondoc@diffusion'), true)))) {
 				$this->db->free($resql);
-				return $this->fail();
+				return $this->fail('DiffusionAttachmentIndexConflict');
 			}
 			$entries[] = $entry;
 		}
 		$this->db->free($resql);
 		if (dol_mkdir(dirname($target)) < 0 || !dol_move_dir($source, $target, 0, 0, 0)) {
-			return $this->fail();
+			return $this->fail('DiffusionAttachmentMoveFailed');
 		}
 		$this->moves[] = array($source, $target, true);
 		// Rename prefixed files without overwriting another attachment (including rename cycles).
 		foreach ($names as $before => $after) {
 			if ($before !== $after) {
 				if (!dol_move($target.'/'.$before, $target.'/'.$after, '0', 0, 0, 0)) {
-					return $this->fail();
+					return $this->fail('DiffusionAttachmentMoveFailed');
 				}
 				$this->moves[] = array($target.'/'.$before, $target.'/'.$after, false);
 			}
@@ -178,7 +178,7 @@ class DiffusionAttachments
 			$relative = ltrim(substr($entry->filepath, strlen($oldrelative)).'/'.$entry->filename, '/');
 			$physical = isset($names[$relative]) ? $relative : $relative.'.noexe';
 			if (!isset($names[$physical])) {
-				return $this->fail();
+				return $this->fail('DiffusionAttachmentIndexedFileMissing');
 			}
 			$newpath = preg_replace('/\.noexe$/', '', $names[$physical]);
 			$entry->filepath = $newrelative.(dirname($newpath) === '.' ? '' : '/'.dirname($newpath));
