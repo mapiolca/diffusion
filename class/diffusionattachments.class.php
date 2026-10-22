@@ -110,6 +110,7 @@ class DiffusionAttachments
 		$targetobject = clone $object;
 		$targetobject->ref = $newref;
 		$target = diffusionGetDocumentUploadDir($targetobject);
+		$targetflat = diffusionGetFlatDocumentUploadDir($targetobject);
 		if ($base === '' || $source === '' || $target === '' || !self::isSafeDirectory($base)) {
 			return $this->fail();
 		}
@@ -119,10 +120,14 @@ class DiffusionAttachments
 		if (!is_dir($source) && is_dir($flat)) {
 			$source = $flat;
 		}
+		// A draft with no directory must not adopt files left under its future reference.
+		if (file_exists($target) || ($targetflat !== '' && file_exists($targetflat))) {
+			return $this->fail('DiffusionAttachmentPathConflict');
+		}
 		if (!is_dir($source)) {
 			return 0;
 		}
-		if (!self::isSafeDirectory($source, true) || file_exists($target)) {
+		if (!self::isSafeDirectory($source, true)) {
 			return $this->fail('DiffusionAttachmentPathConflict');
 		}
 		$oldrelative = diffusionGetDocumentPathRelativeToDataRoot($source);

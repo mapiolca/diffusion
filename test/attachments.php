@@ -161,6 +161,40 @@ foreach (array('begin', 'sql', 'trigger', 'commit', 'collision') as $failure) {
 	checkAttachment(attachmentRow($db)->share, 'fixture-public-key', 'Share survives rollback');
 	clearAttachmentFixture();
 }
+foreach (array(false, true) as $sourcepresent) {
+	foreach (array(false, true) as $flattarget) {
+		$object = attachmentFixture(2);
+		$source = diffusionGetDocumentUploadDir($object);
+		if (!$sourcepresent) {
+			unlink($source.'/(PROV4)-électricité.pdf');
+			rmdir($source);
+		}
+		$future = clone $object; $future->ref = 'DIF2610-0004';
+		$target = $flattarget ? diffusionGetFlatDocumentUploadDir($future) : diffusionGetDocumentUploadDir($future);
+		mkdir($target, 0777, true);
+		file_put_contents($target.'/reserved.pdf', 'reserved bytes');
+		$relative = diffusionGetDocumentPathRelativeToDataRoot($target);
+		$db->query("INSERT INTO fixture_ecm_files(rowid,entity,filepath,filename,share,src_object_type,src_object_id) VALUES(2,2,'$relative','reserved.pdf','reserved-key','diffusion',99)");
+		$before = json_encode($db->query('SELECT * FROM fixture_ecm_files ORDER BY rowid')->rows);
+		checkAttachment($object->validate($user, 1), -1, 'Occupied future directory is refused with or without a draft directory');
+		checkAttachment($object->error, 'DiffusionAttachmentPathConflict', 'Canonical and legacy target conflicts are explicit');
+		checkAttachment($object->ref, '(PROV4)', 'No future reference is adopted');
+		checkAttachment(file_get_contents($target.'/reserved.pdf'), 'reserved bytes', 'Existing file content is untouched');
+		checkAttachment(json_encode($db->query('SELECT * FROM fixture_ecm_files ORDER BY rowid')->rows), $before, 'Existing ECM owners and shares are untouched');
+		checkAttachment($db->depth, 0, 'Target collision rolls back');
+		clearAttachmentFixture();
+	}
+}
+$object = attachmentFixture(2);
+$source = diffusionGetDocumentUploadDir($object);
+unlink($source.'/(PROV4)-électricité.pdf');
+rmdir($source);
+$db->query('DELETE FROM fixture_ecm_files');
+checkAttachment($object->validate($user, 1), 1, 'An empty draft can validate when its future directory is free');
+checkAttachment($object->ref, 'DIF2610-0004', 'Empty draft receives its own final reference');
+checkAttachment((int) $db->query('SELECT status FROM fixture_diffusion WHERE rowid = 4')->rows[0]->status, 1, 'Empty draft validation is stored');
+checkAttachment($db->num_rows($db->query('SELECT * FROM fixture_ecm_files')), 0, 'Empty draft does not acquire another attachment index');
+clearAttachmentFixture();
 foreach (array(false, true) as $mirror) {
 	$object = attachmentFixture(2);
 	$oldrelative = attachmentRow($db)->filepath;
