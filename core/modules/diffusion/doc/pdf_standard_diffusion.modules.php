@@ -990,7 +990,8 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 			return $attachments;
 		}
 
-		if (getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD') && !empty($object->id)) {
+		// This setting creates new shares; existing active shares remain usable when it is off.
+		if (!empty($object->id)) {
 			$shareByFilename = $this->getSharedLinksByFilename($object, $dir);
 		}
 
@@ -1020,13 +1021,18 @@ class pdf_standard_diffusion extends ModelePDFDiffusion
 	protected function getSharedLinksByFilename($object, $dir)
 	{
 		$links = array();
-		$relativeDir = preg_replace('/^'.preg_quote(DOL_DATA_ROOT, '/').'/', '', (string) $dir);
-		$relativeDir = preg_replace('/[\/]$/', '', (string) $relativeDir);
-		$relativeDir = preg_replace('/^[\/]/', '', (string) $relativeDir);
+		if ((int) $object->id <= 0 || (int) $object->entity <= 0) {
+			return $links;
+		}
+		$relativeDir = diffusionGetDocumentPathRelativeToDataRoot($dir);
+		if ($relativeDir === '') {
+			return $links;
+		}
 
 		$sql = "SELECT filename, share";
 		$sql .= " FROM ".MAIN_DB_PREFIX."ecm_files";
-		$sql .= " WHERE src_object_type = '".$this->db->escape($object->table_element)."'";
+		$sql .= " WHERE entity = ".((int) $object->entity);
+		$sql .= " AND src_object_type IN ('".$this->db->escape($object->table_element)."', 'diffusiondoc', 'diffusiondoc@diffusion')";
 		$sql .= " AND src_object_id = ".((int) $object->id);
 		$sql .= " AND filepath = '".$this->db->escape($relativeDir)."'";
 		$sql .= " AND share IS NOT NULL AND share <> ''";

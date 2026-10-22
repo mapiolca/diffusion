@@ -354,7 +354,8 @@ class DiffusionAttachments
 					continue;
 				}
 				$entry = $candidates[0];
-				if ($entry->filepath === $relative && $entry->filename === $name && $source === $directory) {
+				if ($entry->filepath === $relative && $entry->filename === $name && $source === $directory
+					&& (int) $entry->src_object_id === (int) $object->id && $entry->src_object_type === $object->table_element) {
 					continue;
 				}
 				$this->moves = array();

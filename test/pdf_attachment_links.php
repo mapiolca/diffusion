@@ -1,0 +1,50 @@
+<?php
+/* Copyright (C) 2026 Pierre Ardoin; SPDX-License-Identifier: GPL-3.0-or-later */
+require __DIR__.'/document_context.php';
+
+$startchecks = $checks;
+$object = attachmentFixture(2);
+$user = (new ReflectionClass('AttachmentUser'))->newInstanceWithoutConstructor();
+$user->id = 7; $user->socid = 0;
+$dolibarr_main_url_root = 'https://fixture.example/dolibarr';
+$model = (new ReflectionClass('pdf_standard_diffusion'))->newInstanceWithoutConstructor();
+$model->db = $db;
+$load = new ReflectionMethod($model, 'loadDiffusionAttachments');
+$load->setAccessible(true);
+$directory = diffusionGetDocumentUploadDir($object);
+$expected = 'https://fixture.example/dolibarr/document.php?hashp=fixture-public-key';
+// Automatic key creation is independent from displaying an already active native share.
+$conf->global->DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD = 0;
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment($attachments[0]['public_share_link'] ?? '', $expected, 'Existing public share appears when automatic sharing is disabled');
+$conf->global->DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD = 1;
+$db->query("UPDATE fixture_ecm_files SET src_object_type = 'diffusiondoc' WHERE rowid = 1");
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment($attachments[0]['public_share_link'] ?? '', $expected, 'Native document element alias resolves for the same owner');
+$db->query("UPDATE fixture_ecm_files SET src_object_type = 'diffusion', share = NULL WHERE rowid = 1");
+$relative = attachmentRow($db)->filepath;
+$db->query("INSERT INTO fixture_ecm_files(rowid,entity,filename,filepath,share,src_object_type,src_object_id) VALUES(2,1,'(PROV4)-électricité.pdf','$relative','foreign-key','diffusion',4)");
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment(isset($attachments[0]['public_share_link']), false, 'Another entity cannot supply the PDF public link');
+$db->query('DELETE FROM fixture_ecm_files WHERE rowid = 2');
+$db->query("UPDATE fixture_ecm_files SET share = 'fixture-public-key', src_object_id = 99 WHERE rowid = 1");
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment(isset($attachments[0]['public_share_link']), false, 'Another object cannot supply the PDF public link');
+checkAttachment((new DiffusionAttachments($db))->repair($object, $user)['conflicts'], 1, 'Repair refuses another explicit owner');
+$db->query("UPDATE fixture_ecm_files SET src_object_id = 0, src_object_type = '' WHERE rowid = 1");
+$before = attachmentRow($db);
+checkAttachment((new DiffusionAttachments($db))->repair($object, $user)['repaired'], 1, 'Repair restores missing ownership even when the path is already current');
+$after = attachmentRow($db);
+checkAttachment((int) $after->src_object_id, 4, 'Recovered index belongs to the current object');
+checkAttachment($after->src_object_type, 'diffusion', 'Recovered index uses the canonical source type');
+checkAttachment($after->share, $before->share, 'Ownership repair preserves the exact public key');
+checkAttachment($after->label, $before->label, 'Ownership repair preserves the content fingerprint');
+checkAttachment((new DiffusionAttachments($db))->repair($object, $user)['repaired'], 0, 'Repeated ownership repair is idempotent');
+$conf->global->DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD = 0;
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment($attachments[0]['public_share_link'] ?? '', $expected, 'Repaired existing share can be included without generating a new key');
+$db->query('UPDATE fixture_ecm_files SET share = NULL WHERE rowid = 1');
+$attachments = $load->invoke($model, $object, $directory, '(PROV4).pdf');
+checkAttachment(isset($attachments[0]['public_share_link']), false, 'Revoked sharing stays absent from the PDF');
+clearAttachmentFixture();
+echo ($checks - $startchecks)." PDF attachment-link assertions passed; native model lookup and ECM fixtures.\n";

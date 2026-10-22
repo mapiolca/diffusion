@@ -34,6 +34,7 @@ Before deployment acceptance, verify both modified files are served, compare the
 php -d extension=pdo_sqlite test/attachments.php ../dolibarr/htdocs
 php -d extension=pdo_sqlite test/document_context.php ../dolibarr/htdocs
 php -d extension=pdo_sqlite test/numbering.php ../dolibarr/htdocs
+php -d extension=pdo_sqlite test/pdf_attachment_links.php ../dolibarr/htdocs
 node test/attachment_upload.js
 ```
 
@@ -59,7 +60,15 @@ This trial exposed a separate collision gap: `relocate()` returned early for a d
 
 The additional correction checks both canonical and legacy target directories **before** returning for an empty draft. The fixture suite now has **114 assertions**, including 28 new checks of empty/populated drafts against occupied canonical/legacy targets, preservation of file bytes and ECM ownership/share keys, rollback, and successful validation of an empty draft to a free target. These 114 checks pass locally on v25-alpha; the pinned CI covers the other PHP/core pairs. No automatic global data repair or removal is performed.
 
-## Evidence — 2026-10-19
+## PDF link and live public-URL follow-up — 2026-10-22
+
+`pdf_attachment_links.php` adds **13 assertions** to the native model/ECM fixtures. Existing active keys appear when automatic key creation is disabled; source aliases are accepted only for the same object, and entity/owner conflicts and revoked keys are excluded. A same-path index with a missing source owner can be repaired after its content/path/entity checks, preserving its key and content fingerprint; repeated repair has no effect. The first missing-link case was reproduced before the patch. These are isolated lookup/repair tests, not a complete rendered-PDF integration.
+
+Before this PDF follow-up, the served module SHA was `cd7e5e4006585173315baf4b79d1b97a91f832e2`, confirmed in cPanel. A new TEST 1 diffusion **22**, `RECETTE URL PJ — TEST 1 — 22 octobre 2026`, was created with no recipients/project. A harmless UTF-8 text file was uploaded through the native classic form; native filename normalization removed its accents. Public HTTP content had SHA-256 **`427891a849079904770b3b99ab6550a17c682bac2acccf27ed90dd370eadaa63`** before validation. Validation succeeded as **`LTR2610-0006`**, including a reference-prefixed attachment rename. The exact same public URL still returned identical bytes and the same SHA-256 afterward. The generated draft PDF was inspected in Chrome's native viewer and visibly included the public link. No secret URL or key is retained in these notes.
+
+TEST 2, the three physical file-drop gestures, and the old index behind recipe 21's missing PDF link remain under investigation at this stage. Browser pointer/CDP actions repeatedly fail before dispatch; keyboard controls and native file-chooser selection are usable. Public text is inspected through actual HTTP browser navigation; the browser's PDF export/download actions have not returned a local PDF file.
+
+## Source evidence — 2026-10-19
 
 Local results: **86 PHP assertions per source revision**, under **PHP 8.4.22**, and **43 JavaScript assertions** under Node.js. Native source declarations and the optional drag/drop parameter were checked on these revisions:
 

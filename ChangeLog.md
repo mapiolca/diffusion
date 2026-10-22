@@ -8,6 +8,8 @@
 - EN: Fixed preview denial with Dolibarr 25's per-object document check, issuer loading after upload and numbering-model lookup warnings; retained document ownership without Multicompany.
 - FR : Conservation des URL publiques à la validation, contrôle des collisions documentaires même pour un brouillon sans fichier et restauration après échec ; réparation par diffusion des index récupérables sans réupload ni réactivation des partages révoqués.
 - EN: Preserved public URLs during validation, checked document collisions even for empty drafts with failure recovery, and added per-distribution index repair without reuploading or reactivating revoked sharing.
+- FR : Affichage dans le PDF des liens publics déjà actifs indépendamment de la création automatique de liens ; réparation de la propriété documentaire manquante même lorsque le chemin de l’index est déjà correct, sans changer la clé publique.
+- EN: Included existing active public links in PDFs independently of automatic link creation; repaired missing document ownership even when the index path is already correct, preserving the public key.
 - FR : Contrôles de droits et d’entité renforcés, refus des chemins documentaires indisponibles ; tests de régression et matrice CI Dolibarr 20–25 (v25 alpha identifiée). Aucun changement de schéma ; recharger le module après mise à jour pour actualiser les hooks persistés d’une ancienne installation.
 - EN: Strengthened permission/entity checks and rejected unavailable document paths; added regression tests and a Dolibarr 20–25 CI matrix (identified v25 alpha). No schema change; reload the module after upgrading to refresh persisted hooks from an older installation.
 

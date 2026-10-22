@@ -70,6 +70,8 @@ Une validation conserve les clés publiques existantes des pièces jointes, y co
 
 Pour les anciens liens cassés, utiliser **Fichiers joints > Réparer les liens des pièces jointes**. Cette action concerne uniquement la diffusion affichée et ne nécessite aucun réupload. Elle conserve l’ancienne URL lorsque son index et sa clé peuvent être identifiés avec certitude. Si la clé a disparu, une nouvelle URL doit être créée avec le partage natif. Les conflits sont signalés sans fusion automatique des identités publiques. Consulter [les preuves et limites des tests](test/README.md#attachment-regression--140).
 
+Le PDF reprend les liens publics déjà actifs des pièces jointes de la diffusion et de son entité, même lorsque la création automatique de nouveaux liens est désactivée. Après une réparation d’index, régénérer le PDF. Un index rattaché explicitement à un autre objet reste en conflit et son lien n’est pas ajouté au PDF.
+
 ### Configuration
 
 Le module propose une page de configuration dans l’administration pour :
@@ -183,6 +185,8 @@ Previewing and downloading existing documents use the distribution read permissi
 Numbering lookup checks files before loading them, without warnings for modules that provide no Diffusion model. A missing or invalid configured model produces an explicit validation error.
 
 Validation preserves existing public attachment URLs, including across entities. New uploads follow the automatic-sharing setting; validation and repair do not generate keys or reactivate revoked sharing. Use **Attached files > Repair attachment links** to recover a reliable old index without reuploading. Missing original keys require a new URL through native sharing. Ambiguous public identities are reported unchanged. See the [test evidence and limits](test/README.md#attachment-regression--140).
+
+The PDF includes existing active public links for attachments belonging to the distribution and its entity, even when automatic creation of new links is disabled. Regenerate the PDF after repairing its index. An index explicitly owned by another object remains a conflict and its link is not added to the PDF.
 
 ### Configuration
 
