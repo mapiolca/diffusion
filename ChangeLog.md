@@ -4,8 +4,8 @@
 
 - FR : Correction de l’interception des uploads des autres modules et ajout du glisser-déposer natif dans les trois onglets documentaires des diffusions, avec conservation de l’upload classique.
 - EN: Fixed interference with other modules' uploads and enabled native drag and drop on the three distribution tabs while retaining standard uploads.
-- FR : Correction du refus d’aperçu avec le contrôle documentaire par objet de Dolibarr 25 et du chargement de la société émettrice lors de la régénération après dépôt ; conservation de l’entité propriétaire sans Multicompany.
-- EN: Fixed preview denial with Dolibarr 25's per-object document check and issuer loading during regeneration after upload; retained document ownership without Multicompany.
+- FR : Correction du refus d’aperçu avec le contrôle documentaire par objet de Dolibarr 25, du chargement de la société émettrice après dépôt et des avertissements de recherche du modèle de numérotation ; conservation de l’entité propriétaire sans Multicompany.
+- EN: Fixed preview denial with Dolibarr 25's per-object document check, issuer loading after upload and numbering-model lookup warnings; retained document ownership without Multicompany.
 - FR : Conservation des URL publiques à la validation, déplacements documentaires contrôlés et restauration après échec ; réparation par diffusion des index récupérables sans réupload ni réactivation des partages révoqués.
 - EN: Preserved public URLs during validation, checked file relocation with failure recovery, and added per-distribution index repair without reuploading or reactivating revoked sharing.
 - FR : Contrôles de droits et d’entité renforcés, refus des chemins documentaires indisponibles ; tests de régression et matrice CI Dolibarr 20–25 (v25 alpha identifiée). Aucun changement de schéma ; recharger le module après mise à jour pour actualiser les hooks persistés d’une ancienne installation.

@@ -64,6 +64,8 @@ Le glisser-déposer natif est disponible dès Dolibarr 20 sur les onglets **Diff
 
 L’aperçu et le téléchargement d’un document existant utilisent le droit de lecture de la diffusion, y compris avec le contrôle par objet de Dolibarr 25. La régénération après dépôt charge la société émettrice native ; une société indisponible produit un message explicite et conserve les fichiers ajoutés.
 
+La recherche du modèle de numérotation vérifie les fichiers avant de les charger, sans avertissement pour les modules qui ne fournissent aucun modèle Diffusion. Un modèle configuré absent ou invalide produit une erreur explicite dans le parcours de validation.
+
 Une validation conserve les clés publiques existantes des pièces jointes, y compris avec Multicompany. Les nouveaux fichiers suivent l’option de partage automatique ; une validation ou une réparation ne crée pas de nouvelle clé et ne réactive pas un partage révoqué.
 
 Pour les anciens liens cassés, utiliser **Fichiers joints > Réparer les liens des pièces jointes**. Cette action concerne uniquement la diffusion affichée et ne nécessite aucun réupload. Elle conserve l’ancienne URL lorsque son index et sa clé peuvent être identifiés avec certitude. Si la clé a disparu, une nouvelle URL doit être créée avec le partage natif. Les conflits sont signalés sans fusion automatique des identités publiques. Consulter [les preuves et limites des tests](test/README.md#attachment-regression--140).
@@ -177,6 +179,8 @@ Native drag and drop is available from Dolibarr 20 on the **Diffusion**, **Attac
 After upgrading, reload Diffusion from the module list to refresh persisted hooks from an older installation while retaining existing settings, then refresh the browser cache.
 
 Previewing and downloading existing documents use the distribution read permission, including Dolibarr 25's per-object check. Regeneration after upload loads the native issuing company; an unavailable issuer produces an explicit error and preserves uploaded files.
+
+Numbering lookup checks files before loading them, without warnings for modules that provide no Diffusion model. A missing or invalid configured model produces an explicit validation error.
 
 Validation preserves existing public attachment URLs, including across entities. New uploads follow the automatic-sharing setting; validation and repair do not generate keys or reactivate revoked sharing. Use **Attached files > Repair attachment links** to recover a reliable old index without reuploading. Missing original keys require a new URL through native sharing. Ambiguous public identities are reported unchanged. See the [test evidence and limits](test/README.md#attachment-regression--140).
 

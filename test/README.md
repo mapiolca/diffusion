@@ -33,6 +33,7 @@ Before deployment acceptance, verify both modified files are served, compare the
 ```sh
 php -d extension=pdo_sqlite test/attachments.php ../dolibarr/htdocs
 php -d extension=pdo_sqlite test/document_context.php ../dolibarr/htdocs
+php -d extension=pdo_sqlite test/numbering.php ../dolibarr/htdocs
 node test/attachment_upload.js
 ```
 
@@ -43,6 +44,14 @@ Coverage includes exact public-key/ECM-ID preservation and identical file bytes 
 The Node runner checks the actual module completion code with a simulated DOM and Ajax transport: supplier orders, invoices, customer orders, projects and products with the same ID remain untouched; foreign endpoints/IDs, duplicate initialization, multiple files, partial success, invalid/empty responses and PDF failures are covered. No browser request or actual HTTP upload is made.
 
 `document_context.php` reuses the attachment fixtures (86 assertions), then adds **17 assertions on v25, 10 on older cores** with the native object resolver, `CommonObject::fetchCommon()`, HookManager and PDF model. On a core exposing `checkUserAccessToDocumentObject()`, it executes that function and `restrictedArea()` too; older versions exercise the existing native document permission check. The v25 preview refusal was reproduced before the fix (reader has only `diffusion.diffusiondoc.read`, result 0). The existing `elementproperties` registration loads the hook class; the native manager retains its loaded hooks for the subsequent area check. No new global hook is added. Older installations must reload the module to refresh persisted registrations, as confirmed on develop. The tests cover reader/admin denial, external and unshared owners, successive hook results, write denial, native issuer preparation, controlled missing-issuer failure, uploaded-file preservation and actual Ajax bootstrap flags. They do not render a complete PDF or execute an HTTP endpoint.
+
+## Numbering lookup follow-up — 2026-10-22
+
+The user reported missing-file warnings on **Dolibarr 25.0.0-alpha** and explicitly had not tested other instances. The old loader was reproduced at `class/diffusion.class.php:1429`: `@include_once` still reached the error handler for absent core/third-party candidates before finding Diffusion's model. The corrected loader resolves complete filenames with native `dol_buildpath(..., 0, 2)`, loads only existing readable files, stops on the selected provider, and checks the expected numbering contract. It retains provider order, bundled models and the historical standard default without changing configuration. Invalid selections return a translated object error, without HTML or physical paths.
+
+`numbering.php` reuses the 86 attachment checks and adds **24 assertions** against the real loader, standard and advanced models, with disposable external-provider fixtures. Missing-file warnings are exceptions even when suppressed with `@`. It covers absent/empty/default settings, repeated calls, missing registrations, alternate roots, missing/invalid models, mask errors, entity counters, no counter writes, and validation rollback preserving the specific error and attachments. Only MySQL `SUBSTRING(ref FROM n)` is adapted to SQLite syntax; this does not test real MySQL concurrency.
+
+These checks pass locally under **PHP 8.4.22** on the six source revisions listed below (including local v25-alpha). Dolibarr 20 emits its existing native nullable-parameter deprecation under PHP 8.4; the numbering assertions still pass. The six-version CI also runs this new test with each supported PHP pair. These are isolated integrations, not trials on other user instances. The native resolver's third parameter exists in each inspected revision. PHP syntax, the 17 v25 document-context assertions and 43 JavaScript assertions pass; PHPStan remains unavailable.
 
 ## Evidence — 2026-10-19
 

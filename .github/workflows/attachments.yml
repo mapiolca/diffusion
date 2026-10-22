@@ -37,4 +37,5 @@ jobs:
       - name: PHP syntax
         run: git ls-files -z '*.php' | xargs -0 -n1 php -l
       - run: php test/document_context.php test/.core/htdocs
+      - run: php test/numbering.php test/.core/htdocs
       - run: node test/attachment_upload.js

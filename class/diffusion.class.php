@@ -805,7 +805,9 @@ class Diffusion extends CommonObject
 		$num = (preg_match('/^[\(]?PROV/i', $this->ref) || $this->ref === '') ? $this->getNextNumRef() : $this->ref;
 		if (!is_string($num) || $num === '') {
 			$this->db->rollback();
-			$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+			if ($this->error === '') {
+				$this->error = $langs->trans('DiffusionAttachmentOperationFailed');
+			}
 			return -1;
 		}
 		$documents = new DiffusionAttachments($this->db);
@@ -1409,51 +1411,41 @@ class Diffusion extends CommonObject
 	{
 		global $langs, $conf;
 		$langs->load("diffusion@diffusion");
-
-		if (!getDolGlobalString('DIFFUSION_DIFFUSION_ADDON')) {
-			$conf->global->DIFFUSION_DIFFUSION_ADDON = 'mod_diffusion_standard';
+		$this->error = '';
+		$classname = getDolGlobalString('DIFFUSION_DIFFUSION_ADDON');
+		if ($classname === '') {
+			$classname = 'mod_diffusion_standard';
+		}
+		if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $classname)) {
+			$this->error = $langs->trans('DiffusionNumberingModelUnavailable');
+			return '';
 		}
 
-		if (getDolGlobalString('DIFFUSION_DIFFUSION_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('DIFFUSION_DIFFUSION_ADDON').".php";
-			$classname = getDolGlobalString('DIFFUSION_DIFFUSION_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/diffusion/");
-
-				// Load file with numbering class (if found)
-				$mybool = $mybool || @include_once $dir.$file;
+		require_once __DIR__.'/../core/modules/diffusion/modules_diffusion.php';
+		$loaded = false;
+		// Keep registered providers in order and always include this module's own models.
+		$dirmodels = array_unique(array_merge(array('/'), (array) ($conf->modules_parts['models'] ?? array()), array('/diffusion/')));
+		foreach ($dirmodels as $reldir) {
+			$file = dol_buildpath($reldir.'core/modules/diffusion/'.$classname.'.php', 0, 2);
+			if ($file !== '' && is_file($file) && is_readable($file)) {
+				require_once $file;
+				$loaded = true;
+				break;
 			}
-
-			if (!$mybool) {
-				dol_print_error(null, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				'@phan-var-force ModeleNumRefDiffusion $obj';
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
 		}
+		if (!$loaded || !class_exists($classname, false) || !is_subclass_of($classname, 'ModeleNumRefDiffusion')) {
+			$this->error = $langs->trans('DiffusionNumberingModelUnavailable');
+			return '';
+		}
+
+		/** @var ModeleNumRefDiffusion $obj */
+		$obj = new $classname();
+		$numref = $obj->getNextValue($this);
+		if (is_string($numref) && $numref !== '' && $numref !== '-1') {
+			return $numref;
+		}
+		$this->error = $obj->error;
+		return '';
 	}
 
 	/**

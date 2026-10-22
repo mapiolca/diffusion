@@ -68,6 +68,7 @@ ErrorGoToGlobalSetup = Vérifiez la configuration globale.
 ErrorLogoFileNotFound = Fichier logo %s introuvable
 ErrorModuleNotFound = Module introuvable
 ErrorNumberingModuleNotSetup = Le module de numérotation n'est pas configuré.
+DiffusionNumberingModelUnavailable=Le modèle de numérotation configuré est absent ou invalide. Vérifiez les réglages du module Diffusion.
 ErrorThisContactIsAlreadyDefinedAsThisType = Ce contact est déjà lié avec ce type.
 Events = Événements
 Example = Exemple
