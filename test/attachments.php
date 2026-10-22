@@ -61,6 +61,8 @@ class DoliDB
 	public function order($field, $order = 'ASC') { return ' ORDER BY '.$field.' '.$order; }
 	public function prefix() { return MAIN_DB_PREFIX; }
 	public function sanitize($value) { return $value; }
+	public function encrypt($value, $withquote = 1) { return $withquote ? "'".$this->escape($value)."'" : $value; }
+	public function decrypt($value) { return $value; }
 	public function idate($value) { return $value ? gmdate('Y-m-d H:i:s', $value) : null; }
 	public function jdate($value) { return $value ? strtotime($value) : null; }
 	public function lasterror() { return 'Injected database failure'; }

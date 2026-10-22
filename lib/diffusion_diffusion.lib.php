@@ -195,8 +195,17 @@ function diffusionEnsureAttachedFilesIndexedAndShared($db, $object, $upload_dir,
 	$relUploadDir = preg_replace('/[\\/]$/', '', $relUploadDir);
 	$relUploadDir = preg_replace('/^[\\/]/', '', $relUploadDir);
 	$upload_dir = rtrim((string) $upload_dir, '/\\');
-	$objectentity = !empty($object->entity) ? (int) $object->entity : (int) $conf->entity;
-	$setsharekey = $createshares && !empty($filenames) && getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD') ? 1 : 0;
+	$objectentity = (int) $object->entity;
+	$setsharekey = 0;
+	if ($createshares && !empty($filenames)) {
+		if ($objectentity === (int) $conf->entity) {
+			$setsharekey = getDolGlobalInt('DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD') ? 1 : 0;
+		} else {
+			// A shared diffusion keeps its owner's policy without switching the session.
+			require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+			$setsharekey = (int) dolibarr_get_const($db, 'DIFFUSION_ALLOW_EXTERNAL_DOWNLOAD', $objectentity) ? 1 : 0;
+		}
+	}
 
 	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 	if ($setsharekey) {

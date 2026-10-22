@@ -39,4 +39,5 @@ jobs:
       - run: php test/document_context.php test/.core/htdocs
       - run: php test/numbering.php test/.core/htdocs
       - run: php test/pdf_attachment_links.php test/.core/htdocs
+      - run: php test/attachment_sharing.php test/.core/htdocs
       - run: node test/attachment_upload.js

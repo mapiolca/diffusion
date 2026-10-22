@@ -72,6 +72,8 @@ Pour les anciens liens cassés, utiliser **Fichiers joints > Réparer les liens 
 
 Le PDF reprend les liens publics déjà actifs des pièces jointes de la diffusion et de son entité, même lorsque la création automatique de nouveaux liens est désactivée. Après une réparation d’index, régénérer le PDF. Un index rattaché explicitement à un autre objet reste en conflit et son lien n’est pas ajouté au PDF.
 
+La création automatique suit le réglage de l’entité propriétaire de la diffusion, y compris lors d’un dépôt depuis une autre entité. Si ce réglage est désactivé, les nouveaux fichiers restent sans lien public dans la liste et le PDF jusqu’à l’activation de leur partage natif. Activer le réglage concerne les prochains uploads ; une régénération ou une réparation ne publie pas rétroactivement les fichiers existants.
+
 ### Configuration
 
 Le module propose une page de configuration dans l’administration pour :
@@ -187,6 +189,8 @@ Numbering lookup checks files before loading them, without warnings for modules 
 Validation preserves existing public attachment URLs, including across entities. New uploads follow the automatic-sharing setting; validation and repair do not generate keys or reactivate revoked sharing. Use **Attached files > Repair attachment links** to recover a reliable old index without reuploading. Missing original keys require a new URL through native sharing. Ambiguous public identities are reported unchanged. See the [test evidence and limits](test/README.md#attachment-regression--140).
 
 The PDF includes existing active public links for attachments belonging to the distribution and its entity, even when automatic creation of new links is disabled. Regenerate the PDF after repairing its index. An index explicitly owned by another object remains a conflict and its link is not added to the PDF.
+
+Automatic sharing follows the distribution owner's entity setting, including uploads from another entity. When disabled, new files have no public link in the list or PDF until their native sharing is enabled. Enabling the setting affects future uploads; regeneration and repair do not publish existing files retroactively.
 
 ### Configuration
 
