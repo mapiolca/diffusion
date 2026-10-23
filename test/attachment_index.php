@@ -112,7 +112,7 @@ header('Referrer-Policy: no-referrer');
 llxHeader('', $langs->trans('DiffusionAttachmentIndexDiagnostic'));
 print load_fiche_titre($langs->trans('DiffusionAttachmentIndexDiagnostic'));
 print '<p>'.$langs->trans('DiffusionAttachmentIndexDiagnosticHelp').'</p>';
-print '<pre id="attachment-index-diagnostic">'.dol_escape_htmltag((string) json_encode($diagnostic, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)).'</pre>';
+print '<pre id="attachment-index-diagnostic">'.dol_escape_htmltag((string) json_encode($diagnostic, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 0, 1).'</pre>';
 if ((int) $entry->src_object_id === 19 && $sourceResult === 0 && $entry->filepath === $relative
 	&& $sha256 === '4053c73dbcfca066c6d8ea5accd90599621182b36ec5adfd297c2bb58a7d7e17'
 	&& $entry->filename === 'LTR2610-0005-DEVIS 2026CB127 JP SUN Signe.pdf' && count($matches) === 1
