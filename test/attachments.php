@@ -277,4 +277,68 @@ $user->socid = 0;
 unset($conf->diffusion->multidir_output[1]);
 checkAttachment(diffusionGetDocumentUploadDir($object), '', 'Missing owner directory has no fallback');
 clearAttachmentFixture();
-echo $checks." assertions passed; native ECM/files ".DOL_VERSION.", SQLite and disposable filesystem; simulated rights and numbering.\n";
+require_once __DIR__.'/attachment_index_case.class.php';
+// The fixture table omits unrelated Diffusion fields; native ECM updates remain unchanged.
+class MaintenanceAttachmentDiffusion extends AttachmentDiffusion
+{
+	public function fetch($id, $ref = null, $noextrafields = 0, $nolines = 0)
+	{
+		$result = $this->db->query('SELECT rowid, ref, status, entity FROM fixture_diffusion WHERE rowid = '.((int) $id));
+		if (!$result) { return -1; }
+		$row = $this->db->fetch_object($result);
+		if (!is_object($row)) { return 0; }
+		$this->id = (int) $row->rowid; $this->ref = $row->ref; $this->status = (int) $row->status; $this->entity = (int) $row->entity;
+		return $this->id;
+	}
+}
+foreach (array(1, 2) as $entity) {
+	foreach (array('success', 'admin_without_right', 'source_exists', 'source_elsewhere', 'source_read_error', 'file_changed', 'checksum', 'other_owner', 'entity', 'duplicate', 'metadata_normalization', 'admin', 'begin', 'sql', 'commit') as $scenario) {
+		$object = attachmentFixture($entity);
+		$caseObject = new MaintenanceAttachmentDiffusion($db);
+		$caseObject->fetch(4);
+		$row = attachmentRow($db);
+		$db->query("UPDATE fixture_ecm_files SET ref = '".$db->escape(dol_hash($row->filepath.'/'.$row->filename, '3'))."', date_c = '2026-10-19 12:00:00', description = 'Preserved description', note_public = 'Preserved note', src_object_id = 19 WHERE rowid = 1");
+		$file = diffusionGetDocumentUploadDir($object).'/'.$row->filename;
+		$digest = hash_file('sha256', $file);
+		if ($scenario === 'source_exists' || $scenario === 'source_elsewhere') {
+			$sourceEntity = $scenario === 'source_elsewhere' ? $entity + 1 : $entity;
+			$db->query("INSERT INTO fixture_diffusion VALUES(19,'other-source',1,$sourceEntity,NULL,NULL,'')");
+		}
+		if ($scenario === 'source_read_error') { $db->failure = 'SELECT rowid, ref, status, entity FROM fixture_diffusion WHERE rowid = 19'; }
+		if ($scenario === 'file_changed') { file_put_contents($file, 'Different content'); }
+		if ($scenario === 'checksum') { $db->query("UPDATE fixture_ecm_files SET label = 'stale' WHERE rowid = 1"); }
+		if ($scenario === 'other_owner') { $db->query('UPDATE fixture_ecm_files SET src_object_id = 18 WHERE rowid = 1'); }
+		if ($scenario === 'entity') { $db->query('UPDATE fixture_ecm_files SET entity = 99 WHERE rowid = 1'); }
+		if ($scenario === 'duplicate') {
+			$db->query('ALTER TABLE fixture_ecm_files RENAME TO fixture_original_index');
+			$db->query('CREATE TABLE fixture_ecm_files AS SELECT * FROM fixture_original_index');
+			$db->query("INSERT INTO fixture_ecm_files(rowid,entity,ref,filepath,filename,label,share,src_object_type,src_object_id) SELECT 2,entity,'duplicate',filepath,filename,label,'other-public-key',src_object_type,src_object_id FROM fixture_original_index");
+		}
+		if ($scenario === 'metadata_normalization') { $db->query("UPDATE fixture_ecm_files SET description = '  preserve whitespace  ' WHERE rowid = 1"); }
+		if ($scenario === 'admin') { $user->admin = 0; }
+		if ($scenario === 'admin_without_right') { $user->allow = false; }
+		if ($scenario === 'begin') { $db->failbegin = true; }
+		if ($scenario === 'sql') { $db->failure = 'UPDATE fixture_ecm_files'; }
+		if ($scenario === 'commit') { $db->failcommit = true; }
+		$before = json_encode(attachmentRow($db));
+		$bytes = file_get_contents($file);
+		$case = new DiffusionAttachmentIndexCase();
+		$actual = $case->repair($caseObject, $user, 1, 19, $row->filename, $digest);
+		$success = in_array($scenario, array('success', 'admin_without_right'), true);
+		checkAttachment($actual, $success ? 1 : -1, 'Reviewed orphan repair '.$entity.' '.$scenario);
+		if ($success) {
+			checkAttachment((int) attachmentRow($db)->src_object_id, 4, 'Orphan reassigned to the reviewed target');
+			checkAttachment(attachmentRow($db)->share, 'fixture-public-key', 'Reviewed repair preserves the exact public key');
+			checkAttachment(attachmentRow($db)->description, 'Preserved description', 'Reviewed repair preserves metadata');
+			checkAttachment($case->repair($caseObject, $user, 1, 19, $row->filename, $digest), 0, 'Reviewed repair is idempotent');
+		} else {
+			checkAttachment(json_encode(attachmentRow($db)), $before, 'Refused repair leaves the whole ECM row unchanged');
+		}
+		checkAttachment(file_get_contents($file), $bytes, 'Reviewed repair never rewrites the attachment');
+		checkAttachment($db->depth, 0, 'Reviewed repair closes its transaction');
+		$user->admin = 1;
+		$user->allow = true;
+		clearAttachmentFixture();
+	}
+}
+echo $checks." assertions passed; native ECM/files ".DOL_VERSION.", SQLite and disposable filesystem; simulated rights, object fetch and numbering.\n";

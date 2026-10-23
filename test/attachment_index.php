@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-/** Read-only, authenticated diagnosis of the historical LTR2610-0005 index. */
+/** Authenticated diagnosis and reviewed repair of the historical LTR2610-0005 index. */
 $res = 0;
 if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT']) && is_file($_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php')) {
 	$res = include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
@@ -24,7 +24,7 @@ if (!$res) {
 if (!$user->admin || !empty($user->socid) || !isModEnabled('diffusion')) {
 	accessforbidden();
 }
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+if (!in_array($_SERVER['REQUEST_METHOD'], array('GET', 'POST'), true)) {
 	accessforbidden();
 }
 
@@ -48,6 +48,18 @@ if ($directory === '' || !DiffusionAttachments::isSafeDirectory($directory, true
 	accessforbidden();
 }
 $relative = diffusionGetDocumentPathRelativeToDataRoot($directory);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	if (GETPOST('action', 'aZ09') !== 'repaircase') {
+		accessforbidden();
+	}
+	require_once __DIR__.'/attachment_index_case.class.php';
+	$maintenance = new DiffusionAttachmentIndexCase();
+	$result = $maintenance->repair($object, $user, 865, 19, 'LTR2610-0005-DEVIS 2026CB127 JP SUN Signe.pdf',
+		'4053c73dbcfca066c6d8ea5accd90599621182b36ec5adfd297c2bb58a7d7e17');
+	setEventMessages($langs->trans($result < 0 ? $maintenance->error : ($result > 0 ? 'DiffusionAttachmentCaseRepaired' : 'DiffusionAttachmentCaseAlreadyRepaired')), null, $result < 0 ? 'errors' : 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
+}
 $filename = $directory.'/'.$entry->filename;
 $exists = is_file($filename);
 $checksum = $exists ? md5_file($filename) : false;
@@ -101,5 +113,15 @@ llxHeader('', $langs->trans('DiffusionAttachmentIndexDiagnostic'));
 print load_fiche_titre($langs->trans('DiffusionAttachmentIndexDiagnostic'));
 print '<p>'.$langs->trans('DiffusionAttachmentIndexDiagnosticHelp').'</p>';
 print '<pre id="attachment-index-diagnostic">'.dol_escape_htmltag((string) json_encode($diagnostic, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)).'</pre>';
+if ((int) $entry->src_object_id === 19 && $sourceResult === 0 && $entry->filepath === $relative
+	&& $sha256 === '4053c73dbcfca066c6d8ea5accd90599621182b36ec5adfd297c2bb58a7d7e17'
+	&& $entry->filename === 'LTR2610-0005-DEVIS 2026CB127 JP SUN Signe.pdf' && count($matches) === 1
+	&& !empty($entry->share) && $checksum !== false && $entry->label === $checksum) {
+	print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="action" value="repaircase">';
+	print '<input class="button" type="submit" value="'.dol_escape_htmltag($langs->trans('DiffusionAttachmentCaseRepair')).'">';
+	print '</form>';
+}
 llxFooter();
 $db->close();
