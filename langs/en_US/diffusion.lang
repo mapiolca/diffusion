@@ -414,3 +414,5 @@ DiffusionAttachmentPathConflict=Attachment relocation encountered an existing fi
 DiffusionAttachmentIndexConflict=A document index does not match the current distribution. Validation was cancelled.
 DiffusionAttachmentMoveFailed=Attachment relocation failed. Check the document directory permissions.
 DiffusionAttachmentIndexedFileMissing=An indexed file is missing from the document directory. Validation was cancelled.
+DiffusionAttachmentIndexDiagnostic=Attachment index diagnosis
+DiffusionAttachmentIndexDiagnosticHelp=Read-only diagnosis of LTR2610-0005, restricted to authenticated administrators. No file, share or index is changed; public keys are not displayed.

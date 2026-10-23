@@ -414,3 +414,5 @@ DiffusionAttachmentPathConflict=Le déplacement des pièces jointes rencontre un
 DiffusionAttachmentIndexConflict=Un index documentaire ne correspond pas à la diffusion courante. La validation a été annulée.
 DiffusionAttachmentMoveFailed=Le déplacement des pièces jointes a échoué. Vérifiez les autorisations du répertoire documentaire.
 DiffusionAttachmentIndexedFileMissing=Un fichier indexé est absent du répertoire documentaire. La validation a été annulée.
+DiffusionAttachmentIndexDiagnostic=Diagnostic de l’index des pièces jointes
+DiffusionAttachmentIndexDiagnosticHelp=Diagnostic en lecture seule de LTR2610-0005, réservé aux administrateurs connectés. Aucun fichier, partage ou index n’est modifié ; les clés publiques ne sont pas affichées.
