@@ -33,9 +33,7 @@ if (!defined('NOREQUIREHTML')) {
 if (!defined('NOREQUIREAJAX')) {
 	define('NOREQUIREAJAX', '1');
 }
-if (!defined('NOREQUIRESOC')) {
-	define('NOREQUIRESOC', '1');
-}
+// Document models need the native issuer ($mysoc), including after an Ajax upload.
 if (!defined('CSRFCHECK_WITH_TOKEN')) {
 	define('CSRFCHECK_WITH_TOKEN', '1');
 }
@@ -53,6 +51,7 @@ if (!$res) {
 }
 
 dol_include_once('/diffusion/class/diffusion.class.php');
+dol_include_once('/diffusion/class/diffusionattachments.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 
 /**
@@ -87,13 +86,13 @@ if (!is_array($files)) {
 	$files = array();
 }
 
-if ($action !== 'regenerate' || $id <= 0) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || $action !== 'regenerate' || $id <= 0 || !$files) {
 	diffusionAjaxRegenerateDocumentResponse(400, array('status' => 'error', 'errors' => array('Bad parameters')));
 }
 if (!isModEnabled('diffusion')) {
 	diffusionAjaxRegenerateDocumentResponse(403, array('status' => 'error', 'errors' => array('Module disabled')));
 }
-if (empty($user->admin) && !$user->hasRight('diffusion', 'diffusiondoc', 'write')) {
+if (!$user->hasRight('diffusion', 'diffusiondoc', 'write') || !$user->hasRight('diffusion', 'diffusiondoc', 'read')) {
 	diffusionAjaxRegenerateDocumentResponse(403, array('status' => 'error', 'errors' => array('Not enough permissions')));
 }
 
@@ -103,13 +102,18 @@ if ($result <= 0) {
 	diffusionAjaxRegenerateDocumentResponse(404, array('status' => 'error', 'errors' => array('Diffusion not found')));
 }
 
-$allowedentities = array_map('intval', explode(',', (string) getEntity('diffusion')));
-if (!empty($object->entity) && !in_array((int) $object->entity, $allowedentities, true)) {
-	diffusionAjaxRegenerateDocumentResponse(403, array('status' => 'error', 'errors' => array('Entity not allowed')));
+if (!DiffusionAttachments::checkObjectScope($object, $user) || !empty($object->is_template)) {
+	diffusionAjaxRegenerateDocumentResponse(403, array('status' => 'error', 'errors' => array('Not allowed')));
 }
-
 $upload_dir = diffusionGetDocumentUploadDir($object);
-diffusionMigrateFlatDocumentDirectory($db, $object);
+if ($upload_dir === '' || !DiffusionAttachments::isSafeDirectory($upload_dir)) {
+	diffusionAjaxRegenerateDocumentResponse(403, array('status' => 'error', 'errors' => array('Document directory unavailable')));
+}
+foreach ($files as $file) {
+	if (!is_string($file) || $file !== basename(str_replace('\\', '/', $file)) || !is_file($upload_dir.'/'.$file)) {
+		diffusionAjaxRegenerateDocumentResponse(400, array('status' => 'error', 'errors' => array('Invalid file')));
+	}
+}
 $result = diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'ajaxupload', $files);
 if ($result < 0) {
 	$errors = array();

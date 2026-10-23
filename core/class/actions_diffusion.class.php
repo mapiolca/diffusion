@@ -971,37 +971,16 @@ class ActionsDiffusion
 	{
 		global $conf;
 
-		$entity = (int) $entity;
-		if ($entity <= 0) {
-			$entity = !empty($conf->entity) ? (int) $conf->entity : 1;
+		$entity = $entity > 0 ? (int) $entity : (int) $conf->entity;
+		if (!isset($conf->diffusion->multidir_output[$entity]) || !is_string($conf->diffusion->multidir_output[$entity])) {
+			return '';
 		}
-
-		if (!isset($conf->diffusion) || !is_object($conf->diffusion)) {
-			$conf->diffusion = new stdClass();
-		}
-		if (empty($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
-			$conf->diffusion->multidir_output = array();
-		}
-
-		$defaultoutput = DOL_DATA_ROOT.($entity > 1 ? '/'.$entity : '').'/diffusion';
-		if (empty($conf->diffusion->multidir_output[$entity])) {
-			$conf->diffusion->multidir_output[$entity] = $defaultoutput;
-		}
-		if (empty($conf->diffusion->dir_output)) {
-			$conf->diffusion->dir_output = $conf->diffusion->multidir_output[$entity];
-		}
-		if (empty($conf->diffusion->dir_temp)) {
-			$conf->diffusion->dir_temp = $conf->diffusion->multidir_output[$entity].'/temp';
-		}
-
 		if (!isset($conf->diffusiondoc) || !is_object($conf->diffusiondoc)) {
 			$conf->diffusiondoc = new stdClass();
 		}
-		$conf->diffusiondoc->enabled = !empty($conf->diffusion->enabled) ? 1 : 0;
-		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
+		$conf->diffusiondoc->enabled = isModEnabled('diffusion') ? 1 : 0;
 		$conf->diffusiondoc->multidir_output = $conf->diffusion->multidir_output;
-		$conf->diffusiondoc->dir_temp = $conf->diffusion->dir_temp;
-
+		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
 		return $conf->diffusion->multidir_output[$entity];
 	}
 
@@ -1039,6 +1018,33 @@ class ActionsDiffusion
 		);
 		$hookmanager->resArray = $this->results;
 
+		return 1;
+	}
+
+	/**
+	 * Apply the Diffusion object read right in native document-object checks.
+	 * The native resolver loads our existing elementproperties context before restrictedArea().
+	 * No module-level read permission exists, and project/entity restrictions still apply.
+	 *
+	 * @param array<string,mixed> $parameters Native area parameters
+	 * @param CommonObject|null $object Hook object (the area object is in parameters)
+	 * @param string $action Current action
+	 * @param HookManager $hookmanager Native manager
+	 * @return int
+	 */
+	public function restrictedArea($parameters, &$object, &$action, $hookmanager)
+	{
+		$areaobject = isset($parameters['object']) ? $parameters['object'] : null;
+		if (($parameters['features'] ?? '') !== 'diffusion' || ($parameters['mode'] ?? '') !== 'read'
+			|| !($areaobject instanceof Diffusion)) {
+			return 0;
+		}
+		global $user;
+		require_once __DIR__.'/../../class/diffusionattachments.class.php';
+		$allowed = isModEnabled('diffusion') && $user->hasRight('diffusion', 'diffusiondoc', 'read')
+			&& DiffusionAttachments::checkObjectScope($areaobject, $user);
+		// Set the result after nested project checks, which use the same HookManager.
+		$this->results = array('result' => $allowed ? 1 : 0);
 		return 1;
 	}
 
@@ -1093,8 +1099,18 @@ class ActionsDiffusion
 			return 0;
 		}
 
+		global $user;
+		require_once __DIR__.'/../../class/diffusionattachments.class.php';
+		if (!isModEnabled('diffusion') || !$user->hasRight('diffusion', 'diffusiondoc', 'write')
+			|| !$user->hasRight('diffusion', 'diffusiondoc', 'read') || !DiffusionAttachments::checkObjectScope($object, $user)
+			|| !empty($object->is_template)) {
+			httponly_accessforbidden('Not allowed');
+		}
 		$relativePath = diffusionGetDocumentRelativePath($object);
 		$uploadDir = diffusionGetDocumentUploadDir($object);
+		if ($uploadDir === '' || !DiffusionAttachments::isSafeDirectory(diffusionGetDocumentBaseOutputDir($object))) {
+			httponly_accessforbidden('Document directory unavailable');
+		}
 		$uploadDir = rtrim((string) $uploadDir, '/\\').'/';
 		$fileUrl = DOL_URL_ROOT.'/document.php?modulepart='.diffusionGetDocumentModulepart().'&attachment=1&entity='.(int) (!empty($object->entity) ? $object->entity : 1).'&file='.urlencode('/'.$relativePath);
 

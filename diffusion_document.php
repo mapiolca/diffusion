@@ -84,6 +84,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/images.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 dol_include_once('/diffusion/class/diffusion.class.php');
+dol_include_once('/diffusion/class/diffusionattachments.class.php');
 dol_include_once('/diffusion/lib/diffusion_diffusion.lib.php');
 dol_include_once('/diffusion/core/modules/diffusion/modules_diffusion.php');
 
@@ -143,15 +144,12 @@ if (empty($object->fk_element) && !empty($object->element)) {
 if ($id > 0 || !empty($ref)) {
 	$entityfordoc = !empty($object->entity) ? (int) $object->entity : 1;
 	$upload_dir = diffusionGetDocumentUploadDir($object);
-	if (!empty($upload_dir)) {
-		diffusionMigrateFlatDocumentDirectory($db, $object);
-	}
 	dol_syslog(__METHOD__.' upload_dir entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
 }
 
 // Permissions
-$permissiontoread = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'read'));
-$permissiontoadd  = (!empty($user->admin) || $user->hasRight('diffusion', 'diffusiondoc', 'write')); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
+$permissiontoread = $user->hasRight('diffusion', 'diffusiondoc', 'read');
+$permissiontoadd  = $user->hasRight('diffusion', 'diffusiondoc', 'write'); // Used by the include of actions_addupdatedelete.inc.php and actions_linkedfiles.inc.php
 
 // Security check (enable the most restrictive one)
 //if ($user->socid > 0) accessforbidden();
@@ -164,7 +162,10 @@ if (!isModEnabled("diffusion")) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
-if (empty($object->id)) {
+if ($object->id > 0 && !DiffusionAttachments::checkObjectScope($object, $user)) {
+	accessforbidden();
+}
+if (empty($object->id) || !empty($object->is_template)) {
 	accessforbidden();
 }
 
@@ -175,6 +176,24 @@ if (empty($object->id)) {
  */
 
 $error = 0;
+
+if ($action === 'repairattachmentindex') {
+	if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$user->hasRight('diffusion', 'diffusiondoc', 'write') || !empty($object->is_template)) {
+		accessforbidden();
+	}
+	$documents = new DiffusionAttachments($db);
+	$repair = $documents->repair($object, $user);
+	setEventMessages($langs->trans('DiffusionAttachmentRepairResult', $repair['repaired'], $repair['missing'], $repair['conflicts']), null, $repair['conflicts'] ? 'warnings' : 'mesgs');
+	if ($documents->error) {
+		setEventMessages($langs->trans($documents->error), null, 'warnings');
+	}
+	header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+	exit;
+}
+if ($upload_dir === '' && ($action !== '' || GETPOST('sendit', 'alpha'))) {
+	accessforbidden($langs->trans('DiffusionDocumentDirectoryUnavailable'));
+}
+
 
 if ($action == 'remove_file' && !empty($permissiontoadd) && $object->id > 0) {
 	$filetodelete = GETPOST('file', 'alpha');
@@ -196,10 +215,13 @@ if ($action == 'confirm_deletefile' && $confirm == 'yes' && !empty($permissionto
 	header('Location: '.$tmpurl);
 	exit;
 }
+$filesbeforeupload = $diffusionfileupload && is_dir($upload_dir) ? array_column(dol_dir_list($upload_dir, 'files', 0), 'name') : array();
 include DOL_DOCUMENT_ROOT.'/core/actions_linkedfiles.inc.php';
 if ($diffusionfileupload && !empty($permissiontoadd) && empty($error) && isset($result) && $result > 0 && function_exists('diffusionRegenerateDocumentAfterLinkedFileChange')) {
 	dol_syslog(__METHOD__.' post upload processing entity='.(int) $entityfordoc.' upload_dir='.$upload_dir, LOG_DEBUG);
-	diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload');
+	diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'upload', array_values(array_diff(array_column(dol_dir_list($upload_dir, 'files', 0), 'name'), $filesbeforeupload)));
+		header('Location: '.$_SERVER['PHP_SELF'].'?id='.((int) $object->id));
+		exit;
 }
 if ($diffusionfilerename && !empty($permissiontoadd) && empty($error) && $diffusionrenamefrom !== $diffusionrenameto && is_file(diffusionResolveLinkedFilePath($object, $upload_dir, $diffusionrenameto)) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenamefrom) && !diffusionIsGeneratedDocumentFile($object, $diffusionrenameto)) {
 	diffusionRegenerateDocumentAfterLinkedFileChange($db, $object, $upload_dir, $user, $langs, 'rename');
@@ -222,7 +244,7 @@ llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-diffusion page-card_
 // Show tabs
 $head = diffusionPrepareHead($object);
 
-print dol_get_fiche_head($head, 'document', $langs->trans("Diffusion"), -1, $object->picto);
+print dol_get_fiche_head($head, 'document', $langs->trans("Diffusion"), -1, $object->picto, 0, '', '', 0, '', diffusionUseNativeFileDrop($object, $permissiontoadd));
 
 
 // Build file list
@@ -256,6 +278,20 @@ print '</div>';
 print dol_get_fiche_end();
 
 $param = '&id='.$object->id.'&entity='.(int) $entityfordoc;
+if ($permissiontoadd && empty($object->is_template)) {
+	print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="hidden" name="id" value="'.((int) $object->id).'">';
+	print '<input type="hidden" name="action" value="repairattachmentindex">';
+	print '<input type="submit" class="button" value="'.dol_escape_htmltag($langs->trans('DiffusionRepairAttachmentLinks')).'">';
+	print '</form>';
+}
+if ($upload_dir === '') {
+	print '<div class="warning">'.$langs->trans('DiffusionDocumentDirectoryUnavailable').'</div>';
+	llxFooter();
+	$db->close();
+	exit;
+}
 $permtoedit = $permissiontoadd;
 //$relativepathwithnofile='diffusion/' . dol_sanitizeFileName($object->id).'/';
 dol_syslog(__METHOD__.' document_actions_post_headers entity='.(int) $entityfordoc.' relativepathwithnofile='.$relativepathwithnofile.' modulepart='.$modulepart, LOG_DEBUG);

@@ -237,123 +237,68 @@ function diffusionGetAjaxUploadResponseInfo(responseData) {
 		return info;
 	}
 
-	info.hasErrors = false;
+	info.hasErrors = files.length === 0;
 	for (var i = 0; i < files.length; i++) {
 		if (files[i] && files[i].error) {
 			info.hasErrors = true;
 			continue;
 		}
-		if (files[i] && files[i].name) {
+		if (files[i] && typeof files[i].name === 'string' && files[i].name) {
 			info.names.push(files[i].name);
+		} else {
+			info.hasErrors = true;
 		}
 	}
 
 	return info;
 }
 
-function diffusionGetCurrentPageDiffusionId() {
+function diffusionRegisterUploadCompletion() {
 	'use strict';
 
-	var urlParams = new URLSearchParams(window.location.search || '');
-	var id = urlParams.get('id') || '';
-
-	if (!id) {
-		id = jQuery('input[name="id"]').first().val() || '';
-	}
-
-	return id;
-}
-
-function diffusionRedirectAfterDragDrop(id, eventMessages) {
-	'use strict';
-
-	var redirectUrl = new URL(window.location.href);
-	redirectUrl.searchParams.set('id', id);
-	redirectUrl.searchParams.set('seteventmessages', eventMessages);
-	window.location.href = redirectUrl.pathname + redirectUrl.search;
-}
-
-function diffusionHandleDragDropUpload(event) {
-	'use strict';
-
-	var dropArea;
-	var dataTransfer;
-	var droppedFiles;
-	var formData;
-	var id;
-	var token;
-
-	if (!document.body || (!document.body.classList.contains('page-card') && !document.body.classList.contains('page-card_document'))) {
+	var context = document.getElementById('diffusion-document-context');
+	if (!context || window.diffusionUploadCompletionRegistered) {
 		return;
 	}
-
-	dropArea = event.target && event.target.closest ? event.target.closest('.cssDragDropArea') : null;
-	if (!dropArea) {
-		return;
-	}
-	dataTransfer = event.dataTransfer;
-	if (!dataTransfer || !dataTransfer.files || !dataTransfer.files.length) {
-		return;
-	}
-
-	id = diffusionGetCurrentPageDiffusionId();
-	token = jQuery('meta[name="anti-csrf-currenttoken"]').attr('content') || '';
-	if (!id || !token || !diffusionFileUploadUrl) {
-		return;
-	}
-
-	event.preventDefault();
-	event.stopPropagation();
-	event.stopImmediatePropagation();
-
-	formData = new FormData();
-	formData.append('fk_element', id);
-	formData.append('element', 'diffusiondoc');
-	formData.append('token', token);
-	formData.append('action', 'linkit');
-
-	droppedFiles = dataTransfer.files;
-	jQuery.each(droppedFiles, function (index, file) {
-		formData.append('files[]', file, file.name);
-	});
-
-	jQuery('.cssDragDropArea').removeClass('highlightDragDropArea');
-	jQuery('.dragDropAreaMessage').addClass('hidden');
-
-	jQuery.ajax({
-		url: diffusionFileUploadUrl,
-		type: 'POST',
-		processData: false,
-		contentType: false,
-		data: formData
-	}).done(function (responseData) {
-		var uploadInfo = diffusionGetAjaxUploadResponseInfo(responseData);
-
-		if (uploadInfo.hasErrors) {
-			diffusionRedirectAfterDragDrop(id, 'ErrorOnAtLeastOneFileUpload:warnings');
+	window.diffusionUploadCompletionRegistered = true;
+	jQuery.ajaxPrefilter(function (options) {
+		var data = options.data;
+		var requestUrl = new URL(options.url, window.location.href);
+		if (requestUrl.origin !== window.location.origin
+			|| requestUrl.pathname !== new URL(diffusionFileUploadUrl, window.location.href).pathname
+			|| !(data instanceof FormData)
+			|| ['diffusiondoc', 'diffusiondoc@diffusion'].indexOf(data.get('element')) === -1
+			|| String(data.get('fk_element')) !== context.getAttribute('data-id')) {
 			return;
 		}
-
-		jQuery.ajax({
-			url: diffusionRegenerateDocumentUrl,
-			type: 'POST',
-			data: {
-				action: 'regenerate',
-				id: id,
-				token: token,
-				files: uploadInfo.names
+		// Leave the native uploader, transport and error callback intact.
+		options.success = function (response) {
+			var info = diffusionGetAjaxUploadResponseInfo(response);
+			var messages = info.hasErrors ? 'ErrorOnAtLeastOneFileUpload:warnings' : 'UploadFileDragDropSuccess:mesgs';
+			var redirect = function (regenerationFailed) {
+				var url = new URL(window.location.href);
+				url.searchParams.delete('action');
+				url.searchParams.delete('token');
+				url.searchParams.set('id', context.getAttribute('data-id'));
+				url.searchParams.set('seteventmessages', messages + (regenerationFailed ? ',DiffusionDocumentRegenerationAfterFileChangeFailed:warnings' : ''));
+				window.location.href = url.pathname + url.search;
+			};
+			if (!info.names.length) {
+				messages = 'ErrorUploadFileDragDrop:errors';
+				redirect(false);
+				return;
 			}
-		}).done(function () {
-			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs');
-		}).fail(function () {
-			diffusionRedirectAfterDragDrop(id, 'UploadFileDragDropSuccess:mesgs,DiffusionDocumentRegenerationAfterFileChangeFailed:warnings');
-		});
-	}).fail(function (jqXHR) {
-		if (jqXHR && jqXHR.status === 403) {
-			diffusionRedirectAfterDragDrop(id, 'ErrorUploadPermissionDenied:errors');
-			return;
-		}
-		diffusionRedirectAfterDragDrop(id, 'ErrorUploadFileDragDropPermissionDenied:errors');
+			jQuery.ajax({
+				url: diffusionRegenerateDocumentUrl,
+				type: 'POST',
+				dataType: 'json',
+				data: { action: 'regenerate', id: context.getAttribute('data-id'), token: data.get('token'), files: info.names }
+			}).done(function (result) {
+				redirect(!result || result.status !== 'ok');
+			}).fail(function () {
+				redirect(true);
+			});
+		};
 	});
 }
 
@@ -363,7 +308,7 @@ jQuery(document).ready(function () {
 	diffusionEnhanceEmailTemplateSubstitutionTooltips();
 	diffusionScheduleProjectContactsDialogResize();
 
-	document.addEventListener('drop', diffusionHandleDragDropUpload, true);
+	diffusionRegisterUploadCompletion();
 
 	jQuery(document).on('click', '.diffusion-select-all-project-contacts', function (event) {
 		var target = jQuery(this).data('target');

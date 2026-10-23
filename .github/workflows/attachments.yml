@@ -1,0 +1,44 @@
+name: Attachment regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  attachments:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {php: '8.0', dolibarr: '20', ref: '697bf01970740a3339cd99cf055b4428fc5e051c'}
+          - {php: '8.1', dolibarr: '21', ref: 'fd970b582a4d8c5779a2958a4e9f4fce225cf085'}
+          - {php: '8.2', dolibarr: '22', ref: '49b9a6d19f3deb6d410c0e9b3310e95be4ea7710'}
+          - {php: '8.3', dolibarr: '23', ref: '57a1f05d490a7a80944a8232e9c613e6556d2704'}
+          - {php: '8.4', dolibarr: '24', ref: '769c7db907099643558e77d7002c109cfda919e5'}
+          - {php: '8.4', dolibarr: '25-alpha', ref: '6033765a10c40a251becb58f4ec266ff9a74e8d3'}
+    name: Dolibarr ${{ matrix.dolibarr }} / PHP ${{ matrix.php }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Dolibarr/dolibarr
+          ref: ${{ matrix.ref }}
+          path: test/.core
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, mbstring
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: PHP syntax
+        run: git ls-files -z '*.php' | xargs -0 -n1 php -l
+      - run: php test/attachments.php test/.core/htdocs
+      - run: php test/document_context.php test/.core/htdocs
+      - run: php test/numbering.php test/.core/htdocs
+      - run: php test/pdf_attachment_links.php test/.core/htdocs
+      - run: php test/attachment_sharing.php test/.core/htdocs
+      - run: node test/attachment_upload.js

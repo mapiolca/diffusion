@@ -1,5 +1,7 @@
 # Diffusion for Dolibarr ERP/CRM
 
+Version du code / Code version: **1.4.0** — 2026-10-23.
+
 ## 🇫🇷 Français
 
 ### Présentation
@@ -51,6 +53,26 @@ Copiez le dossier du module dans :
 - Vérifiez que les répertoires de données du module sont accessibles en écriture.
 - Vérifiez les permissions utilisateurs/groupes liées aux diffusions.
 - Vérifiez les constantes de configuration (numérotation, modèles, automatisations agenda).
+
+### Pièces jointes et liens publics
+
+Après déploiement, effectuer un rechargement forcé du navigateur pour remplacer l’ancien script éventuellement en cache.
+
+Recharger également Diffusion depuis la liste des modules pour actualiser les hooks enregistrés d’une ancienne installation, en conservant les réglages existants.
+
+Le glisser-déposer natif est disponible dès Dolibarr 20 sur les onglets **Diffusion**, **Fichiers joints** et **Événements/Agenda**, pour une diffusion enregistrée et un utilisateur disposant des droits de lecture et d’écriture. Il suit le réglage JavaScript/Ajax de Dolibarr. L’upload classique reste disponible dans Fichiers joints. Les modèles de diffusion ne reçoivent pas de pièces jointes.
+
+L’aperçu et le téléchargement d’un document existant utilisent le droit de lecture de la diffusion, y compris avec le contrôle par objet de Dolibarr 25. La régénération après dépôt charge la société émettrice native ; une société indisponible produit un message explicite et conserve les fichiers ajoutés.
+
+La recherche du modèle de numérotation vérifie les fichiers avant de les charger, sans avertissement pour les modules qui ne fournissent aucun modèle Diffusion. Un modèle configuré absent ou invalide produit une erreur explicite dans le parcours de validation.
+
+Une validation conserve les clés publiques existantes des pièces jointes, y compris avec Multicompany. Les nouveaux fichiers suivent l’option de partage automatique ; une validation ou une réparation ne crée pas de nouvelle clé et ne réactive pas un partage révoqué.
+
+Pour les anciens liens cassés, utiliser **Fichiers joints > Réparer les liens des pièces jointes**. Cette action concerne uniquement la diffusion affichée et ne nécessite aucun réupload. Elle conserve l’ancienne URL lorsque son index et sa clé peuvent être identifiés avec certitude. Si la clé a disparu, une nouvelle URL doit être créée avec le partage natif. Les conflits sont signalés sans fusion automatique des identités publiques. Consulter [les preuves et limites des tests](test/README.md#attachment-regression--140).
+
+Le PDF reprend les liens publics déjà actifs des pièces jointes de la diffusion et de son entité, même lorsque la création automatique de nouveaux liens est désactivée. Après une réparation d’index, régénérer le PDF. Un index rattaché explicitement à un autre objet reste en conflit et son lien n’est pas ajouté au PDF.
+
+La création automatique suit le réglage de l’entité propriétaire de la diffusion, y compris lors d’un dépôt depuis une autre entité. Si ce réglage est désactivé, les nouveaux fichiers restent sans lien public dans la liste et le PDF jusqu’à l’activation de leur partage natif. Activer le réglage concerne les prochains uploads ; une régénération ou une réparation ne publie pas rétroactivement les fichiers existants.
 
 ### Configuration
 
@@ -153,6 +175,22 @@ Copy the module folder into:
 - Check that module data directories are writable.
 - Check user/group permissions for distributions.
 - Check module constants (numbering, templates, automatic agenda actions).
+
+### Attachments and public links
+
+Native drag and drop is available from Dolibarr 20 on the **Diffusion**, **Attached files** and **Events/Agenda** tabs for a saved distribution and a user with read/write permission. It follows Dolibarr's JavaScript/Ajax setting; the standard upload remains available. Distribution templates do not accept attachments.
+
+After upgrading, reload Diffusion from the module list to refresh persisted hooks from an older installation while retaining existing settings, then refresh the browser cache.
+
+Previewing and downloading existing documents use the distribution read permission, including Dolibarr 25's per-object check. Regeneration after upload loads the native issuing company; an unavailable issuer produces an explicit error and preserves uploaded files.
+
+Numbering lookup checks files before loading them, without warnings for modules that provide no Diffusion model. A missing or invalid configured model produces an explicit validation error.
+
+Validation preserves existing public attachment URLs, including across entities. New uploads follow the automatic-sharing setting; validation and repair do not generate keys or reactivate revoked sharing. Use **Attached files > Repair attachment links** to recover a reliable old index without reuploading. Missing original keys require a new URL through native sharing. Ambiguous public identities are reported unchanged. See the [test evidence and limits](test/README.md#attachment-regression--140).
+
+The PDF includes existing active public links for attachments belonging to the distribution and its entity, even when automatic creation of new links is disabled. Regenerate the PDF after repairing its index. An index explicitly owned by another object remains a conflict and its link is not added to the PDF.
+
+Automatic sharing follows the distribution owner's entity setting, including uploads from another entity. When disabled, new files have no public link in the list or PDF until their native sharing is enabled. Enabling the setting affects future uploads; regeneration and repair do not publish existing files retroactively.
 
 ### Configuration
 

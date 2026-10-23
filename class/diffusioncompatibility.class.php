@@ -53,6 +53,13 @@ class DiffusionCompatibility
 	public static function getFeatures()
 	{
 		return array(
+			'native_drag_drop' => array(
+				'label' => 'DiffusionCompatibilityFeatureDragDrop',
+				'description' => 'DiffusionCompatibilityFeatureDragDropDesc',
+				'min_dolibarr' => '20.0.0',
+				'min_php' => self::MIN_PHP_VERSION,
+				'checks' => array('dragAndDropFileUpload'),
+			),
 			'core_module' => array(
 				'label' => 'DiffusionCompatibilityFeatureCore',
 				'description' => 'DiffusionCompatibilityFeatureCoreDesc',
@@ -140,7 +147,7 @@ class DiffusionCompatibility
 		}
 		if ($available && !empty($feature['checks']) && is_array($feature['checks'])) {
 			foreach ($feature['checks'] as $check) {
-				if ($check === 'getMultidirOutput' && !function_exists('getMultidirOutput')) {
+				if (in_array($check, array('getMultidirOutput', 'dragAndDropFileUpload'), true) && !function_exists($check)) {
 					$available = false;
 					$reason = 'DiffusionCompatibilityReasonFunctionMissing';
 					break;
