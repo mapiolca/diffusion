@@ -721,7 +721,44 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 	$triggersendname = 'DIFFUSION_SENDMAIL';
 	$autocopy = 'MAIN_MAIL_AUTOCOPY_DIFFUSION_TO';
 	$trackid = 'diffusion'.$object->id;
-	include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
+	// Mail attachment removal changes the selection only, never the stored documents.
+	if (GETPOST('removeAll', 'alpha') || GETPOSTINT('removedfile') > 0) {
+		require_once DOL_DOCUMENT_ROOT.'/core/class/html.formmail.class.php';
+		$formmail = new FormMail($db);
+		$formmail->trackid = $trackid; // Derived from the loaded object, never from request input.
+		if (GETPOST('removeAll', 'alpha')) {
+			$mailattachments = $formmail->get_attached_files();
+			// Removing backwards preserves the native positional indexes after each removal.
+			for ($mailattachmentindex = count($mailattachments['paths']) - 1; $mailattachmentindex >= 0; $mailattachmentindex--) {
+				$formmail->remove_attached_files($mailattachmentindex);
+			}
+		} else {
+			$formmail->remove_attached_files(GETPOSTINT('removedfile') - 1);
+		}
+		$action = 'presend';
+	} else {
+		// Native Agenda may move the supplied paths after SMTP; never supply originals.
+		if (in_array($action, array('send', 'relance'), true) && !GETPOST('addfile') && !GETPOST('cancel') && !GETPOST('modelselected')) {
+			require_once DOL_DOCUMENT_ROOT.'/core/class/html.formmail.class.php';
+			$formmail = new FormMail($db);
+			$formmail->trackid = $trackid;
+			$mailattachments = $formmail->get_attached_files();
+			$mailcopies = DiffusionAttachments::stageMailFiles($object, $user, $mailattachments);
+			if ($mailcopies === null) {
+				setEventMessages($langs->trans('DiffusionAttachmentOperationFailed'), null, 'errors');
+				$action = 'presend';
+			} else {
+				for ($mailattachmentindex = count($mailattachments['paths']) - 1; $mailattachmentindex >= 0; $mailattachmentindex--) {
+					$formmail->remove_attached_files($mailattachmentindex);
+				}
+				foreach ($mailcopies['paths'] as $mailattachmentindex => $mailpath) {
+					$formmail->add_attached_files($mailpath, $mailcopies['names'][$mailattachmentindex], $mailcopies['mimes'][$mailattachmentindex]);
+				}
+			}
+		}
+		include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
+	}
+	// End mail attachment removal.
 
 	if ($action == 'set_sent' && $permissiontoadd) {
 		$result = $object->setSent($user);

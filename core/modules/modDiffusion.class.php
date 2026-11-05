@@ -76,7 +76,7 @@ class modDiffusion extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@diffusion'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '1.4.0';
+		$this->version = '1.4.1';
 		// Url to the file with your last numberversion of this module
 		//$this->url_last_version = 'http://www.example.com/versionmodule.txt';
 
@@ -685,7 +685,7 @@ class modDiffusion extends DolibarrModules
 	 */
 	private function registerDiffusionActionTriggers()
 	{
-		global $langs;
+		global $langs, $conf;
 
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/actions_diffusion.class.php');
@@ -741,6 +741,12 @@ class modDiffusion extends DolibarrModules
 		if ($resultrepair < 0) {
 			$this->error = $this->db->lasterror();
 			return -4;
+		}
+
+		$resultlabels = ActionsDiffusion::repairContactAgendaLabels($this->db, $langs, (int) $conf->entity);
+		if ($resultlabels < 0) {
+			$this->error = 'Contact Agenda label repair failed: missing translation or database error. '.$this->db->lasterror();
+			return -5;
 		}
 
 		return 1;

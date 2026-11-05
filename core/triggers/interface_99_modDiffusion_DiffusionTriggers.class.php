@@ -70,12 +70,16 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 			case 'DIFFUSION_DELETE':
 			case 'DIFFUSIONCONTACT_INSERT':
 			case 'DIFFUSIONCONTACT_DELETELINE':
-			case 'DIFFUSIONCONTACT_UPDATELINE':
 			case 'DIFFUSIONCONTACT_DELETEALL':
 				$result = $this->createAgendaEvent($action, $object, $user, $langs, $conf);
 				if ($result < 0) {
 					return -1;
 				}
+				return 0;
+
+			case 'DIFFUSIONCONTACT_UPDATELINE':
+				// The configured native Agenda trigger owns this event; its translated
+				// label/description are supplied by updateStatusField(), without a duplicate.
 				return 0;
 
 			case 'DIFFUSION_SENDMAIL':
@@ -178,7 +182,9 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 		$agenda = new ActionComm($this->db);
 		$agenda->type_code = 'AC_OTH_AUTO';
 		$agenda->code = $action;
-		$agenda->label = $langs->trans('Notify_'.$action);
+		// Translate before persistence, including calls from Ajax, API or cron.
+		$langs->load('diffusion@diffusion');
+		$agenda->label = $langs->transnoentities('Notify_'.$action);
 		$agenda->note_private = !empty($object->actionmsg) ? (string) $object->actionmsg : $agenda->label;
 		$agenda->datep = dol_now();
 		$agenda->datef = $agenda->datep;

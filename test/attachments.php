@@ -33,6 +33,7 @@ class AttachmentResult
 }
 class DoliDB
 {
+	public $transaction_opened = 0;
 	public $pdo;
 	public $failure = '';
 	public $failcommit = false;

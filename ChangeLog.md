@@ -1,5 +1,24 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.1 (2026-11-05)
+
+- FR : Réparation ciblée des anciens libellés Agenda restés sous forme de clé de traduction, avec conservation des titres et descriptions personnalisés et du périmètre d’entité. La réparation s’exécute à l’initialisation du module, dans la langue choisie pour cette entité.
+- EN: Targeted repair of historical Agenda labels containing raw translation keys, preserving custom titles/descriptions and entity scope. Repair runs during module initialization in the selected entity language.
+
+- FR : Les changements de statut d’un contact transmettent leur libellé traduit à l’Agenda natif et ne créent plus un second événement manuel pour la même modification. Les doublons historiques restent à examiner séparément.
+- EN: Contact status changes supply translated text to native Agenda and no longer create a second manual event for the same update. Historical duplicates require separate review.
+
+- FR : Envoi de copies temporaires via FormMail pour conserver les originaux même si l’Agenda déplace les pièces jointes après SMTP ; répertoire temporaire utilisateur natif, refus de l’envoi si la copie échoue.
+- EN: Send temporary copies through FormMail to retain originals even when Agenda moves attachments after SMTP; use native user temporary storage and refuse sending if copying fails.
+
+- FR : Recherche de la lettre dans le répertoire documentaire de l’entité propriétaire lors de la préparation du mail, y compris après génération, sans sélectionner une archive ZIP à sa place ; prise en charge des noms ODT/ODS incluant le modèle et un horodatage.
+- EN: Find the letter in its owning entity's document directory when composing email, including after generation, without selecting a ZIP archive instead; support ODT/ODS filenames containing the template name and a timestamp.
+- FR : Le retrait individuel ou global des pièces jointes du mail conserve les fichiers sur disque et ne modifie que la sélection du message. Aucun changement de schéma ni réactivation du module nécessaire.
+- EN: Removing one or all email attachments preserves the stored files and only changes the message selection. No schema change or module reactivation is required.
+
+- FR : Présélection des contacts externes destinataires par mail à l’ouverture du formulaire d’envoi d’une diffusion, avec conservation des choix manuels, exclusion des contacts sans adresse et respect du périmètre d’entités existant. Aucun changement de schéma ni réactivation du module nécessaire.
+- EN: Preselect external contacts marked as email recipients when opening a distribution email, preserving manual choices, excluding contacts without an email address and retaining the existing entity scope. No schema change or module reactivation is required.
+
 ## 1.4.0 (2026-10-23)
 
 - FR : Correction de l’interception des uploads des autres modules et ajout du glisser-déposer natif dans les trois onglets documentaires des diffusions, avec conservation de l’upload classique.
