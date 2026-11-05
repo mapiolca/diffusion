@@ -10,6 +10,7 @@ class MailAgendaDiffusion extends Diffusion
 	public $attachedfiles = array('paths' => array(), 'names' => array(), 'mimes' => array());
 }
 $startchecks = $checks;
+$conf->modules_parts['triggers'] = array(); // Real dispatcher, no instance trigger modules in the fixture.
 $source = file_get_contents(DOL_DOCUMENT_ROOT.'/core/triggers/interface_50_modAgenda_ActionsAuto.class.php');
 $constant = strpos($source, 'MAIN_COPY_FILE_IN_EVENT_AUTO');
 if ($constant === false) { throw new RuntimeException('Native Agenda transfer block missing'); }
