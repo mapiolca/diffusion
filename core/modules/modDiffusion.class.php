@@ -685,7 +685,7 @@ class modDiffusion extends DolibarrModules
 	 */
 	private function registerDiffusionActionTriggers()
 	{
-		global $langs;
+		global $langs, $conf;
 
 		$langs->load('diffusion@diffusion');
 		dol_include_once('/diffusion/class/actions_diffusion.class.php');
@@ -741,6 +741,12 @@ class modDiffusion extends DolibarrModules
 		if ($resultrepair < 0) {
 			$this->error = $this->db->lasterror();
 			return -4;
+		}
+
+		$resultlabels = ActionsDiffusion::repairContactAgendaLabels($this->db, $langs, (int) $conf->entity);
+		if ($resultlabels < 0) {
+			$this->error = 'Contact Agenda label repair failed: missing translation or database error. '.$this->db->lasterror();
+			return -5;
 		}
 
 		return 1;

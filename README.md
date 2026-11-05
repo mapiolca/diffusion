@@ -239,3 +239,9 @@ Module translation files are available in:
 - Dolibarr website: <https://www.dolibarr.org>
 - Dolistore: <https://www.dolistore.com>
 - Dolibarr technical documentation (Doxygen): <https://doxygen.dolibarr.org/>
+
+### Repair untranslated contact Agenda events
+
+After deploying the Agenda label fix, disable and re-enable the Diffusion module through native module administration in each affected entity, using the language wanted for the historical titles. Existing module settings are retained by the module lifecycle. This repairs only events in that entity whose title is exactly `Notify_DIFFUSIONCONTACT_UPDATELINE`, with code `DIFFUSIONCONTACT_UPDATELINE` and the canonical or legacy Diffusion contact element type. The private description is translated only when it equals that same raw key; custom descriptions and titles remain intact. Repeating setup has no further effect. No event is deleted or created, and no notification is sent. A missing translation or database error fails setup rather than reporting a successful repair.
+
+Après déploiement du correctif, désactiver puis réactiver le module Diffusion depuis l’administration native des modules dans chaque entité concernée, dans la langue souhaitée pour les titres historiques. La réparation cible uniquement la clé brute exacte ci-dessus et conserve les titres et descriptions personnalisés. Elle est rejouable, sans création ni suppression d’événement, ni notification. Cette procédure reste à valider sur l’instance déployée.
