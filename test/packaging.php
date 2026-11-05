@@ -40,13 +40,19 @@ try {
 		$zip->close();
 	}
 	$zip = new ZipArchive(); packageCheck($zip->open($zipfile) === true, 'Cannot open final ZIP');
-	$extractCandidate = sys_get_temp_dir().'/unzip-dir-'.basename($zipfile);
-	packageCheck(!file_exists($extractCandidate), 'Native extraction directory already exists; refusing to overwrite it');
-	$extract = $extractCandidate;
-	$result = validateZipFile($zip, 'module_diffusion-1.4.3.zip', $zipfile, $langs);
-	packageCheck($result['error'] === 0 && $result['upload'] === 0, 'Native ZIP rejected: '.($result['errormsg'] ?? ''));
-	$source = file_get_contents($extract.'/diffusion/test/attachment_index.php');
+	$source = $zip->getFromName('diffusion/test/attachment_index.php');
 	packageCheck(is_string($source), 'Packaged bootstrap unavailable');
+	if (function_exists('validateZipFile')) {
+		$extractCandidate = sys_get_temp_dir().'/unzip-dir-'.basename($zipfile);
+		packageCheck(!file_exists($extractCandidate), 'Native extraction directory already exists; refusing to overwrite it');
+		$extract = $extractCandidate;
+		$result = validateZipFile($zip, 'module_diffusion-1.4.3.zip', $zipfile, $langs);
+		packageCheck($result['error'] === 0 && $result['upload'] === 0, 'Native ZIP rejected: '.($result['errormsg'] ?? ''));
+		echo "Native ZIP validation passed.\n";
+	} else {
+		$zip->close();
+		echo "Native ZIP validation unavailable in this core (no validateZipFile); bootstrap fixtures still run.\n";
+	}
 	$end = strpos($source, '/** @var User'); packageCheck($end !== false, 'Bootstrap boundary missing');
 	$bootstrap = substr($source, 0, $end);
 	foreach (array('htdocs/diffusion/test', 'htdocs/custom/diffusion/test', 'missing/diffusion/test') as $layout) {
@@ -59,7 +65,7 @@ try {
 		packageCheck($error === '', 'Bootstrap emitted errors for '.$layout.': '.$error);
 		packageCheck($output === (strpos($layout, 'htdocs/') === 0 ? 'BOOTSTRAP_OK' : 'Dolibarr bootstrap unavailable'), 'Wrong bootstrap result for '.$layout.': '.$output);
 	}
-	echo "Native ZIP validation passed; root/custom/missing bootstrap fixtures passed; ".$checks." checks.\n";
+	echo "Root/custom/missing bootstrap fixtures passed; ".$checks." checks.\n";
 } finally {
 	// These directories are disposable fixtures created by this process only.
 	foreach (array($extract, $work) as $directory) {
