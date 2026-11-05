@@ -2,6 +2,9 @@
 
 ## 1.4.1 (2026-11-05)
 
+- FR : Initialisation du répertoire documentaire natif dès la construction de l’objet, afin de conserver le PDF après envoi même lorsque les hooks ne sont pas chargés ; test de régression sans initialisation préalable du hook.
+- EN: Initialize the native document directory when constructing the object to retain the PDF after sending even without loaded hooks; regression coverage starts without a hook instance.
+
 - FR : Recherche de la lettre dans le répertoire documentaire de l’entité propriétaire lors de la préparation du mail, y compris après génération, sans sélectionner une archive ZIP à sa place ; prise en charge des noms ODT/ODS incluant le modèle et un horodatage.
 - EN: Find the letter in its owning entity's document directory when composing email, including after generation, without selecting a ZIP archive instead; support ODT/ODS filenames containing the template name and a timestamp.
 - FR : Le retrait individuel ou global des pièces jointes du mail conserve les fichiers sur disque et ne modifie que la sélection du message. Aucun changement de schéma ni réactivation du module nécessaire.

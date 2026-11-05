@@ -3,9 +3,10 @@
 // Native Agenda file handling against disposable fixtures; no mail or live Agenda write.
 require __DIR__.'/attachments.php';
 require_once __DIR__.'/../class/actions_diffusion.class.php';
-class MailAgendaDiffusion extends AttachmentDiffusion
+class MailAgendaDiffusion extends Diffusion
 {
 	/** @var array{paths:list<string>,names:list<string>,mimes:list<string>} */
+	public $failtrigger = false;
 	public $attachedfiles = array('paths' => array(), 'names' => array(), 'mimes' => array());
 }
 $startchecks = $checks;
@@ -28,12 +29,14 @@ foreach ($tokens as $token) {
 }
 foreach (array(1, 2) as $entity) {
 	$fixture = attachmentFixture($entity);
+	$db->query('CREATE TABLE fixture_rights_def (perms TEXT, module TEXT, subperms TEXT, libelle TEXT)');
+	unset($conf->diffusiondoc); // No hook instance exists in a fresh mail request.
+	$conf->diffusion->multidir_output[1] = DOL_DATA_ROOT.'/diffusion';
 	$object = new MailAgendaDiffusion($db);
 	foreach (get_object_vars($fixture) as $property => $value) { $object->$property = $value; }
 	$conf->entity = 1; // Also exercise shared consultation of the owning entity 2.
 	$conf->diffusion->multidir_output[1] = DOL_DATA_ROOT.'/diffusion';
 	$base = $conf->diffusion->multidir_output;
-	$hooks = new ActionsDiffusion($db);
 	$directory = diffusionGetDocumentUploadDir($object);
 	$native = getMultidirOutput($object, '', 1);
 	checkAttachment(rtrim($native, '/'), $directory, 'Native Agenda destination equals the owner document directory');
