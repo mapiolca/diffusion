@@ -19,7 +19,9 @@ foreach (get_object_vars($fixtureconf) as $property => $value) { $conf->$propert
 $conf->file->dol_document_root = array(DOL_DOCUMENT_ROOT);
 $langs = new Translate('', $conf);
 $langs->setDefaultLang('en_US');
-function setEventMessages($message, $errors = null, $style = '') { throw new RuntimeException($message.' '.json_encode($errors)); }
+if (!function_exists('setEventMessages')) {
+	function setEventMessages($message, $errors = null, $style = '') { throw new RuntimeException($message.' '.json_encode($errors)); }
+}
 $conf->modules_parts['triggers'] = array(); // Real dispatcher, no instance trigger modules in the fixture.
 $source = file_get_contents(DOL_DOCUMENT_ROOT.'/core/triggers/interface_50_modAgenda_ActionsAuto.class.php');
 $constant = strpos($source, 'MAIN_COPY_FILE_IN_EVENT_AUTO');
