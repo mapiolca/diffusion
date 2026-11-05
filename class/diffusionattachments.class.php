@@ -24,6 +24,54 @@ class DiffusionAttachments
 	}
 
 	/**
+	 * Give native mail/Agenda disposable copies instead of stored object files.
+	 * Copies follow FormMail's native user/temp lifecycle, including failed retries.
+	 *
+	 * @param Diffusion $object Loaded and authorized diffusion
+	 * @param User $user Authenticated sender
+	 * @param array{paths:array<int,string>,names:array<int,string>,mimes:array<int,string>} $files Native mail selection
+	 * @return array{paths:array<int,string>,names:array<int,string>,mimes:array<int,string>}|null Null on failure
+	 */
+	public static function stageMailFiles($object, $user, array $files)
+	{
+		global $conf;
+		$directory = diffusionGetDocumentUploadDir($object);
+		if ($directory === '' || !self::isSafeDirectory($directory)) {
+			return null;
+		}
+		$originalroot = rtrim(str_replace('\\', '/', (string) realpath($directory)), '/').'/';
+		$staging = '';
+		foreach ($files['paths'] as $key => $source) {
+			$real = realpath($source);
+			if ($real === false || !is_file($source)) {
+				return null;
+			}
+			if (strpos(str_replace('\\', '/', $real), $originalroot) !== 0) {
+				continue; // Native uploads already live in the user's temporary directory.
+			}
+			if (is_link($source) || !self::isSafeDirectory(dirname($source))) {
+				return null;
+			}
+			if ($staging === '') {
+				if ((int) $user->id <= 0 || empty($conf->user->dir_output)
+					|| !self::isSafeDirectory($conf->user->dir_output)) {
+					return null;
+				}
+				$staging = $conf->user->dir_output.'/'.((int) $user->id).'/temp/diffusion-'.bin2hex(random_bytes(12));
+				if (dol_mkdir($staging) < 0 || !self::isSafeDirectory($staging)) {
+					return null;
+				}
+			}
+			$target = $staging.'/'.((int) $key).'-'.dol_sanitizeFileName(basename($source));
+			if (dol_copy($source, $target, '0', 0, 0, 0) <= 0) {
+				return null;
+			}
+			$files['paths'][$key] = $target;
+		}
+		return $files;
+	}
+
+	/**
 	 * Check data scope independently of the caller's functional permission.
 	 * @param Diffusion $object Loaded diffusion
 	 * @param User $user Actor

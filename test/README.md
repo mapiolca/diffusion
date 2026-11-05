@@ -139,9 +139,9 @@ Activation calls this single atomic repair after trigger registration for the cu
 
 ## Post-mail Agenda document preservation — 1.4.1
 
-`php test/mail_agenda_documents.php <Dolibarr htdocs>` executes the unmodified native `MAIN_COPY_FILE_IN_EVENT_AUTO` file-transfer block extracted from the supplied core, after a simulated successful mail/Agenda insertion. It checks the canonical object destination, preservation of the sent PDF bytes, owning entity 2 while consulting entity 1, unchanged module roots and global option, and repeated hook initialization. The native destination mismatch was reproduced before the alias fix. Older cores copy into Agenda storage; newer cores attempt a move into the object's directory, which must match Diffusion's canonical layout. These tests do not send email or execute a complete Agenda transaction.
+`php test/mail_agenda_documents.php <Dolibarr htdocs>` stages exact copies in native user temporary storage, then executes the unmodified native Agenda file-transfer block against a deliberately reset/legacy destination. It checks two owner entities, including entity 2 consulted from entity 1, identical sent bytes and filenames, retry selection, native FormMail cleanup, unchanged module roots/global option and refusal when user temporary storage is unavailable. SMTP and Agenda insertion remain simulated; file helpers and ECM indexing are native against disposable SQLite.
 
-The fix prevents future displacement. It does not automatically recover historical files from the flat directory; their identity, owning entity, contents and collisions must be checked before any recovery. The reported production incident still requires verification of the active global setting, deployed code and actual file locations.
+Stored originals are never supplied to destructive Agenda handling. Temporary copies follow the existing FormMail user/temp lifecycle. Previously displaced PDFs are not recovered automatically; their ownership, bytes and collisions require separate checks.
 
 
 The mail lookup regression additionally covers template-suffixed ODT and ODS files, including timestamped names, in both initial and post-generation lookup. The exact-name-only pattern was reproduced failing before this correction (PR #27 review).

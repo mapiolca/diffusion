@@ -1012,8 +1012,12 @@ class ActionsDiffusion
 		if (!isset($conf->diffusion->multidir_output[$entity]) || !is_string($conf->diffusion->multidir_output[$entity])) {
 			return '';
 		}
-		require_once __DIR__.'/../../class/diffusion.class.php';
-		Diffusion::initDocumentOutputDirectories();
+		if (!isset($conf->diffusiondoc) || !is_object($conf->diffusiondoc)) {
+			$conf->diffusiondoc = new stdClass();
+		}
+		$conf->diffusiondoc->enabled = isModEnabled('diffusion') ? 1 : 0;
+		$conf->diffusiondoc->multidir_output = $conf->diffusion->multidir_output;
+		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
 		return $conf->diffusion->multidir_output[$entity];
 	}
 

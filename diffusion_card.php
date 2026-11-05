@@ -737,6 +737,25 @@ include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 		}
 		$action = 'presend';
 	} else {
+		// Native Agenda may move the supplied paths after SMTP; never supply originals.
+		if (in_array($action, array('send', 'relance'), true) && !GETPOST('addfile') && !GETPOST('cancel') && !GETPOST('modelselected')) {
+			require_once DOL_DOCUMENT_ROOT.'/core/class/html.formmail.class.php';
+			$formmail = new FormMail($db);
+			$formmail->trackid = $trackid;
+			$mailattachments = $formmail->get_attached_files();
+			$mailcopies = DiffusionAttachments::stageMailFiles($object, $user, $mailattachments);
+			if ($mailcopies === null) {
+				setEventMessages($langs->trans('DiffusionAttachmentOperationFailed'), null, 'errors');
+				$action = 'presend';
+			} else {
+				for ($mailattachmentindex = count($mailattachments['paths']) - 1; $mailattachmentindex >= 0; $mailattachmentindex--) {
+					$formmail->remove_attached_files($mailattachmentindex);
+				}
+				foreach ($mailcopies['paths'] as $mailattachmentindex => $mailpath) {
+					$formmail->add_attached_files($mailpath, $mailcopies['names'][$mailattachmentindex], $mailcopies['mimes'][$mailattachmentindex]);
+				}
+			}
+		}
 		include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
 	}
 	// End mail attachment removal.
