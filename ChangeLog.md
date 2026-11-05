@@ -1,5 +1,10 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.1 (2026-11-05)
+
+- FR : Présélection des contacts externes destinataires par mail à l’ouverture du formulaire d’envoi d’une diffusion, avec conservation des choix manuels, exclusion des contacts sans adresse et respect du périmètre d’entités existant. Aucun changement de schéma ni réactivation du module nécessaire.
+- EN: Preselect external contacts marked as email recipients when opening a distribution email, preserving manual choices, excluding contacts without an email address and retaining the existing entity scope. No schema change or module reactivation is required.
+
 ## 1.4.0 (2026-10-23)
 
 - FR : Correction de l’interception des uploads des autres modules et ajout du glisser-déposer natif dans les trois onglets documentaires des diffusions, avec conservation de l’upload classique.
