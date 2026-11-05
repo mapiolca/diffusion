@@ -29,13 +29,14 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: pdo_sqlite, mbstring
+          extensions: pdo_sqlite, mbstring, zip
           coverage: none
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: PHP syntax
         run: git ls-files -z '*.php' | xargs -0 -n1 php -l
+      - run: php test/packaging.php test/.core/htdocs
       - run: php test/attachments.php test/.core/htdocs
       - run: php test/mail_attachments.php test/.core/htdocs
       - run: php test/mail_agenda_documents.php test/.core/htdocs
