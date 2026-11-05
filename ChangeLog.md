@@ -1,5 +1,12 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.1 (2026-11-05)
+
+- FR : Recherche de la lettre dans le répertoire documentaire de l’entité propriétaire lors de la préparation du mail, y compris après génération, sans sélectionner une archive ZIP à sa place.
+- EN: Find the letter in its owning entity's document directory when composing email, including after generation, without selecting a ZIP archive instead.
+- FR : Le retrait individuel ou global des pièces jointes du mail conserve les fichiers sur disque et ne modifie que la sélection du message. Aucun changement de schéma ni réactivation du module nécessaire.
+- EN: Removing one or all email attachments preserves the stored files and only changes the message selection. No schema change or module reactivation is required.
+
 ## 1.4.0 (2026-10-23)
 
 - FR : Correction de l’interception des uploads des autres modules et ajout du glisser-déposer natif dans les trois onglets documentaires des diffusions, avec conservation de l’upload classique.
