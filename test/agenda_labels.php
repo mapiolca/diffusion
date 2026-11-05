@@ -7,6 +7,11 @@ if (PHP_SAPI !== 'cli') {
 	exit(1);
 }
 require_once __DIR__.'/../core/class/actions_diffusion.class.php';
+$core = realpath($argv[1] ?? dirname(__DIR__, 2).'/dolibarr/htdocs');
+$schema = $core ? file_get_contents($core.'/install/mysql/tables/llx_actioncomm.sql') : false;
+if ($schema === false || !preg_match('/^\s*note\s+mediumtext/m', $schema) || preg_match('/^\s*note_private\s/m', $schema)) {
+	throw new RuntimeException('Requires native Agenda schema with SQL note column; note_private is only a PHP property.');
+}
 define('MAIN_DB_PREFIX', 'fixture_long_prefix_');
 class AgendaLabelDatabase
 {
@@ -19,7 +24,7 @@ class AgendaLabelDatabase
 		$this->queries++;
 		if ($this->fail) { return false; }
 		// MySQL unary BINARY becomes SQLite's exact binary collation.
-		$sql = preg_replace('/BINARY (note_private|label)/', '$1 COLLATE BINARY', $sql);
+		$sql = preg_replace('/BINARY (note|label)/', '$1 COLLATE BINARY', $sql);
 		return $this->pdo->exec($sql) !== false;
 	}
 }
@@ -42,7 +47,7 @@ class AgendaLabelLanguage
 function check($ok, $message) { if (!$ok) { throw new RuntimeException($message); } }
 foreach (array('fr_FR' => "Modification d'un contact de diffusion", 'en_US' => 'Diffusion contact updated') as $locale => $expected) {
 	$db = new AgendaLabelDatabase();
-	$db->pdo->exec('CREATE TABLE '.MAIN_DB_PREFIX.'actioncomm (id INTEGER PRIMARY KEY, entity INTEGER, label TEXT, note_private TEXT, code TEXT, elementtype TEXT, fk_element INTEGER)');
+	$db->pdo->exec('CREATE TABLE '.MAIN_DB_PREFIX.'actioncomm (id INTEGER PRIMARY KEY, entity INTEGER, label TEXT, note TEXT, code TEXT, elementtype TEXT, fk_element INTEGER)');
 	$key = 'Notify_DIFFUSIONCONTACT_UPDATELINE';
 	$base = array(1, $key, $key, 'DIFFUSIONCONTACT_UPDATELINE', 'diffusioncontact@diffusion', 42);
 	$rows = array($base);
@@ -53,14 +58,14 @@ foreach (array('fr_FR' => "Modification d'un contact de diffusion", 'en_US' => '
 	$row = $base; $row[4] = 'other@other'; $rows[] = $row;
 	$row = $base; $row[1] = strtolower($key); $rows[] = $row;
 	$row = $base; $row[2] = null; $rows[] = $row;
-	$insert = $db->pdo->prepare('INSERT INTO '.MAIN_DB_PREFIX.'actioncomm (entity,label,note_private,code,elementtype,fk_element) VALUES (?,?,?,?,?,?)');
+	$insert = $db->pdo->prepare('INSERT INTO '.MAIN_DB_PREFIX.'actioncomm (entity,label,note,code,elementtype,fk_element) VALUES (?,?,?,?,?,?)');
 	foreach ($rows as $row) { $insert->execute($row); }
 	$read = static function () use ($db) { return $db->pdo->query('SELECT * FROM '.MAIN_DB_PREFIX.'actioncomm ORDER BY id')->fetchAll(PDO::FETCH_ASSOC); };
 	$before = $read();
 	$langs = new AgendaLabelLanguage(); $langs->locale = $locale;
 	check(ActionsDiffusion::repairContactAgendaLabels($db, $langs, 1) === 1, 'Repair failed');
 	$wanted = $before;
-	$wanted[0]['label'] = $expected; $wanted[0]['note_private'] = $expected;
+	$wanted[0]['label'] = $expected; $wanted[0]['note'] = $expected;
 	$wanted[1]['label'] = $expected; $wanted[7]['label'] = $expected;
 	check($read() === $wanted, 'Unexpected row or field changed');
 	check(ActionsDiffusion::repairContactAgendaLabels($db, $langs, 1) === 1 && $read() === $wanted, 'Replay changed data');

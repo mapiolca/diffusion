@@ -2,6 +2,9 @@
 
 ## 1.4.1 (2026-11-05)
 
+- FR : Réparation ciblée des anciens libellés Agenda restés sous forme de clé de traduction, avec conservation des titres et descriptions personnalisés et du périmètre d’entité. La réparation s’exécute à l’initialisation du module, dans la langue choisie pour cette entité.
+- EN: Targeted repair of historical Agenda labels containing raw translation keys, preserving custom titles/descriptions and entity scope. Repair runs during module initialization in the selected entity language.
+
 - FR : Les changements de statut d’un contact transmettent leur libellé traduit à l’Agenda natif et ne créent plus un second événement manuel pour la même modification. Les doublons historiques restent à examiner séparément.
 - EN: Contact status changes supply translated text to native Agenda and no longer create a second manual event for the same update. Historical duplicates require separate review.
 
@@ -13,8 +16,6 @@
 - FR : Le retrait individuel ou global des pièces jointes du mail conserve les fichiers sur disque et ne modifie que la sélection du message. Aucun changement de schéma ni réactivation du module nécessaire.
 - EN: Removing one or all email attachments preserves the stored files and only changes the message selection. No schema change or module reactivation is required.
 
-- FR : Conservation de la lettre après envoi lorsque la copie des pièces jointes dans les événements Agenda est activée : transmission de copies temporaires au traitement natif, sans modifier le réglage global. Les PDF déjà déplacés ne sont pas restaurés automatiquement.
-- EN: Preserve the letter after email delivery when automatic Agenda attachment copying is enabled by supplying disposable copies to native handling, without changing the global option. Previously moved PDFs are not restored automatically.
 - FR : Présélection des contacts externes destinataires par mail à l’ouverture du formulaire d’envoi d’une diffusion, avec conservation des choix manuels, exclusion des contacts sans adresse et respect du périmètre d’entités existant. Aucun changement de schéma ni réactivation du module nécessaire.
 - EN: Preselect external contacts marked as email recipients when opening a distribution email, preserving manual choices, excluding contacts without an email address and retaining the existing entity scope. No schema change or module reactivation is required.
 

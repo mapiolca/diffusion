@@ -189,8 +189,8 @@ class ActionsDiffusion
 		$raw = $db->escape($key);
 		$translated = $db->escape($label);
 		$sql = "UPDATE ".MAIN_DB_PREFIX."actioncomm";
-		$sql .= " SET label = '".$translated."', note_private = CASE";
-		$sql .= " WHEN BINARY note_private = '".$raw."' THEN '".$translated."' ELSE note_private END";
+		$sql .= " SET label = '".$translated."', note = CASE";
+		$sql .= " WHEN BINARY note = '".$raw."' THEN '".$translated."' ELSE note END";
 		$sql .= " WHERE entity = ".$entity;
 		$sql .= " AND BINARY label = '".$raw."'";
 		$sql .= " AND code = 'DIFFUSIONCONTACT_UPDATELINE'";

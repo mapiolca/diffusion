@@ -44,5 +44,5 @@ jobs:
       - run: php test/numbering.php test/.core/htdocs
       - run: php test/pdf_attachment_links.php test/.core/htdocs
       - run: php test/attachment_sharing.php test/.core/htdocs
-      - run: php test/agenda_labels.php
+      - run: php test/agenda_labels.php test/.core/htdocs
       - run: node test/attachment_upload.js
