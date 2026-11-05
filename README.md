@@ -1,6 +1,6 @@
 # Diffusion for Dolibarr ERP/CRM
 
-Version du code / Code version: **1.4.1** — 2026-11-05.
+Version du code / Code version: **1.4.2** — 2026-11-05.
 
 ## 🇫🇷 Français
 
