@@ -163,6 +163,43 @@ class ActionsDiffusion
 	}
 
 	/**
+	 * Repair only untranslated historical contact-update events during module setup.
+	 *
+	 * Uses the setup language for this entity; never rewrites personalized titles.
+	 * One atomic UPDATE, without triggers, notifications or new Agenda events.
+	 *
+	 * @param DoliDB $db Database handler
+	 * @param Translate $langs Setup language
+	 * @param int $entity Entity being initialized
+	 * @return int 1 on success, -1 on invalid context, missing translation or SQL failure
+	 */
+	public static function repairContactAgendaLabels($db, $langs, $entity)
+	{
+		$entity = (int) $entity;
+		if ($entity <= 0) {
+			return -1;
+		}
+		$key = 'Notify_DIFFUSIONCONTACT_UPDATELINE';
+		$langs->load('diffusion@diffusion');
+		$label = $langs->transnoentities($key);
+		if ($label === $key || trim($label) === '') {
+			return -1;
+		}
+
+		$raw = $db->escape($key);
+		$translated = $db->escape($label);
+		$sql = "UPDATE ".MAIN_DB_PREFIX."actioncomm";
+		$sql .= " SET label = '".$translated."', note_private = CASE";
+		$sql .= " WHEN BINARY note_private = '".$raw."' THEN '".$translated."' ELSE note_private END";
+		$sql .= " WHERE entity = ".$entity;
+		$sql .= " AND BINARY label = '".$raw."'";
+		$sql .= " AND code = 'DIFFUSIONCONTACT_UPDATELINE'";
+		$sql .= " AND elementtype IN ('diffusioncontact@diffusion', 'diffusion@diffusion')";
+
+		return $db->query($sql) ? 1 : -1;
+	}
+
+	/**
 	 * Return email template types exposed by the module.
 	 *
 	 * @return array<string,array<string,string>>
