@@ -42,6 +42,7 @@ jobs:
       - run: php test/mail_recipients.php test/.core/htdocs
       - run: php test/document_context.php test/.core/htdocs
       - run: php test/numbering.php test/.core/htdocs
+      - run: php test/cloning.php test/.core/htdocs
       - run: php test/pdf_attachment_links.php test/.core/htdocs
       - run: php test/attachment_sharing.php test/.core/htdocs
       - run: php test/agenda_labels.php test/.core/htdocs

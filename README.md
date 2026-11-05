@@ -245,3 +245,10 @@ Module translation files are available in:
 After deploying the Agenda label fix, disable and re-enable the Diffusion module through native module administration in each affected entity, using the language wanted for the historical titles. Existing module settings are retained by the module lifecycle. This repairs only events in that entity whose title is exactly `Notify_DIFFUSIONCONTACT_UPDATELINE`, with code `DIFFUSIONCONTACT_UPDATELINE` and the canonical or legacy Diffusion contact element type. The private description is translated only when it equals that same raw key; custom descriptions and titles remain intact. Repeating setup has no further effect. No event is deleted or created, and no notification is sent. A missing translation or database error fails setup rather than reporting a successful repair.
 
 Après déploiement du correctif, désactiver puis réactiver le module Diffusion depuis l’administration native des modules dans chaque entité concernée, dans la langue souhaitée pour les titres historiques. La réparation cible uniquement la clé brute exacte ci-dessus et conserve les titres et descriptions personnalisés. Elle est rejouable, sans création ni suppression d’événement, ni notification. Cette procédure reste à valider sur l’instance déployée.
+
+
+### Clonage / Cloning
+
+Un clone est créé en **Brouillon** avec la référence native **`(PROV{id})`**. Sa validation attribue la référence du modèle de numérotation configuré. Le clone d’une diffusion issue d’un modèle conserve `model_source`, le modèle documentaire et les données métier copiées ; il apparaît donc aussi parmi les diffusions générées de ce modèle source. La date et l’expéditeur d’envoi ainsi que le pointeur du document principal ne sont pas repris.
+
+Clones start as **Draft** with the native **`(PROV{id})`** reference. Validation assigns the configured numbering model's reference. Cloning a template-generated diffusion retains `model_source`, the document model and copied business data, so the clone also appears among that source template's generated diffusions. Dispatch date/sender and the source main-document pointer are cleared.

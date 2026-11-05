@@ -136,7 +136,7 @@ class Diffusion extends CommonObject
 	public $fields = array(
 		"rowid" => array("type" => "integer", "label" => "TechnicalID", "enabled" => "1", 'position' => 1, 'notnull' => 1, "visible" => "0", "noteditable" => "1", "index" => "1", "css" => "left", "comment" => "Id"),
 		"entity" => array("type" => "integer", "label" => "Entity", "enabled" => "isModEnabled('multicompany')", 'position' => 10, 'notnull' => 1, "visible" => "0", "default" => "1", "index" => "1"),
-		"ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "1", "index" => "1", "searchall" => "1", "showoncombobox" => "1", "validate" => "1", "comment" => "Reference of object"),
+		"ref" => array("type" => "varchar(128)", "label" => "Ref", "enabled" => "1", 'position' => 20, 'notnull' => 1, "visible" => "1", "index" => "1", "searchall" => "1", "showoncombobox" => "1", "validate" => "1", "default" => "(PROV)", "comment" => "Reference of object"),
 		"label" => array("type" => "varchar(255)", "label" => "Label", "enabled" => "1", 'position' => 30, 'notnull' => 0, "visible" => "1", "searchall" => "1", "css" => "minwidth300", "cssview" => "wordbreak", "help" => "label_help", "validate" => "1",),
 		"fk_project" => array("type" => "integer:Project:projet/class/project.class.php:1", "label" => "Project", "picto" => "project", "enabled" => "isModEnabled('project')", 'position' => 52, 'notnull' => -1, "visible" => "-1", "index" => "1", "css" => "maxwidth500 widthcentpercentminusxx", "csslist" => "tdoverflowmax150", "validate" => "1",),
 		"description" => array("type" => "html", "label" => "Description", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "3", "validate" => "1",),
@@ -491,8 +491,14 @@ class Diffusion extends CommonObject
 	 */
 	public function createFromClone(User $user, $fromid)
 	{
-		global $langs, $extrafields;
+		global $langs, $extrafields, $conf;
 		$error = 0;
+		require_once __DIR__.'/diffusionattachments.class.php';
+		$langs->load('diffusion@diffusion');
+		if (!isModEnabled('diffusion') || !$user->hasRight('diffusion', 'diffusiondoc', 'write')) {
+			$this->error = $langs->trans('NotEnoughPermissions');
+			return -1;
+		}
 
 		dol_syslog(__METHOD__, LOG_DEBUG);
 
@@ -502,7 +508,17 @@ class Diffusion extends CommonObject
 
 		// Load source object
 		$result = $object->fetchCommon($fromid);
-		if ($result > 0 && !empty($object->table_element_line)) {
+		if ($result <= 0) {
+			$this->setErrorsFromObject($object);
+			$this->db->rollback();
+			return -1;
+		}
+		if (!DiffusionAttachments::checkObjectScope($object, $user) || !empty($object->is_template)) {
+			$this->error = $langs->trans('NotEnoughPermissions');
+			$this->db->rollback();
+			return -1;
+		}
+		if (!empty($object->table_element_line)) {
 			$object->fetchLines();
 		}
 
@@ -511,13 +527,15 @@ class Diffusion extends CommonObject
 		//	$line->fetch_optionals();
 
 		// Reset some properties
+		$object->entity = (int) $conf->entity;
 		unset($object->id);
 		unset($object->fk_user_creat);
 		unset($object->import_key);
 
 		// Clear fields
 		if (property_exists($object, 'ref')) {
-			$object->ref = empty($this->fields['ref']['default']) ? "Copy_Of_".$object->ref : $this->fields['ref']['default'];
+			// CommonObject assigns (PROV{id}) from the native field default.
+			$object->ref = $object->fields['ref']['default'];
 		}
 		if (property_exists($object, 'label')) {
 			$object->label = empty($this->fields['label']['default']) ? $langs->trans("CopyOf")." ".$object->label : $this->fields['label']['default'];
@@ -531,7 +549,12 @@ class Diffusion extends CommonObject
 		if (property_exists($object, 'date_modification')) {
 			$object->date_modification = null;
 		}
-		// ...
+		$object->date_expedition = null;
+		$object->fk_user_exped = null;
+		$object->fk_user_modif = null;
+		$object->last_main_doc = '';
+		// Keep model_source and model_pdf from the source: this remains a generated
+		// diffusion of the same template, counted by the existing model_source query.
 		// Clear extrafields that are unique
 		if (is_array($object->array_options) && count($object->array_options) > 0) {
 			$extrafields->fetch_name_optionals_label($this->table_element);
