@@ -34,7 +34,7 @@ try {
 		packageCheck($status === 0, 'Cannot enumerate tracked package files: '.$error);
 		$zip = new ZipArchive(); packageCheck($zip->open($zipfile, ZipArchive::CREATE) === true, 'Cannot create ZIP');
 		foreach (explode("\0", $files) as $file) {
-			if ($file === '' || strpos($file, '.github/') === 0) { continue; }
+			if ($file === '' || strpos($file, '.github/') === 0 || $file === 'test/packaging.php') { continue; }
 			packageCheck($zip->addFile($root.'/'.$file, 'diffusion/'.$file), 'Cannot add '.$file);
 		}
 		$zip->close();
