@@ -42,7 +42,7 @@ foreach (array(1, 2) as $entity) {
 	$object->last_main_doc = 'unusable/old.pdf';
 	$fileparams = array();
 	eval($lookup);
-	checkAttachment(str_replace('\\', '/', $file), str_replace('\\', '/', $pdf), 'Mail finds the owner letter despite a stale last_main_doc');
+	checkAttachment(str_replace('\\', '/', (string) $file), str_replace('\\', '/', $pdf), 'Mail finds the owner letter despite a stale last_main_doc');
 	$trackid = 'diffusion'.$object->id;
 	$formmail->trackid = $trackid;
 	$formmail->add_attached_files($pdf);
@@ -70,7 +70,23 @@ foreach (array(1, 2) as $entity) {
 	$hidedetails = $hidedesc = $hideref = 0;
 	$_POST = $_REQUEST = array();
 	eval($build);
-	checkAttachment(str_replace('\\', '/', $file), str_replace('\\', '/', $pdf), 'Mail finds the letter after generation in the owner directory');
+	checkAttachment(str_replace('\\', '/', (string) $file), str_replace('\\', '/', $pdf), 'Mail finds the letter after generation in the owner directory');
+	// The bundled ODT generator appends the template name and optional timestamp.
+	foreach (array('_letter.odt', '_letter-20261105103000.odt', '_letter.ods') as $suffix) {
+		unlink($pdf);
+		$odt = $directory.'/'.dol_sanitizeFileName($object->ref).$suffix;
+		file_put_contents($odt, 'Generated template letter');
+		$fileparams = array();
+		eval($lookup);
+		checkAttachment(str_replace('\\', '/', (string) $file), str_replace('\\', '/', $odt), 'Composer finds template-suffixed office letters');
+		// Exercise the same lookup after generation as well.
+		$generatedlookupstart = strpos($build, "if (\$object->element === 'diffusiondoc')");
+		$generatedlookupend = strpos($build, '$file = isset', $generatedlookupstart);
+		eval(substr($build, $generatedlookupstart, $generatedlookupend - $generatedlookupstart));
+		checkAttachment(str_replace('\\', '/', $fileparams['fullname']), str_replace('\\', '/', $odt), 'Post-generation lookup finds template-suffixed office letters');
+		unlink($odt);
+		file_put_contents($pdf, 'Generated letter');
+	}
 	clearAttachmentFixture();
 }
 echo ($checks - $startchecks)." mail attachment assertions passed; native FormMail and disposable files.\n";

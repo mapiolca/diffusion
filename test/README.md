@@ -137,3 +137,6 @@ All **six pinned CI jobs** passed on `f531a64` ([run 39921834297](https://github
 `php test/mail_agenda_documents.php <Dolibarr htdocs>` executes the unmodified native `MAIN_COPY_FILE_IN_EVENT_AUTO` file-transfer block extracted from the supplied core, after a simulated successful mail/Agenda insertion. It checks the canonical object destination, preservation of the sent PDF bytes, owning entity 2 while consulting entity 1, unchanged module roots and global option, and repeated hook initialization. The native destination mismatch was reproduced before the alias fix. Older cores copy into Agenda storage; newer cores attempt a move into the object's directory, which must match Diffusion's canonical layout. These tests do not send email or execute a complete Agenda transaction.
 
 The fix prevents future displacement. It does not automatically recover historical files from the flat directory; their identity, owning entity, contents and collisions must be checked before any recovery. The reported production incident still requires verification of the active global setting, deployed code and actual file locations.
+
+
+The mail lookup regression additionally covers template-suffixed ODT and ODS files, including timestamped names, in both initial and post-generation lookup. The exact-name-only pattern was reproduced failing before this correction (PR #27 review).

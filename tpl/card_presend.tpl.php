@@ -79,7 +79,7 @@ if ($action == 'presend') {
 			if ($maildocumentdir === '') {
 				accessforbidden($langs->trans('DiffusionDocumentDirectoryUnavailable'));
 			}
-			$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'\.(pdf|odt)$');
+			$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'(\.pdf|(_.+)?\.(odt|ods))$');
 		} elseif (!empty($object->last_main_doc) && is_readable(DOL_DATA_ROOT.'/'.$object->last_main_doc) && is_file(DOL_DATA_ROOT.'/'.$object->last_main_doc)) {
 			$fileparams['fullname'] = DOL_DATA_ROOT.'/'.$object->last_main_doc;
 		} else {
@@ -151,7 +151,7 @@ if ($action == 'presend') {
 				exit();
 			}
 			if ($object->element === 'diffusiondoc') {
-				$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'\.(pdf|odt)$');
+				$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'(\.pdf|(_.+)?\.(odt|ods))$');
 			} elseif ($object->element == 'invoice_supplier') {
 				$fileparams = dol_most_recent_file($diroutput.'/'.get_exdir($object->id, 2, 0, 0, $object, $object->element).$ref, preg_quote($ref, '/').'([^\-])+');
 			} else {
