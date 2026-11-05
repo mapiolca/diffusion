@@ -126,6 +126,11 @@ The normal per-diffusion repair action was also submitted afterward. A later fre
 
 All **six pinned CI jobs** passed on `f531a64` ([run 39921834297](https://github.com/mapiolca/diffusion/actions/runs/39921834297)), including **246 attachment assertions** per core revision. PHP 8.4.22 syntax/local fixtures passed. PHPStan remains unavailable; no analysis level or baseline was changed. Anonymous access previously showed the Dolibarr login screen; non-admin account and live missing-token refusal were not executed. After repair, browser screenshot capture became available and confirmed the persisted source 21; review images are not committed.
 
+# Historical Agenda label repair
+
+Run `php -d extension=pdo_sqlite test/agenda_labels.php` (omit the extension flag if already enabled). The test executes the real repair method against disposable SQLite fixtures using the shipped French/English catalogues. Only MySQL unary `BINARY` is adapted to SQLite binary collation; database and language services are test doubles, not a live Dolibarr/MySQL integration. It checks canonical/legacy element types, exact keys (including case), other entities/codes/elements, personalized titles and notes, null notes, unchanged relationships, idempotence, invalid entity, missing translation and database failure. The CI runs it in the existing PHP 8.0–8.4/core matrix; that does not constitute a live migration test on each core.
+
+Activation calls this single atomic repair after trigger registration for the current entity. Repeat activation separately for each affected entity using its intended historical-label language. No instance repair, deployment, notification or real event creation was performed during local verification. The regression fixes the label and the private description only when it is the same raw key; all other columns are left unchanged by the UPDATE (normal database modification timestamps may advance).
 
 ## Mail letter lookup and non-destructive removal
 

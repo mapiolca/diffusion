@@ -882,6 +882,8 @@ class DiffusionContact extends CommonObject
 		$this->fetch($id);
 
 		if (!$notrigger) {
+			// Ajax callers do not necessarily load the module catalogue.
+			$langs->load('diffusion@diffusion');
 			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
 			$interface = new Interfaces($this->db);
 			$result = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
