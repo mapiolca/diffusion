@@ -884,9 +884,15 @@ class DiffusionContact extends CommonObject
 		if (!$notrigger) {
 			// Ajax callers do not necessarily load the module catalogue.
 			$langs->load('diffusion@diffusion');
+			$this->context['actionmsg2'] = $langs->transnoentities('Notify_DIFFUSIONCONTACT_UPDATELINE');
+			$this->context['actionmsg'] = $this->context['actionmsg2'];
 			include_once DOL_DOCUMENT_ROOT.'/core/class/interfaces.class.php';
 			$interface = new Interfaces($this->db);
-			$result = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
+			try {
+				$result = $interface->run_triggers('DIFFUSIONCONTACT_UPDATELINE', $this, $user, $langs, $conf);
+			} finally {
+				unset($this->context['actionmsg2'], $this->context['actionmsg']);
+			}
 			if ($result < 0) {
 				$this->errors = $interface->errors;
 				$this->error = !empty($interface->error) ? $interface->error : implode(', ', $this->errors);

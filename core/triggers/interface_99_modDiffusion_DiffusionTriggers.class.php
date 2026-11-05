@@ -70,12 +70,16 @@ class InterfaceDiffusionTriggers extends DolibarrTriggers
 			case 'DIFFUSION_DELETE':
 			case 'DIFFUSIONCONTACT_INSERT':
 			case 'DIFFUSIONCONTACT_DELETELINE':
-			case 'DIFFUSIONCONTACT_UPDATELINE':
 			case 'DIFFUSIONCONTACT_DELETEALL':
 				$result = $this->createAgendaEvent($action, $object, $user, $langs, $conf);
 				if ($result < 0) {
 					return -1;
 				}
+				return 0;
+
+			case 'DIFFUSIONCONTACT_UPDATELINE':
+				// The configured native Agenda trigger owns this event; its translated
+				// label/description are supplied by updateStatusField(), without a duplicate.
 				return 0;
 
 			case 'DIFFUSION_SENDMAIL':

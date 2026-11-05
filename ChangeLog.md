@@ -2,6 +2,9 @@
 
 ## 1.4.1 (2026-11-05)
 
+- FR : Les changements de statut d’un contact transmettent leur libellé traduit à l’Agenda natif et ne créent plus un second événement manuel pour la même modification. Les doublons historiques restent à examiner séparément.
+- EN: Contact status changes supply translated text to native Agenda and no longer create a second manual event for the same update. Historical duplicates require separate review.
+
 - FR : Envoi de copies temporaires via FormMail pour conserver les originaux même si l’Agenda déplace les pièces jointes après SMTP ; répertoire temporaire utilisateur natif, refus de l’envoi si la copie échoue.
 - EN: Send temporary copies through FormMail to retain originals even when Agenda moves attachments after SMTP; use native user temporary storage and refuse sending if copying fails.
 
