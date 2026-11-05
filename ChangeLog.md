@@ -2,6 +2,9 @@
 
 ## 1.4.3 (2026-11-05)
 
+- FR : Correctif de paquet 1.4.3 : chargement de Dolibarr par tentatives explicites dans le diagnostic documentaire, compatible avec le validateur natif et les installations sous `htdocs` ou `custom`. Le ZIP corrigé est identifié séparément du tag 1.4.3 initial.
+- EN: 1.4.3 package correction: explicit Dolibarr bootstrap attempts in the document diagnostic, compatible with native validation and installations under `htdocs` or `custom`. The corrected ZIP is identified separately from the original 1.4.3 tag.
+
 - FR : Un clone est créé en Brouillon avec la référence provisoire native `(PROV{id})` ; sa validation applique le modèle de numérotation configuré au lieu de conserver une référence `Copy_Of_…`.
 - EN: Clones start as Draft with the native `(PROV{id})` provisional reference; validation applies the configured numbering model instead of retaining a `Copy_Of_…` reference.
 - FR : Le clone d’une diffusion issue d’un modèle conserve `model_source`, le modèle documentaire et les données métier copiées ; il est comptabilisé parmi les diffusions générées du même modèle source.

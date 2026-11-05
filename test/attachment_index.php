@@ -8,10 +8,12 @@ $res = 0;
 if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT']) && is_file($_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php')) {
 	$res = include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
-foreach (array(__DIR__.'/../../main.inc.php', __DIR__.'/../../../main.inc.php', __DIR__.'/../../../../main.inc.php') as $bootstrap) {
-	if (!$res && is_file($bootstrap)) {
-		$res = include $bootstrap;
-	}
+// Explicit attempts are required both by runtime layout and native package validation.
+if (!$res && is_file(__DIR__.'/../../main.inc.php')) {
+	$res = include __DIR__.'/../../main.inc.php';
+}
+if (!$res && is_file(__DIR__.'/../../../main.inc.php')) {
+	$res = include __DIR__.'/../../../main.inc.php';
 }
 if (!$res) {
 	http_response_code(503);
