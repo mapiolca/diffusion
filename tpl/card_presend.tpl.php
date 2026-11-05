@@ -422,9 +422,13 @@ if ($action == 'presend') {
 	}
 
 	// Add entity contacts for diffusion recipient selector.
+	$defaultreceivers = array();
 	if ($object->element === 'diffusiondoc') {
 		$sharescopecontacts = (int) getDolGlobalInt('DIFFUSION_FULLACCESS_CONTACT');
 		$sql = 'SELECT sp.rowid, sp.firstname, sp.lastname, sp.email, s.nom as company';
+		$sql .= ', EXISTS (SELECT dc.rowid FROM '.MAIN_DB_PREFIX.'diffusion_contact as dc';
+		$sql .= ' WHERE dc.fk_diffusion = '.((int) $object->id);
+		$sql .= " AND dc.contact_source = 'external' AND dc.fk_contact = sp.rowid AND dc.mail_status = 1) as mail_recipient";
 		$sql .= ' FROM '.MAIN_DB_PREFIX.'socpeople as sp';
 		$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'societe as s ON s.rowid = sp.fk_soc';
 		$sql .= ' WHERE sp.entity IN ('.getEntity('socpeople', $sharescopecontacts, $object).')';
@@ -442,9 +446,20 @@ if ($action == 'presend') {
 					$contactlabel = $obj->company.' - '.$contactlabel;
 				}
 				$liste[(int) $obj->rowid] = $contactlabel.' <'.$obj->email.'>';
+				if ((int) $obj->mail_recipient === 1) {
+					$defaultreceivers[] = (string) $obj->rowid;
+				}
 			}
 		}
 
+	}
+
+	// Seed native FormMail only on opening; submitted selections (including none) remain authoritative.
+	if ($object->element === 'diffusiondoc' && GETPOST('mode', 'aZ09') === 'init'
+		&& $_SERVER['REQUEST_METHOD'] === 'GET' && !GETPOSTISSET('receiver') && !GETPOSTISSET('sendto')) {
+		// A blank selection also prevents FormMail from selecting a sole, unmarked contact.
+		$_POST['receiver'] = $defaultreceivers ?: array('');
+		$_REQUEST['receiver'] = $_POST['receiver'];
 	}
 
 	$formmail->withto = $liste;
