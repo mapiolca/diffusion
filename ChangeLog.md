@@ -1,5 +1,16 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.2 (2026-11-05)
+
+- FR : Publication du correctif complet de conservation des lettres après envoi : copies temporaires FormMail pour le traitement Agenda, conservation des originaux et refus de l’envoi si la copie échoue. Aucun correctif du core ni changement global de configuration.
+- EN: Release the complete post-email letter preservation fix: temporary FormMail copies for Agenda processing, preserved originals and sending refused if copying fails. No core patch or global configuration change.
+- FR : Présélection des contacts destinataires à l’ouverture du mail et conservation des choix manuels ; événement unique et traduit pour les changements de statut des contacts.
+- EN: Preselect marked recipients when opening email and preserve manual choices; contact status changes create one translated native Agenda event.
+- FR : Réparation ciblée des libellés Agenda historiques à l’initialisation par entité, utilisant la colonne SQL native `note`, avec conservation des textes personnalisés. Les PDF déjà déplacés et doublons historiques ne sont pas corrigés automatiquement.
+- EN: Targeted historical Agenda label repair during per-entity initialization, using native SQL column `note` and preserving customized content. Previously moved PDFs and historical duplicates are not automatically repaired.
+- FR : Cette version inclut les compléments fusionnés après le tag 1.4.1 (`9fff081`), qui reste inchangé. La recette develop et la matrice CI Dolibarr 20–25-alpha sont documentées dans `test/README.md` et la PR #27 ; PHPStan n’a pas été exécuté.
+- EN: Includes follow-up fixes merged after tag 1.4.1 (`9fff081`), which remains unchanged. Develop acceptance and Dolibarr 20–25-alpha CI coverage are documented in `test/README.md` and PR #27; PHPStan was not run.
+
 ## 1.4.1 (2026-11-05)
 
 - FR : Réparation ciblée des anciens libellés Agenda restés sous forme de clé de traduction, avec conservation des titres et descriptions personnalisés et du périmètre d’entité. La réparation s’exécute à l’initialisation du module, dans la langue choisie pour cette entité.
