@@ -1016,8 +1016,17 @@ class ActionsDiffusion
 			$conf->diffusiondoc = new stdClass();
 		}
 		$conf->diffusiondoc->enabled = isModEnabled('diffusion') ? 1 : 0;
-		$conf->diffusiondoc->multidir_output = $conf->diffusion->multidir_output;
-		$conf->diffusiondoc->dir_output = $conf->diffusion->multidir_output[$entity];
+		// Generic native consumers resolve the object element, not the module key.
+		// Match the canonical diffusion/diffusiondoc/<ref>/ layout so Agenda never
+		// moves an already stored letter to the legacy flat directory after SMTP.
+		$conf->diffusiondoc->multidir_output = array();
+		foreach ($conf->diffusion->multidir_output as $ownerentity => $directory) {
+			if (is_string($directory) && trim($directory) !== '' && strpos($directory, 'error-') !== 0) {
+				$conf->diffusiondoc->multidir_output[$ownerentity] = rtrim($directory, '/\\').'/diffusiondoc';
+			}
+		}
+		$conf->diffusiondoc->dir_output = isset($conf->diffusiondoc->multidir_output[$entity])
+			? $conf->diffusiondoc->multidir_output[$entity] : '';
 		return $conf->diffusion->multidir_output[$entity];
 	}
 

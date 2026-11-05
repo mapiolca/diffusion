@@ -73,7 +73,14 @@ if ($action == 'presend') {
 	if (!in_array($object->element, array('user', 'member'))) {
 		//$fileparams['fullname'] can be filled from the card
 		//Get also the main_lastdoc field of $object. If not found, try to guess with following code
-		if (!empty($object->last_main_doc) && is_readable(DOL_DATA_ROOT.'/'.$object->last_main_doc) && is_file(DOL_DATA_ROOT.'/'.$object->last_main_doc)) {
+		if ($object->element === 'diffusiondoc') {
+			// Use the owning entity and the same directory as generation and attached files.
+			$maildocumentdir = diffusionGetDocumentUploadDir($object);
+			if ($maildocumentdir === '') {
+				accessforbidden($langs->trans('DiffusionDocumentDirectoryUnavailable'));
+			}
+			$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'(\.pdf|(_.+)?\.(odt|ods))$');
+		} elseif (!empty($object->last_main_doc) && is_readable(DOL_DATA_ROOT.'/'.$object->last_main_doc) && is_file(DOL_DATA_ROOT.'/'.$object->last_main_doc)) {
 			$fileparams['fullname'] = DOL_DATA_ROOT.'/'.$object->last_main_doc;
 		} else {
 			include_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
@@ -143,7 +150,9 @@ if ($action == 'presend') {
 				dol_print_error($db, $object->error, $object->errors);
 				exit();
 			}
-			if ($object->element == 'invoice_supplier') {
+			if ($object->element === 'diffusiondoc') {
+				$fileparams = dol_most_recent_file($maildocumentdir, '^'.preg_quote($ref, '/').'(\.pdf|(_.+)?\.(odt|ods))$');
+			} elseif ($object->element == 'invoice_supplier') {
 				$fileparams = dol_most_recent_file($diroutput.'/'.get_exdir($object->id, 2, 0, 0, $object, $object->element).$ref, preg_quote($ref, '/').'([^\-])+');
 			} else {
 				$fileparams = dol_most_recent_file($diroutput.'/'.$ref, preg_quote($ref, '/').'[^\-]+');

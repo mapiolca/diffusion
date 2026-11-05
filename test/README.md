@@ -131,3 +131,17 @@ All **six pinned CI jobs** passed on `f531a64` ([run 39921834297](https://github
 Run `php -d extension=pdo_sqlite test/agenda_labels.php` (omit the extension flag if already enabled). The test executes the real repair method against disposable SQLite fixtures using the shipped French/English catalogues. Only MySQL unary `BINARY` is adapted to SQLite binary collation; database and language services are test doubles, not a live Dolibarr/MySQL integration. It checks canonical/legacy element types, exact keys (including case), other entities/codes/elements, personalized titles and notes, null notes, unchanged relationships, idempotence, invalid entity, missing translation and database failure. The CI runs it in the existing PHP 8.0–8.4/core matrix; that does not constitute a live migration test on each core.
 
 Activation calls this single atomic repair after trigger registration for the current entity. Repeat activation separately for each affected entity using its intended historical-label language. No instance repair, deployment, notification or real event creation was performed during local verification. The regression fixes the label and the private description only when it is the same raw key; all other columns are left unchanged by the UPDATE (normal database modification timestamps may advance).
+
+## Mail letter lookup and non-destructive removal
+
+`php test/mail_attachments.php <Dolibarr htdocs>` executes the card removal and composer lookup blocks with native `FormMail`, disposable files and simulated object/database fixtures. It checks two owning entities, stale `last_main_doc`, exclusion of ZIP attachments from letter lookup, lookup after simulated generation, individual/global removal, unchanged PDF bytes and forged tracking IDs. No email is sent. PDO SQLite is required. This does not replace browser validation on the deployed revision.
+
+
+## Post-mail Agenda document preservation — 1.4.1
+
+`php test/mail_agenda_documents.php <Dolibarr htdocs>` executes the unmodified native `MAIN_COPY_FILE_IN_EVENT_AUTO` file-transfer block extracted from the supplied core, after a simulated successful mail/Agenda insertion. It checks the canonical object destination, preservation of the sent PDF bytes, owning entity 2 while consulting entity 1, unchanged module roots and global option, and repeated hook initialization. The native destination mismatch was reproduced before the alias fix. Older cores copy into Agenda storage; newer cores attempt a move into the object's directory, which must match Diffusion's canonical layout. These tests do not send email or execute a complete Agenda transaction.
+
+The fix prevents future displacement. It does not automatically recover historical files from the flat directory; their identity, owning entity, contents and collisions must be checked before any recovery. The reported production incident still requires verification of the active global setting, deployed code and actual file locations.
+
+
+The mail lookup regression additionally covers template-suffixed ODT and ODS files, including timestamped names, in both initial and post-generation lookup. The exact-name-only pattern was reproduced failing before this correction (PR #27 review).
