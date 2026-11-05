@@ -1,5 +1,16 @@
 # CHANGELOG MODULE DIFFUSION FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 1.4.3 (2026-11-05)
+
+- FR : Un clone est créé en Brouillon avec la référence provisoire native `(PROV{id})` ; sa validation applique le modèle de numérotation configuré au lieu de conserver une référence `Copy_Of_…`.
+- EN: Clones start as Draft with the native `(PROV{id})` provisional reference; validation applies the configured numbering model instead of retaining a `Copy_Of_…` reference.
+- FR : Le clone d’une diffusion issue d’un modèle conserve `model_source`, le modèle documentaire et les données métier copiées ; il est comptabilisé parmi les diffusions générées du même modèle source.
+- EN: Cloning a template-generated diffusion preserves `model_source`, the document model and copied business data; the clone is counted among the same source template’s generated diffusions.
+- FR : La date et l’expéditeur d’envoi, l’auteur de modification et le pointeur du document principal de la source sont réinitialisés sur le nouveau brouillon. Les sources inexistantes, modèles ou hors du périmètre autorisé sont refusées.
+- EN: Dispatch date/sender, modification author and the source main-document pointer are cleared on the new draft. Missing sources, templates themselves and unauthorized sources are rejected.
+- FR : Aucun changement de schéma ni réactivation nécessaire. Les références `Copy_Of_…` historiques ne sont pas modifiées automatiquement. Recette develop et CI Dolibarr 20–25-alpha documentées dans la PR #31 ; PHPStan indisponible.
+- EN: No schema change or module reactivation required. Existing historical `Copy_Of_…` references are not modified automatically. Develop acceptance and Dolibarr 20–25-alpha CI are documented in PR #31; PHPStan unavailable.
+
 ## 1.4.2 (2026-11-05)
 
 - FR : Publication du correctif complet de conservation des lettres après envoi : copies temporaires FormMail pour le traitement Agenda, conservation des originaux et refus de l’envoi si la copie échoue. Aucun correctif du core ni changement global de configuration.
