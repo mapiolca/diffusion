@@ -5,8 +5,8 @@ require __DIR__.'/attachments.php';
 require_once __DIR__.'/../class/actions_diffusion.class.php';
 class MailAgendaDiffusion extends Diffusion
 {
-	/** @var array{paths:list<string>,names:list<string>,mimes:list<string>} */
 	public $failtrigger = false;
+	/** @var array{paths:list<string>,names:list<string>,mimes:list<string>} */
 	public $attachedfiles = array('paths' => array(), 'names' => array(), 'mimes' => array());
 }
 $startchecks = $checks;
@@ -48,6 +48,9 @@ foreach (array(1, 2) as $entity) {
 	$object->attachedfiles = array('paths' => array($pdf), 'names' => array($name), 'mimes' => array('application/pdf'));
 	$conf->agenda = (object) array('dir_output' => DOL_DATA_ROOT.'/agenda');
 	$conf->global->MAIN_COPY_FILE_IN_EVENT_AUTO = '1';
+	// Native email preparation may reload configuration after object construction.
+	$conf->diffusiondoc->multidir_output = $base;
+	$object->call_trigger('DIFFUSION_SENDMAIL', $user);
 	$ret = 1; // Successful Agenda insertion; exercise its actual file-transfer block only.
 	eval($transfer);
 	checkAttachment(is_file($pdf), true, 'Successful post-mail Agenda handling preserves the letter');

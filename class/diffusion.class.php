@@ -300,6 +300,21 @@ class Diffusion extends CommonObject
 	}
 
 	/**
+	 * Refresh the element alias after mail substitutions and before native triggers.
+	 *
+	 * @param string $triggerName Trigger code
+	 * @param User|null $user Actor
+	 * @return int
+	 */
+	public function call_trigger($triggerName, $user)
+	{
+		if ($triggerName === 'DIFFUSION_SENDMAIL') {
+			self::initDocumentOutputDirectories();
+		}
+		return parent::call_trigger($triggerName, $user);
+	}
+
+	/**
 	 * Create object into database
 	 *
 	 * @param	User		$user		User that creates
