@@ -220,6 +220,7 @@ class Diffusion extends CommonObject
                 global $conf, $langs;
 
                 $this->db = $db;
+		self::initDocumentOutputDirectories();
 
 		// Keep backward compatibility for instances not reinitialized after permission key rename.
 		static $diffusionRightsMigrationDone = false;
@@ -270,6 +271,32 @@ class Diffusion extends CommonObject
 				}
 			}
 		}
+	}
+
+	/**
+	 * Register the native element directory before any mail trigger can run.
+	 * Does not depend on persisted hooks or change the module document roots.
+	 *
+	 * @return void
+	 */
+	public static function initDocumentOutputDirectories()
+	{
+		global $conf;
+
+		if (!isset($conf->diffusion->multidir_output) || !is_array($conf->diffusion->multidir_output)) {
+			return;
+		}
+		if (!isset($conf->diffusiondoc) || !is_object($conf->diffusiondoc)) {
+			$conf->diffusiondoc = new stdClass();
+		}
+		$conf->diffusiondoc->enabled = isModEnabled('diffusion') ? 1 : 0;
+		$conf->diffusiondoc->multidir_output = array();
+		foreach ($conf->diffusion->multidir_output as $ownerentity => $directory) {
+			if (is_string($directory) && trim($directory) !== '' && strpos($directory, 'error-') !== 0) {
+				$conf->diffusiondoc->multidir_output[$ownerentity] = rtrim($directory, '/\\').'/diffusiondoc';
+			}
+		}
+		$conf->diffusiondoc->dir_output = $conf->diffusiondoc->multidir_output[(int) $conf->entity] ?? '';
 	}
 
 	/**

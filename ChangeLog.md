@@ -2,6 +2,9 @@
 
 ## 1.4.1 (2026-11-05)
 
+- FR : Initialisation du répertoire documentaire natif dès la construction de l’objet, afin de conserver le PDF après envoi même lorsque les hooks ne sont pas chargés ; test de régression sans initialisation préalable du hook.
+- EN: Initialize the native document directory when constructing the object to retain the PDF after sending even without loaded hooks; regression coverage starts without a hook instance.
+
 - FR : Recherche de la lettre dans le répertoire documentaire de l’entité propriétaire lors de la préparation du mail, y compris après génération, sans sélectionner une archive ZIP à sa place ; prise en charge des noms ODT/ODS incluant le modèle et un horodatage.
 - EN: Find the letter in its owning entity's document directory when composing email, including after generation, without selecting a ZIP archive instead; support ODT/ODS filenames containing the template name and a timestamp.
 - FR : Le retrait individuel ou global des pièces jointes du mail conserve les fichiers sur disque et ne modifie que la sélection du message. Aucun changement de schéma ni réactivation du module nécessaire.
@@ -9,6 +12,8 @@
 
 - FR : Conservation de la lettre après envoi lorsque la copie des pièces jointes dans les événements Agenda est activée : alignement du répertoire natif de l’objet sur le rangement documentaire Diffusion, sans modifier le réglage global. Les PDF déjà déplacés ne sont pas restaurés automatiquement.
 - EN: Preserve the letter after email delivery when automatic Agenda attachment copying is enabled by aligning the native object directory with Diffusion document storage, without changing the global option. Previously moved PDFs are not restored automatically.
+- FR : Présélection des contacts externes destinataires par mail à l’ouverture du formulaire d’envoi d’une diffusion, avec conservation des choix manuels, exclusion des contacts sans adresse et respect du périmètre d’entités existant. Aucun changement de schéma ni réactivation du module nécessaire.
+- EN: Preselect external contacts marked as email recipients when opening a distribution email, preserving manual choices, excluding contacts without an email address and retaining the existing entity scope. No schema change or module reactivation is required.
 
 ## 1.4.0 (2026-10-23)
 
